@@ -2,13 +2,31 @@
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/github?repo=https://github.com/pcelebrado/openclaw-template)
 
-OpenClaw is a monorepo Railway template with three services:
+OpenClaw is a monorepo template for a three-service Railway architecture with a
+single public entry point.
 
-- `web` - Next.js public application
-- `core` - internal OpenClaw wrapper service
-- `mongo` - internal MongoDB replica set service
+## Services
 
-## Repository Layout
+- `web` — Next.js app (public)
+- `core` — OpenClaw internal runtime and integrations (internal-only)
+- `mongo` — MongoDB replica set (internal-only)
+
+## Architecture
+
+```text
+Public Internet
+      |
+      v
+[web] (public)
+  | \
+  |  +--> [mongo] (internal)
+  +-----> [core]  (internal)
+```
+
+Boundary rule: browsers talk only to `web`. `core` and `mongo` stay private on
+Railway internal networking.
+
+## Monorepo Layout
 
 ```text
 openclaw-template/
@@ -18,49 +36,77 @@ openclaw-template/
 │   └── mongo/
 ├── railway.json
 ├── README.md
-├── LICENSE
-└── .github/
+└── LICENSE
 ```
 
-## Architecture
+## Railway Setup
 
-```text
-Public Internet
-      |
-      v
-[web (public)]
-   |        \
-   v         v
-[core]    [mongo]
-(internal) (internal)
-```
-
-## Railway Service Setup
-
-Create three services in one Railway project using this repository:
+Create three Railway services from this repository:
 
 1. `web`
    - Root directory: `services/web`
+   - Config path: `/services/web/railway.toml`
    - Public networking: enabled
 2. `core`
    - Root directory: `services/core`
+   - Config path: `/services/core/railway.toml`
    - Public networking: disabled
-   - Volume mount path: `/data`
+   - Required volume mount: `/data`
 3. `mongo`
    - Root directory: `services/mongo/nodes`
+   - Dockerfile: `services/mongo/nodes/Dockerfile`
    - Public networking: disabled
 
-## Required Environment Variables
+## Environment Reference
 
-Set environment variables per service from each service's `.env.example` file.
+Set variables per service using each service's `.env.example` as the baseline.
 
-At minimum, keep these contracts aligned across services:
+### web
 
-- `web` and `core` must share the same `INTERNAL_SERVICE_TOKEN`
-- `web` must use internal hostnames for `INTERNAL_CORE_BASE_URL` and `MONGODB_URI`
+- `MONGODB_URI` (internal connection string)
+- `INTERNAL_CORE_BASE_URL` (internal core URL)
+- `INTERNAL_SERVICE_TOKEN` (must match core)
+- `AUTH_SECRET`
+- `AUTH_URL`
+
+### core
+
+- `INTERNAL_SERVICE_TOKEN` (must match web)
+- `SETUP_PASSWORD`
+- `OPENCLAW_STATE_DIR` (`/data/.openclaw`)
+- `OPENCLAW_WORKSPACE_DIR` (`/data/workspace`)
+
+### mongo
+
+- `REPLICA_SET_NAME`
+- `MONGO_INITDB_ROOT_USERNAME`
+- `MONGO_INITDB_ROOT_PASSWORD`
+
+Never commit real secrets.
+
+## Local Development
+
+```bash
+# web
+cd services/web
+npm install
+npm run dev
+```
+
+```bash
+# web production build check
+cd services/web
+npm run build
+```
+
+```bash
+# container build checks
+docker build -f services/web/Dockerfile services/web
+docker build -f services/core/Dockerfile services/core
+docker build -f services/mongo/nodes/Dockerfile services/mongo/nodes
+```
 
 ## Notes
 
-- Only `web` is intended to be publicly reachable.
-- `core` and `mongo` must remain internal-only.
-- This template provides code scaffolding and configuration only.
+- This template is configuration and code scaffolding only.
+- No deployment action is required for local validation.

@@ -1,52 +1,104 @@
-/**
- * Login + onboarding page.
- * UI Foundation §5.1 item 6.
- *
- * Scaffold only. MVP-hardened login pattern will be implemented with Auth.js.
- * This shell provides the route and intentional empty state.
- */
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (!response.ok) {
+        setError(payload.error?.message ?? 'Login failed.');
+        return;
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch {
+      setError('Login failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-[calc(100vh-57px)] items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-center text-2xl font-semibold tracking-tight">
-          Sign in
-        </h1>
-        <p className="mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400">
-          Authentication will be configured during deployment.
-        </p>
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl">Sign in</CardTitle>
+          <CardDescription>Book-first learning access for OpenClaw.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form className="space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
 
-        {/* Placeholder form — no auth wiring yet */}
-        <div className="mt-8 space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-xs font-medium text-neutral-600 dark:text-neutral-400"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              disabled
-              placeholder="you@example.com"
-              className="mt-1 w-full rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm placeholder:text-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-600"
-            />
-          </div>
-          <button
-            type="button"
-            disabled
-            className="w-full rounded bg-neutral-900 px-3 py-2 text-sm font-medium text-white opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          >
-            Continue
-          </button>
-        </div>
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
 
-        <p className="mt-6 text-center text-xs text-neutral-400">
-          Auth provider will be selected at deploy time via AUTH_SECRET and
-          AUTH_URL.
-        </p>
-      </div>
+            {error ? (
+              <Alert>
+                <AlertTitle>Login failed.</AlertTitle>
+                <AlertDescription>
+                  {error.includes('Too many')
+                    ? 'Too many attempts. Try again in 15 minutes.'
+                    : 'Login failed. Check your email and password.'}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? 'Signing in...' : 'Continue'}
+            </Button>
+          </form>
+
+          <p className="text-xs text-muted-foreground">
+            New here? <Link href="/onboarding" className="underline">Start onboarding</Link>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

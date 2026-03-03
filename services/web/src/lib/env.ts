@@ -24,6 +24,51 @@ export function getServiceToken(): string {
   return process.env.INTERNAL_SERVICE_TOKEN ?? '';
 }
 
+export interface JwtSigningKey {
+  kid: string;
+  secret: string;
+  active: boolean;
+}
+
+/** Auth.js/NextAuth secret (server-side only). */
+export function getAuthSecret(): string {
+  return process.env.AUTH_SECRET ?? '';
+}
+
+/** JWT signing keys for internal service auth (server-side only). */
+export function getJwtSigningKeys(): JwtSigningKey[] {
+  const keySet = process.env.INTERNAL_JWT_SIGNING_KEYS;
+
+  if (keySet) {
+    try {
+      const parsed = JSON.parse(keySet) as Array<Partial<JwtSigningKey>>;
+
+      return parsed
+        .filter((item) => Boolean(item.kid) && Boolean(item.secret))
+        .map((item) => ({
+          kid: item.kid as string,
+          secret: item.secret as string,
+          active: item.active === true,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  const singleKey = process.env.INTERNAL_JWT_SIGNING_KEY;
+  if (!singleKey) {
+    return [];
+  }
+
+  return [
+    {
+      kid: 'k1',
+      secret: singleKey,
+      active: true,
+    },
+  ];
+}
+
 /** Book content configuration (safe to read on server). */
 export function getBookConfig() {
   return {
@@ -49,6 +94,7 @@ export function getConfigStatus() {
     core: Boolean(process.env.INTERNAL_CORE_BASE_URL),
     serviceAuth: Boolean(
       process.env.INTERNAL_SERVICE_TOKEN ||
+        process.env.INTERNAL_JWT_SIGNING_KEYS ||
         process.env.INTERNAL_JWT_SIGNING_KEY
     ),
     bookImport: process.env.BOOK_IMPORT_ENABLED === 'true',

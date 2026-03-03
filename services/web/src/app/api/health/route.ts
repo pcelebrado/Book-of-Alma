@@ -6,6 +6,8 @@
  */
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const checks: Record<string, string> = {
     status: 'ok',
@@ -15,7 +17,18 @@ export async function GET() {
 
   // Check MongoDB connectivity (non-blocking, best-effort)
   const mongoUri = process.env.MONGODB_URI;
-  checks.mongo = mongoUri ? 'configured' : 'not_configured';
+  if (!mongoUri) {
+    checks.mongo = 'not_configured';
+  } else {
+    try {
+      const { getMongoClient } = await import('@/lib/db/mongo');
+      const client = getMongoClient();
+      await client.db().command({ ping: 1 });
+      checks.mongo = 'connected';
+    } catch {
+      checks.mongo = 'unreachable';
+    }
+  }
 
   // Check internal core reachability config (non-blocking)
   const coreUrl = process.env.INTERNAL_CORE_BASE_URL;
@@ -23,8 +36,11 @@ export async function GET() {
 
   // Check service auth config
   const serviceToken = process.env.INTERNAL_SERVICE_TOKEN;
+  const jwtKeySet = process.env.INTERNAL_JWT_SIGNING_KEYS;
   const jwtKey = process.env.INTERNAL_JWT_SIGNING_KEY;
-  checks.service_auth = serviceToken || jwtKey ? 'configured' : 'not_configured';
+  checks.service_auth = serviceToken || jwtKey || jwtKeySet
+    ? 'configured'
+    : 'not_configured';
 
   return NextResponse.json(checks);
 }

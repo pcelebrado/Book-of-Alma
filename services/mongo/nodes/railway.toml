@@ -1,0 +1,13 @@
+# =============================================================================
+# OpenClaw Mongo Service - Railway Configuration
+# INTERNAL-ONLY SERVICE
+# Monorepo path contract: service root directory must be `services/mongo/nodes`.
+# If using custom config file path in Railway, set `/services/mongo/nodes/railway.toml`.
+# =============================================================================
+
+[build]
+builder = "dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+requiredMountPath = "/data"

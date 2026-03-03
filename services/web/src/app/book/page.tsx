@@ -1,20 +1,25 @@
-/**
- * Reader landing — shown when no section slug is provided.
- * Redirects attention to the Library to pick a section.
- */
+import Link from 'next/link';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 export default function ReaderLandingPage() {
   return (
-    <div className="flex min-h-[calc(100vh-57px)] items-center justify-center px-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Reader</h1>
-        <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-          Select a section from the{' '}
-          <a href="/" className="underline">
-            Library
-          </a>{' '}
-          to start reading.
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl py-8">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">Reader</CardTitle>
+          <CardDescription>Select a section from the Table of Contents to begin reading.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            The Reader includes structured section blocks, anchor links, and the assistant rail.
+          </p>
+          <Button asChild>
+            <Link href="/">Open Library</Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
