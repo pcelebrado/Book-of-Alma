@@ -3,7 +3,7 @@
 # CONSOLIDATED SERVICE: OpenClaw + MongoDB + QMD + SFTPGo
 # =============================================================================
 # This service runs OpenClaw, QMD, embedded MongoDB, and SFTPGo.
-# All persistent data is stored on a single Railway volume at /data (500MB).
+# All persistent data is stored on a single Railway volume at /data.
 #
 # Railway monorepo auto-import detects this file at the workspace package root.
 # =============================================================================
@@ -22,7 +22,7 @@ healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-# Require a persistent volume mounted at /data (Railway).
+# Persistent volume mounted at /data (Railway).
 # Volume layout:
 #   /data/db          — MongoDB data files
 #   /data/log         — MongoDB + SFTPGo logs
@@ -33,36 +33,74 @@ restartPolicyMaxRetries = 10
 requiredMountPath = "/data"
 
 [variables]
-# NOTE: Railway injects PORT automatically.
-# The service should listen on 0.0.0.0:$PORT or ::$PORT for healthchecks to work.
-# Do not hardcode PORT here to avoid domain routing mismatches.
+# ---------------------------------------------------------------------------
+# SETUP PASSWORD (required)
+# Protects /setup and the dashboard. You will be prompted for this on deploy.
+# ---------------------------------------------------------------------------
+SETUP_PASSWORD = ""
+
+# ---------------------------------------------------------------------------
+# Auto-generated secrets — users never need to touch these
+# ---------------------------------------------------------------------------
+# Shared service-to-service auth token. Automatically kept in sync with
+# the web service via Railway reference variables.
+INTERNAL_SERVICE_TOKEN = "${{ secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\") }}"
+
+# Gateway token that protects the OpenClaw Control UI.
+OPENCLAW_GATEWAY_TOKEN = "${{ secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\") }}"
+
+# ---------------------------------------------------------------------------
+# OpenClaw state directories (on Railway volume)
+# ---------------------------------------------------------------------------
 OPENCLAW_STATE_DIR = "/data/.openclaw"
 OPENCLAW_WORKSPACE_DIR = "/data/workspace"
 
-# Volume permissions: volumes are mounted as root, so non-root containers
-# need this to access the volume properly.
+# ---------------------------------------------------------------------------
+# Volume permissions
+# Volumes are mounted as root — this ensures the container can access /data.
+# ---------------------------------------------------------------------------
 RAILWAY_RUN_UID = "0"
 
-# Embedded MongoDB configuration.
-# MongoDB runs inside this container and listens on all interfaces (IPv6+IPv4).
-# The web service connects via Railway private networking: core.railway.internal:27017
-# Railway private networking requires IPv6 binding (::) for service discovery.
+# ---------------------------------------------------------------------------
+# Embedded MongoDB (runs inside this container)
+# The web service connects via Railway private networking.
+# ---------------------------------------------------------------------------
 MONGO_PORT = "27017"
 MONGO_BIND_IP = "::,0.0.0.0"
 MONGODB_URI = "mongodb://127.0.0.1:27017/openclaw"
 
-# Embedded SFTPGo configuration.
-# SFTP on port 2022 — enable TCP Proxy in Railway dashboard to expose externally.
-# Web admin on port 2080 (internal only — accessible via private networking).
-# Set SFTPGO_DEFAULT_ADMIN_USERNAME and SFTPGO_DEFAULT_ADMIN_PASSWORD in Railway
-# Variables (not here) to create the initial admin account on first boot.
+# ---------------------------------------------------------------------------
+# Embedded SFTPGo
+# SFTP on port 2022 — enable TCP Proxy in Railway dashboard for external access.
+# Web admin on port 2080 (internal only).
+# ---------------------------------------------------------------------------
 SFTPGO_ENABLED = "true"
 SFTPGO_DATA_ROOT = "/data/sftpgo"
 SFTPGO_SFTPD__BINDINGS__0__PORT = "2022"
 SFTPGO_HTTPD__BINDINGS__0__PORT = "2080"
 SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN = "true"
+SFTPGO_DEFAULT_ADMIN_USERNAME = "admin"
+SFTPGO_DEFAULT_ADMIN_PASSWORD = "${{ secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\") }}"
 
-# Internal service auth token.
-# Must match the value set on the web service as INTERNAL_SERVICE_TOKEN.
-# All /internal/* endpoints MUST verify this token.
-# INTERNAL_SERVICE_TOKEN = "set-in-railway-variables-not-here"
+# ---------------------------------------------------------------------------
+# Internal gateway wiring (no user action needed)
+# ---------------------------------------------------------------------------
+INTERNAL_GATEWAY_HOST = "127.0.0.1"
+INTERNAL_GATEWAY_PORT = "18789"
+
+# ---------------------------------------------------------------------------
+# OpenClaw binary paths (no user action needed)
+# ---------------------------------------------------------------------------
+OPENCLAW_ENTRY = "/openclaw/dist/entry.js"
+OPENCLAW_NODE = "node"
+
+# ---------------------------------------------------------------------------
+# Book content defaults (can be customized later)
+# ---------------------------------------------------------------------------
+BOOK_SOURCE_MODE = "external"
+BOOK_SOURCE_DIR = "/data/book-source"
+BOOK_IMPORT_MANIFEST = "/data/book-source/manifest.json"
+BOOK_CANONICAL_COLLECTION = "book_sections"
+BOOK_TOC_COLLECTION = "book_toc"
+BOOK_IMPORT_ENABLED = "false"
+BOOK_IMPORT_DRY_RUN = "true"

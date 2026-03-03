@@ -1,6 +1,6 @@
 # OpenClaw Book Template
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/github?repo=https://github.com/pcelebrado/Book-of-Openclaw&branch=mvp)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/github?repo=https://github.com/pcelebrado/Book-of-Openclaw&branch=book-of-alma)
 
 > **Give OpenClaw a Book. A topic. Let it become a master, then let it become your Teacher.**
 
@@ -122,70 +122,44 @@ The right rail exposes **context-aware teaching tools** for whatever you're read
 
 ## Quick Start
 
-### 1. Import to Railway
+### 1. Deploy to Railway (One Click)
 
-This repo is structured as an **npm workspace monorepo**. Railway auto-detects both services on import.
+Click the **Deploy on Railway** button above. That's it.
 
-1. Go to [railway.com/new](https://railway.com/new) → **Deploy from GitHub repo**
-2. Select **`pcelebrado/Book-of-Openclaw`** (branch: `mvp`)
-3. Railway stages **two services** automatically: `openclaw-web` and `openclaw-core`
-4. Confirm and deploy
+- Railway stages **two services**: `openclaw-web` (public) and `openclaw-core` (internal)
+- All environment variables, secrets, networking, and the data volume are **pre-configured**
+- You only need to set **one value**: `SETUP_PASSWORD` — a password to protect the setup wizard
 
-> If using the "Deploy on Railway" button above, Railway handles steps 1-3 for you.
+### 2. What's Pre-Configured For You
 
-### 2. Post-Import Setup (Dashboard)
+Everything below is handled automatically. No manual wiring needed.
 
-After Railway creates both services, configure these in the dashboard:
+| What | How |
+|------|-----|
+| **MongoDB connection** | Web connects to core's embedded MongoDB via private networking |
+| **Service auth tokens** | Auto-generated and shared between web and core |
+| **Auth.js session secret** | Auto-generated (equivalent to `openssl rand -base64 32`) |
+| **Public URL wiring** | `AUTH_URL` and `NEXT_PUBLIC_APP_URL` use your Railway domain |
+| **SFTPGo admin password** | Auto-generated |
+| **Gateway token** | Auto-generated |
+| **Data volume** | Mounted at `/data` on the core service |
+| **Book content defaults** | Preconfigured for external upload workflow |
 
-| Step | Service | Where | What |
-|------|---------|-------|------|
-| **Volume** | `core` | Settings → Volumes | Add volume, mount path: `/data` |
-| **TCP Proxy** | `core` | Settings → Networking | Enable TCP Proxy on port `2022` (for SFTP) |
-| **Public Domain** | `web` | Settings → Networking | Generate domain (or add custom) |
-| **No Public** | `core` | Settings → Networking | Ensure NO public domain (internal only) |
+### 3. After Deploy
 
-### 3. Set Environment Variables
+1. Wait for both services to build and deploy (core first, then web)
+2. Visit `https://your-app.railway.app` — this is your learning platform
+3. Navigate to the `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
+4. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
 
-Set these in Railway Variables (per service), not in code. **Never commit real secrets.**
+### Manual Import (Advanced)
 
-#### Web Service Variables
+If you import the repo directly instead of using the template button, copy the `.env.railway` files into each service's Raw Editor:
 
-```bash
-# Database (MongoDB runs inside core service — standalone, no replica set)
-MONGODB_URI=mongodb://core.railway.internal:27017/openclaw
+- `services/core/.env.railway` → Core service Variables → Raw Editor
+- `services/web/.env.railway` → Web service Variables → Raw Editor
 
-# Internal Service Communication
-INTERNAL_CORE_BASE_URL=http://core.railway.internal:8080
-INTERNAL_SERVICE_TOKEN=<generate-a-strong-random-token>
-
-# Auth
-AUTH_SECRET=<generate-with-openssl-rand-base64-32>
-AUTH_URL=https://your-app.railway.app
-NEXT_PUBLIC_APP_URL=https://your-app.railway.app
-```
-
-#### Core Service Variables
-
-```bash
-# Must match web service
-INTERNAL_SERVICE_TOKEN=<same-token-as-web-service>
-
-# Setup & State
-SETUP_PASSWORD=<your-secure-setup-password>
-
-# SFTPGo admin credentials (set here, not in code)
-SFTPGO_DEFAULT_ADMIN_USERNAME=<your-admin-username>
-SFTPGO_DEFAULT_ADMIN_PASSWORD=<your-strong-password>
-```
-
-> Most core variables (MongoDB, OpenClaw paths, SFTPGo ports) are pre-configured in `railway.toml`. Only secrets and service tokens need manual entry.
-
-### 4. Deploy and Verify
-
-1. Deploy `core` first — it starts MongoDB and SFTPGo automatically
-2. Deploy `web` — verify `/api/health` returns 200
-3. Connect via SFTP to upload book content (Railway gives you `roundhouse.proxy.rlwy.net:XXXXX`)
-4. Run reindex from Admin panel
+Then manually: attach a volume at `/data` to core, generate a public domain for web, and keep core internal-only.
 
 ---
 
