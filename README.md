@@ -415,6 +415,74 @@ See `docs/PREDEPLOY_NEXT_STEPS.md` for the full deployment checklist.
 
 ---
 
+## Planned Features (Roadmap)
+
+The following features are planned for future development based on research notes and user needs:
+
+### Trading & Analytics Add-ons
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Paper Trading Integration** | Alpaca paper trading for validating signals without real capital | Planned |
+| **Options Chain Feed** | Brokerage API integration for options quotes and Greeks | Research |
+| **Volatility Regime Engine** | HV/IV analysis, ATR, trend/mean-reversion classification | Planned |
+| **Payoff & Greeks Calculator** | PnL curves, break-evens, theta decay profiles | Planned |
+| **Position Sizing Module** | Risk per trade, max portfolio exposure calculations | Planned |
+| **Alerts Engine** | Price/level alerts, volatility alerts, time-based alerts | Planned |
+| **EDGAR Watcher** | SEC filings monitoring for SPY top holdings with diff summaries | Planned |
+| **FRED Macro Context** | Interest rates, CPI, unemployment data integration | Planned |
+| **Trade Journal** | Paper + real trade logging with screenshots and thesis | Planned |
+| **Backtesting Harness** | Simple rules validation without overfitting | Research |
+
+### Data Sources
+
+| Source | Purpose | Cost |
+|--------|---------|------|
+| **Alpaca Paper Trading** | Simulate trades and track positions | Free |
+| **FRED API** | Economic indicators and macro data | Free |
+| **SEC EDGAR API** | Filings and material changes | Free |
+| **GDELT** | Global news dataset for event radar | Free |
+| **Stooq** | Historical market data for research | Free |
+| **Finnhub** | Earnings calendar and fundamentals | Free tier |
+| **Tradier** | Options chain (requires brokerage account) | Account holders |
+
+### UX Enhancements
+
+| Feature | Description |
+|---------|-------------|
+| **Telegram/Discord Bot** | Alerts and Q&A outside the web app |
+| **Email Digests** | Morning plan + end-of-day recap |
+| **Mobile App** | Native mobile experience (PWA first) |
+| **Dashboard** | Portfolio overview and key metrics |
+| **Journal** | Structured trade review and reflection |
+| **Alerts Center** | Centralized alert management and history |
+
+### Technical Infrastructure
+
+| Feature | Description |
+|---------|-------------|
+| **Redis/Valkey** | Caching, session storage, queueing |
+| **Dedicated Worker Service** | Background jobs for indexing and imports |
+| **CDN Integration** | Static asset delivery optimization |
+| **Multi-Region Deployment** | Global availability |
+| **Monitoring Stack** | Prometheus/Grafana for metrics |
+
+---
+
+## Design System
+
+The template follows a **calm editorial "research UI"** pattern inspired by OpenAI's design philosophy:
+
+- **Typography:** Contemporary grotesk/neo-grotesk (Inter), strong hierarchy, relaxed line height (1.65)
+- **Layout:** Three-column sacred shell (TOC left, content center, agent right)
+- **Color:** Charcoal-based dark theme, one restrained accent, quiet chrome
+- **Spacing:** Consistent scale (4/8/12/16/24/32/48/64), rhythmic vertical layout
+- **Components:** Tailwind + shadcn/ui for standardized controls
+
+See [Visual Style Direction](https://github.com/pcelebrado/openclaw-template/blob/main/docs/book-first-ui.md) for full details.
+
+---
+
 ## License
 
 [License](./LICENSE)
