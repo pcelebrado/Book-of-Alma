@@ -44,20 +44,23 @@ This Railway template deploys a complete **AI-powered learning platform** in min
 │  │  • Admin (Status & Reindex)  • Command Palette (⌘K)             │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                              │                                          │
-│           ┌──────────────────┼──────────────────┐                      │
-│           ▼                  ▼                  ▼                      │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                │
-│  │   [core]    │    │   [mongo]   │    │  [sftpgo]   │                │
-│  │  (internal) │    │  (internal) │    │  (optional) │                │
-│  │             │    │             │    │             │                │
-│  │ • OpenClaw  │    │ • Content   │    │ • SSH/SFTP  │                │
-│  │ • QMD       │    │ • Notes     │    │ • File      │                │
-│  │ • SFTPGo    │    │ • Playbooks │    │   Uploads   │                │
-│  └─────────────┘    └─────────────┘    └─────────────┘                │
+│                              ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    [core] — Internal Only                         │   │
+│  │                                                                  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │   │
+│  │  │   OpenClaw   │  │   MongoDB    │  │     QMD Search       │   │   │
+│  │  │  (AI Agent)  │  │  (embedded)  │  │  (Semantic Index)    │   │   │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────┘   │   │
+│  │                                                                  │   │
+│  │  Single Railway volume: /data (500MB)                            │   │
+│  │  • /data/db — MongoDB   • /data/.openclaw — Config & state      │   │
+│  │  • /data/workspace      • /data/book-source — Content staging   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Boundary Rule:** Browsers talk only to `web`. `core` and `mongo` remain private on Railway internal networking.
+**Two-service architecture:** Browsers talk only to `web`. The `core` service runs OpenClaw, MongoDB, and QMD together on a single 500MB persistent volume — optimized for Railway's free plan.
 
 ---
 
@@ -133,9 +136,9 @@ Create these Railway services from your repository:
 | Service | Root Directory | Config | Public Network | Volumes |
 |---------|---------------|--------|----------------|---------|
 | `web` | `services/web` | `railway.toml` | ✅ Enabled | — |
-| `core` | `services/core` | `railway.toml` | ❌ Disabled | `/data` |
-| `mongo` | `services/mongo/nodes` | `Dockerfile` | ❌ Disabled | — |
-| `sftpgo` (optional) | `services/sftpgo` | `railway.toml` | ✅ Optional | `/data` |
+| `core` | `services/core` | `railway.toml` | ❌ Disabled | `/data` (500MB) |
+
+> **Free plan note:** MongoDB runs embedded inside the `core` container sharing a single 500MB persistent volume. No separate database service needed.
 
 ### 3. Set Environment Variables
 
@@ -144,28 +147,17 @@ Use each service's `.env.example` as a baseline. **Never commit real secrets.**
 #### Web Service
 
 ```bash
-# Database
-MONGODB_URI=mongodb://mongo.railway.internal:27017/openclaw
+# Database (MongoDB runs inside core service — standalone, no replica set)
+MONGODB_URI=mongodb://core.railway.internal:27017/openclaw
 
 # Internal Service Communication
-INTERNAL_CORE_BASE_URL=http://core.railway.internal:7200
+INTERNAL_CORE_BASE_URL=http://core.railway.internal:8080
 INTERNAL_SERVICE_TOKEN=your-shared-secret-here
-# OR for JWT mode:
-INTERNAL_JWT_SIGNING_KEYS=[{"kid":"k1","secret":"...","active":true}]
 
 # Auth
 AUTH_SECRET=your-auth-secret-here
 AUTH_URL=https://your-app.railway.app
 NEXT_PUBLIC_APP_URL=https://your-app.railway.app
-
-# Content Import (optional)
-CONTENT_SOURCE_MODE=manifest
-CONTENT_SOURCE_DIR=/data/content
-CONTENT_IMPORT_MANIFEST=/data/content/manifest.json
-CONTENT_CANONICAL_COLLECTION=content_sections
-CONTENT_TOC_COLLECTION=content_toc
-CONTENT_IMPORT_ENABLED=false
-CONTENT_IMPORT_DRY_RUN=true
 ```
 
 #### Core Service
@@ -178,33 +170,11 @@ INTERNAL_SERVICE_TOKEN=your-shared-secret-here
 SETUP_PASSWORD=your-secure-setup-password
 OPENCLAW_STATE_DIR=/data/.openclaw
 OPENCLAW_WORKSPACE_DIR=/data/workspace
-OPENCLAW_GATEWAY_TOKEN=your-gateway-token-here
 
-# Content Import (same as web)
-CONTENT_SOURCE_MODE=manifest
-CONTENT_SOURCE_DIR=/data/content
-# ... etc
-```
-
-#### Mongo Service
-
-```bash
-REPLICA_SET_NAME=rs0
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=your-secure-password
-KEYFILE=/data/keyfile
+# Embedded MongoDB (auto-configured, override only if needed)
 MONGO_PORT=27017
-MONGO_PRIMARY_HOST=mongo.railway.internal
-```
-
-#### SFTPGo Service (Optional)
-
-```bash
-SFTPGO_DEFAULT_ADMIN_USERNAME=admin
-SFTPGO_DEFAULT_ADMIN_PASSWORD=your-secure-password
-SFTPGO_HTTPD__BINDINGS__0__PORT=8080
-SFTPGO_SFTPD__BINDINGS__0__PORT=2022
-SFTPGO_DATA_ROOT=/data/sftpgo
+MONGO_BIND_IP=::,0.0.0.0
+MONGODB_URI=mongodb://127.0.0.1:27017/openclaw
 ```
 
 ---
@@ -264,11 +234,8 @@ npm run build
 # Web
 docker build -f services/web/Dockerfile services/web
 
-# Core
+# Core (includes embedded MongoDB)
 docker build -f services/core/Dockerfile services/core
-
-# Mongo
-docker build -f services/mongo/nodes/Dockerfile services/mongo/nodes
 ```
 
 ---
@@ -334,7 +301,7 @@ X-Request-Id: <uuid>
 
 1. **User Auth** — Next.js sessions (HTTP-only cookies)
 2. **Service Auth** — JWT or shared secret between Web ↔ Core
-3. **Mongo Auth** — Replica set with credentials
+3. **Mongo Auth** — Embedded in core container (no public exposure, no auth by default on free plan)
 
 ### Rate Limits
 

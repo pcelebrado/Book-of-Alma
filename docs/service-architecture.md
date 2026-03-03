@@ -170,27 +170,31 @@ Response (degraded):
 Railway provides internal DNS resolution for service-to-service communication:
 
 ```
-web.railway.internal    → Web service
-mongo.railway.internal  → MongoDB service
-core.railway.internal   → Core service
+web.railway.internal    → Web service (public HTTP)
+core.railway.internal   → Core service (OpenClaw + embedded MongoDB + QMD)
 ```
+
+> **Note:** MongoDB runs embedded inside the `core` container. There is no separate
+> `mongo.railway.internal` service on the free plan. The web service connects to
+> MongoDB via `core.railway.internal:27017`.
 
 **Key Points:**
 - Services within the same Railway project can communicate via these hostnames
 - No public internet required for internal traffic
-- Traffic stays within Railway's private network
+- Traffic stays within Railway's private network (encrypted Wireguard tunnels)
 - DNS resolution is automatic—no configuration needed
+- Railway private networking supports any TCP/UDP port, not just the HTTP port
 
 **Example Connection:**
 ```javascript
-// Web service connecting to Core
+// Web service connecting to Core HTTP API
 const coreClient = new CoreClient({
-  baseUrl: 'http://core.railway.internal:7200'
+  baseUrl: 'http://core.railway.internal:8080'
 });
 
-// Web service connecting to MongoDB
+// Web service connecting to MongoDB (embedded in core container)
 const mongoClient = new MongoClient(
-  'mongodb://mongo.railway.internal:27017/natealma'
+  'mongodb://core.railway.internal:27017/openclaw'
 );
 ```
 
@@ -423,7 +427,7 @@ See [Sleep/Scale-to-Zero UX](./sleep-scale-to-zero.md) for full details.
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `MONGODB_URI` | `mongodb://mongo.railway.internal:27017/natealma` | MongoDB connection string |
+| `MONGODB_URI` | `mongodb://core.railway.internal:27017/openclaw` | MongoDB connection string (embedded in core) |
 | `INTERNAL_CORE_BASE_URL` | `http://core.railway.internal:7200` | Core service URL |
 | `INTERNAL_JWT_SIGNING_KEYS` | `[{"kid":"k1","secret":"...","active":true}]` | JWT signing keys |
 | `AUTH_SECRET` | `openssl rand -base64 32` | NextAuth secret |
@@ -607,10 +611,11 @@ curl -H "Authorization: Bearer <jwt>" \
 
 **Check:**
 ```bash
-# Verify replica set is initialized
-mongosh "mongodb://mongo.railway.internal:27017" \
-  --username admin --password <password> \
-  --eval "rs.status()"
+# Verify replica set is initialized (MongoDB runs inside core container)
+# From within the core container or via Railway shell:
+mongosh "mongodb://127.0.0.1:27017" --eval "rs.status()"
+# From the web service, connect via private networking:
+# mongosh "mongodb://core.railway.internal:27017" --eval "rs.status()"
 ```
 
 **Common Causes:**

@@ -1,12 +1,19 @@
 # OpenClaw Core Service Dockerfile
-# Multi-stage build with OpenClaw runtime and wrapper service
-# INTERNAL-ONLY SERVICE - No public HTTP exposure
-# 
+# Consolidated: OpenClaw + MongoDB + QMD + SFTPGo wrapper
+# All persistent data stored on a single Railway volume at /data (500MB free plan)
+#
 # Railway Configuration Notes:
-# - This service MUST have Public Networking DISABLED in Railway settings
 # - Requires a volume mounted at /data for persistence
 # - Healthchecks use /setup/healthz endpoint
 # - RAILWAY_RUN_UID=0 is set in railway.toml for volume permissions
+#
+# Volume layout (/data):
+#   /data/db              — MongoDB data files
+#   /data/.openclaw       — OpenClaw state and config
+#   /data/workspace       — OpenClaw workspace
+#   /data/npm             — Persistent npm global installs
+#   /data/pnpm            — Persistent pnpm binaries
+#   /data/book-source     — Book content staging (optional)
 # =============================================================================
 
 # =============================================================================
@@ -52,19 +59,38 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:install && pnpm ui:build
 
 # =============================================================================
-# Stage 2: Runtime Image
+# Stage 2: Runtime Image (Node.js + MongoDB consolidated)
 # =============================================================================
 FROM node:22-bookworm
 
 ENV NODE_ENV=production
 
-# Install runtime dependencies
+# Install MongoDB 7.0 community server (standalone, no replica set needed)
+# Uses the official MongoDB apt repository for Debian Bookworm
+# Only install mongod (server), mongosh (shell), and tools — skip mongos (sharding router)
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
+    gnupg \
+  && curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
+    gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg \
+  && echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | \
+    tee /etc/apt/sources.list.d/mongodb-org-7.0.list \
+  && apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    mongodb-org-server \
+    mongodb-org-tools \
+    mongodb-mongosh \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install other runtime dependencies
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     tini \
     python3 \
     python3-venv \
+    bash \
   && rm -rf /var/lib/apt/lists/*
 
 # `openclaw update` expects pnpm. Provide it in the runtime image.
@@ -93,6 +119,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
   && chmod +x /usr/local/bin/openclaw
 
 COPY src ./src
+COPY scripts ./scripts
 
 # =============================================================================
 # Railway Port Configuration
@@ -107,4 +134,4 @@ EXPOSE 8080
 
 # Ensure PID 1 reaps zombies and forwards signals.
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "src/server.js"]
+CMD ["bash", "/app/scripts/entrypoint.sh"]

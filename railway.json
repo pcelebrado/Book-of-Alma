@@ -1,18 +1,5 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
-  "build": {
-    "builder": "DOCKERFILE",
-    "watchPatterns": [
-      "railway.json",
-      "services/web/**",
-      "services/core/**",
-      "services/mongo/**",
-      "services/sftpgo/**",
-      "!**/*.test.ts",
-      "!**/*.test.tsx",
-      "!**/node_modules/**"
-    ]
-  },
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10

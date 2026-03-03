@@ -347,7 +347,11 @@ users
 
 ### Connection String
 ```bash
-MONGODB_URI=mongodb://mongo.railway.internal:27017/natealma
+# Web service (connects to embedded MongoDB inside core via private networking)
+MONGODB_URI=mongodb://core.railway.internal:27017/openclaw
+
+# Core service (connects locally — MongoDB runs in the same container)
+MONGODB_URI=mongodb://127.0.0.1:27017/openclaw
 ```
 
 ### Collection Names

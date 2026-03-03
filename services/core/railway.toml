@@ -1,16 +1,20 @@
 # =============================================================================
 # OpenClaw Core Service - Railway Configuration
-# INTERNAL-ONLY SERVICE
+# CONSOLIDATED SERVICE: OpenClaw + MongoDB + QMD
 # Monorepo path contract: service root directory must be `services/core`.
 # If using custom config file path in Railway, set `/services/core/railway.toml`.
 # =============================================================================
-# BOUNDARY RULE: This service MUST NOT have public HTTP exposure.
-# Configure Railway service settings: Networking > Public Networking = DISABLED.
-# Only the `web` service is publicly accessible.
+# This service runs OpenClaw, QMD, and an embedded MongoDB instance.
+# All persistent data is stored on a single Railway volume at /data (500MB).
 # =============================================================================
 
 [build]
 builder = "dockerfile"
+watchPatterns = [
+  "/services/core/**",
+  "!**/node_modules/**",
+  "!**/*.test.js"
+]
 
 [deploy]
 healthcheckPath = "/setup/healthz"
@@ -18,6 +22,12 @@ healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
 # Require a persistent volume mounted at /data (Railway).
+# Volume layout:
+#   /data/db          — MongoDB data files
+#   /data/log         — MongoDB logs
+#   /data/.openclaw   — OpenClaw state and config
+#   /data/workspace   — OpenClaw workspace
+#   /data/book-source — Book content staging (optional)
 requiredMountPath = "/data"
 
 [variables]
@@ -30,6 +40,14 @@ OPENCLAW_WORKSPACE_DIR = "/data/workspace"
 # Volume permissions: volumes are mounted as root, so non-root containers
 # need this to access the volume properly.
 RAILWAY_RUN_UID = "0"
+
+# Embedded MongoDB configuration.
+# MongoDB runs inside this container and listens on all interfaces (IPv6+IPv4).
+# The web service connects via Railway private networking: core.railway.internal:27017
+# Railway private networking requires IPv6 binding (::) for service discovery.
+MONGO_PORT = "27017"
+MONGO_BIND_IP = "::,0.0.0.0"
+MONGODB_URI = "mongodb://127.0.0.1:27017/openclaw"
 
 # Internal service auth token.
 # Must match the value set on the web service as INTERNAL_SERVICE_TOKEN.

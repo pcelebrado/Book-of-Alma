@@ -57,7 +57,7 @@
         {
           "step": 7,
           "action": "Verify internal networking",
-          "details": "Ensure services can communicate via Railway internal DNS: web.railway.internal, core.railway.internal, mongo.railway.internal"
+          "details": "Ensure services can communicate via Railway internal DNS: web.railway.internal, core.railway.internal (MongoDB embedded in core on port 27017)"
         }
       ],
       "sourceSpecs": ["01-SPEC_RAILWAY_ARCHITECTURE.md", "02-SPEC_NETWORKING_SECURITY.md", "10-SPEC_CORE_CONTAINER_STARTUP.md"],
@@ -142,7 +142,7 @@
         {
           "step": 1,
           "action": "Configure MongoDB connection",
-          "details": "Set MONGODB_URI in web service (e.g., mongodb://mongo.railway.internal:27017/natealma)"
+          "details": "Set MONGODB_URI in web service (e.g., mongodb://core.railway.internal:27017/openclaw)"
         },
         {
           "step": 2,

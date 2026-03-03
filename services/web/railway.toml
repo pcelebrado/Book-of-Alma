@@ -7,6 +7,12 @@
 
 [build]
 builder = "dockerfile"
+watchPatterns = [
+  "/services/web/**",
+  "!**/node_modules/**",
+  "!**/*.test.ts",
+  "!**/*.test.tsx"
+]
 
 [deploy]
 healthcheckPath = "/api/health"

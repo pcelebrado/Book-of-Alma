@@ -4,7 +4,7 @@ Welcome to the comprehensive documentation for the OpenClaw Railway Template—a
 
 ## Quick Start
 
-- **[Service Architecture](./service-architecture.md)** — Understand the three-service architecture
+- **[Service Architecture](./service-architecture.md)** — Understand the two-service architecture
 - **[Book-First UI](./book-first-ui.md)** — Learn about the calm research UI pattern
 - **[Predeploy Next Steps](./PREDEPLOY_NEXT_STEPS.md)** — Deployment checklist and secrets wiring map
 
@@ -12,7 +12,7 @@ Welcome to the comprehensive documentation for the OpenClaw Railway Template—a
 
 ### Core Features
 
-1. **[Service Architecture](./service-architecture.md)** — Three-service Railway deployment (Web, Core, MongoDB)
+1. **[Service Architecture](./service-architecture.md)** — Two-service Railway deployment (Web + Core w/ embedded MongoDB)
 2. **[Book-First UI](./book-first-ui.md)** — Calm research UI with three-column sacred shell
 3. **[MongoDB Data Layer](./mongodb-data-layer.md)** — Data model for book content and user data
 4. **[Internal Service Authentication](./internal-service-auth.md)** — JWT-based service-to-service auth
@@ -36,18 +36,23 @@ Welcome to the comprehensive documentation for the OpenClaw Railway Template—a
 │  │  └──────────────┘  └──────────────────┘  └──────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                              │                                          │
-│           ┌──────────────────┼──────────────────┐                      │
-│           ▼                  ▼                  ▼                      │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                │
-│  │   [core]    │    │   [mongo]   │    │  [sftpgo]   │                │
-│  │  (internal) │    │  (internal) │    │  (optional) │                │
-│  │             │    │             │    │             │                │
-│  │ • OpenClaw  │    │ • Book      │    │ • SSH/SFTP  │                │
-│  │ • QMD       │    │ • Notes     │    │ • File      │                │
-│  │ • SFTPGo    │    │ • Playbooks │    │   Uploads   │                │
-│  └─────────────┘    └─────────────┘    └─────────────┘                │
+│                              ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    [core] — Internal Only                         │   │
+│  │                                                                  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │   │
+│  │  │   OpenClaw   │  │   MongoDB    │  │     QMD Search       │   │   │
+│  │  │  (AI Agent)  │  │  (embedded)  │  │  (Semantic Index)    │   │   │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────┘   │   │
+│  │                                                                  │   │
+│  │  Single Railway volume: /data (500MB)                            │   │
+│  │  • /data/db — MongoDB   • /data/.openclaw — Config & state      │   │
+│  │  • /data/workspace      • /data/book-source — Content staging   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Two-service architecture:** Browsers talk only to `web`. The `core` service runs OpenClaw, MongoDB, and QMD together on a single 500MB persistent volume — optimized for Railway's free plan.
 
 ## Design Philosophy
 
@@ -96,22 +101,20 @@ See individual feature documents for detailed configuration options.
 
 ```bash
 # Web Service
-MONGODB_URI=mongodb://mongo.railway.internal:27017/openclaw
+MONGODB_URI=mongodb://core.railway.internal:27017/openclaw
 INTERNAL_CORE_BASE_URL=http://core.railway.internal:8080
 INTERNAL_SERVICE_TOKEN=changeme-generate-a-strong-random-token
 AUTH_SECRET=your-auth-secret
 AUTH_URL=https://your-app.railway.app
 
-# Core Service
+# Core Service (MongoDB runs embedded — no separate mongo service needed)
 INTERNAL_SERVICE_TOKEN=changeme-generate-a-strong-random-token
 SETUP_PASSWORD=your-secure-setup-password
 OPENCLAW_STATE_DIR=/data/.openclaw
 OPENCLAW_WORKSPACE_DIR=/data/workspace
-
-# MongoDB Service
-REPLICA_SET_NAME=rs0
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=your-secure-password
+MONGO_PORT=27017
+MONGO_BIND_IP=::,0.0.0.0
+MONGODB_URI=mongodb://127.0.0.1:27017/openclaw
 ```
 
 ## Deployment
