@@ -1,0 +1,15 @@
+[tools]
+node = "20.9.0"
+buildpack = "latest"
+railway = { version = "latest", exe = "railway" }
+"ubi:railwayapp/railpack" = "latest"
+
+[tasks.build]
+run  = "cd services/web"
+run  = "npm install" 
+run  = "npm run build"
+run  = "cd services/core"
+run  = "docker build -t openclaw-web ."
+
+[tasks.start]
+run  = "npm run dev"

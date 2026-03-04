@@ -2,14 +2,14 @@
 # OpenClaw Core Service — Railway Config-as-Code
 # CONSOLIDATED SERVICE: OpenClaw + MongoDB + QMD + SFTPGo
 # =============================================================================
-# railway.toml controls build + deploy settings only.
-# Environment variables are configured via the Railway dashboard or
+# Must use Dockerfile — this container runs multiple processes (mongod,
+# sftpgo, node) that Railpack cannot orchestrate.
+# Environment variables are configured via Railway dashboard or
 # Raw Editor (see .env.railway for copy-paste values).
 # =============================================================================
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
 watchPatterns = [
   "/services/core/**",
   "!**/node_modules/**",
@@ -22,80 +22,7 @@ healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-# Persistent volume at /data — Railway will prompt for volume attachment.
+# Persistent volume at /data — Railway attaches on deploy.
 # Layout: /data/db, /data/log, /data/.openclaw, /data/workspace,
 #         /data/book-source, /data/sftpgo
 requiredMountPath = "/data"
-
-[variables]
-# ---------------------------------------------------------------------------
-# SETUP PASSWORD (required)
-# Protects /setup and the dashboard. You will be prompted for this on deploy.
-# ---------------------------------------------------------------------------
-SETUP_PASSWORD = ""
-
-# ---------------------------------------------------------------------------
-# Auto-generated secrets — users never need to touch these
-# ---------------------------------------------------------------------------
-# Shared service-to-service auth token. Automatically kept in sync with
-# the web service via Railway reference variables.
-INTERNAL_SERVICE_TOKEN = "${{ secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\") }}"
-
-# Gateway token that protects the OpenClaw Control UI.
-OPENCLAW_GATEWAY_TOKEN = "${{ secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\") }}"
-
-# ---------------------------------------------------------------------------
-# OpenClaw state directories (on Railway volume)
-# ---------------------------------------------------------------------------
-OPENCLAW_STATE_DIR = "/data/.openclaw"
-OPENCLAW_WORKSPACE_DIR = "/data/workspace"
-
-# ---------------------------------------------------------------------------
-# Volume permissions
-# Volumes are mounted as root — this ensures the container can access /data.
-# ---------------------------------------------------------------------------
-RAILWAY_RUN_UID = "0"
-
-# ---------------------------------------------------------------------------
-# Embedded MongoDB (runs inside this container)
-# The web service connects via Railway private networking.
-# ---------------------------------------------------------------------------
-MONGO_PORT = "27017"
-MONGO_BIND_IP = "::,0.0.0.0"
-MONGODB_URI = "mongodb://127.0.0.1:27017/openclaw"
-
-# ---------------------------------------------------------------------------
-# Embedded SFTPGo
-# SFTP on port 2022 — enable TCP Proxy in Railway dashboard for external access.
-# Web admin on port 2080 (internal only).
-# ---------------------------------------------------------------------------
-SFTPGO_ENABLED = "true"
-SFTPGO_DATA_ROOT = "/data/sftpgo"
-SFTPGO_SFTPD__BINDINGS__0__PORT = "2022"
-SFTPGO_HTTPD__BINDINGS__0__PORT = "2080"
-SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN = "true"
-SFTPGO_DEFAULT_ADMIN_USERNAME = "admin"
-SFTPGO_DEFAULT_ADMIN_PASSWORD = "${{ secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\") }}"
-
-# ---------------------------------------------------------------------------
-# Internal gateway wiring (no user action needed)
-# ---------------------------------------------------------------------------
-INTERNAL_GATEWAY_HOST = "127.0.0.1"
-INTERNAL_GATEWAY_PORT = "18789"
-
-# ---------------------------------------------------------------------------
-# OpenClaw binary paths (no user action needed)
-# ---------------------------------------------------------------------------
-OPENCLAW_ENTRY = "/openclaw/dist/entry.js"
-OPENCLAW_NODE = "node"
-
-# ---------------------------------------------------------------------------
-# Book content defaults (can be customized later)
-# ---------------------------------------------------------------------------
-BOOK_SOURCE_MODE = "external"
-BOOK_SOURCE_DIR = "/data/book-source"
-BOOK_IMPORT_MANIFEST = "/data/book-source/manifest.json"
-BOOK_CANONICAL_COLLECTION = "book_sections"
-BOOK_TOC_COLLECTION = "book_toc"
-BOOK_IMPORT_ENABLED = "false"
-BOOK_IMPORT_DRY_RUN = "true"

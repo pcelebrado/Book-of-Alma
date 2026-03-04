@@ -33,3 +33,11 @@ services/core/assets/*.png
 
 # Upstream example apps (not part of OpenClaw template)
 services/mongo/exampleApps/
+
+# Local testing artifacts
+mise
+.env.railpack
+.test/
+my-app/
+test-local.sh
+railway-deploy.sh
