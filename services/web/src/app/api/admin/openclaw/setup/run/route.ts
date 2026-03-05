@@ -40,9 +40,20 @@ export async function POST(request: NextRequest) {
     return Response.json(payload);
   } catch (error) {
     if (error instanceof CoreClientError) {
-      return apiError('core_unavailable', error.message, error.statusCode, {
+      const details = error.details as
+        | { output?: string; error?: { message?: string } }
+        | string
+        | undefined;
+
+      const detailedMessage =
+        typeof details === 'string'
+          ? details
+          : details?.output ?? details?.error?.message ?? error.message;
+
+      return apiError('core_unavailable', detailedMessage, error.statusCode, {
         requestId: error.requestId,
         details: error.details,
+        message: detailedMessage,
       });
     }
     return apiError('internal_error', 'Unable to run onboarding', 500);

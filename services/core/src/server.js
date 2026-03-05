@@ -792,7 +792,7 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
 
     let onboardArgs;
     try {
-      onboardArgs = buildOnboardArgs(payload);
+      onboardArgs = await buildOnboardArgs(payload);
     } catch (err) {
       return respondJson(400, { ok: false, output: `Setup input error: ${String(err)}` });
     }
@@ -1270,7 +1270,42 @@ app.get("/setup/api/auth-groups", requireSetupAuth, (_req, res) => {
   res.json({ ok: true, authGroups: AUTH_GROUPS });
 });
 
-function buildOnboardArgs(payload) {
+let cachedOnboardHelp = { text: "", at: 0 };
+
+async function getOnboardHelpText() {
+  const now = Date.now();
+  if (cachedOnboardHelp.text && now - cachedOnboardHelp.at < 5 * 60_000) {
+    return cachedOnboardHelp.text;
+  }
+
+  const help = await runCmd(OPENCLAW_NODE, clawArgs(["onboard", "--help"]), {
+    timeoutMs: 20_000,
+  });
+
+  cachedOnboardHelp = {
+    text: String(help.output || ""),
+    at: now,
+  };
+
+  return cachedOnboardHelp.text;
+}
+
+async function resolveAuthChoiceCompatibility(authChoice) {
+  if (!authChoice) return authChoice;
+
+  const help = (await getOnboardHelpText()).toLowerCase();
+  const normalized = String(authChoice).trim();
+
+  // Backward-compat: older OpenClaw builds may not expose Kimi Code as a
+  // separate auth-choice. Fall back to Moonshot API key path in that case.
+  if (normalized === "kimi-code-api-key" && !help.includes("kimi-code-api-key")) {
+    return "moonshot-api-key";
+  }
+
+  return normalized;
+}
+
+async function buildOnboardArgs(payload) {
   const args = [
     "onboard",
     "--non-interactive",
@@ -1294,7 +1329,8 @@ function buildOnboardArgs(payload) {
   ];
 
   if (payload.authChoice) {
-    args.push("--auth-choice", payload.authChoice);
+    const resolvedAuthChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
+    args.push("--auth-choice", resolvedAuthChoice);
 
     // Map secret to correct flag for common choices.
     const secret = (payload.authSecret || "").trim();
@@ -1313,20 +1349,20 @@ function buildOnboardArgs(payload) {
       "opencode-zen": "--opencode-zen-api-key",
     };
 
-    const flag = map[payload.authChoice];
+    const flag = map[resolvedAuthChoice];
 
     // If the user picked an API-key auth choice but didn't provide a secret, fail fast.
     // Otherwise OpenClaw may fall back to its default auth choice, which looks like the
     // wizard "reverted" their selection.
     if (flag && !secret) {
-      throw new Error(`Missing auth secret for authChoice=${payload.authChoice}`);
+      throw new Error(`Missing auth secret for authChoice=${resolvedAuthChoice}`);
     }
 
     if (flag) {
       args.push(flag, secret);
     }
 
-    if (payload.authChoice === "token") {
+    if (resolvedAuthChoice === "token") {
       // This is the Anthropic setup-token flow.
       if (!secret) throw new Error("Missing auth secret for authChoice=token");
       args.push("--token-provider", "anthropic", "--token", secret);
@@ -1399,7 +1435,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     let onboardArgs;
     try {
-      onboardArgs = buildOnboardArgs(payload);
+      onboardArgs = await buildOnboardArgs(payload);
     } catch (err) {
       return respondJson(400, { ok: false, output: `Setup input error: ${String(err)}` });
     }
