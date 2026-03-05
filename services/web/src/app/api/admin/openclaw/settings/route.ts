@@ -31,6 +31,8 @@ interface OpenClawSettingsPayload {
     gateway: string | null;
     setup: string | null;
   };
+  corePublicUrlConfigured?: boolean;
+  corePublicUrlHint?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
       uid: session.id,
       role: session.role,
       rid: request.headers.get('x-request-id') ?? undefined,
+      timeoutMs: 15_000,
     });
 
     const corePublicUrl = process.env.CORE_PUBLIC_URL?.trim();
@@ -60,6 +63,10 @@ export async function GET(request: NextRequest) {
         gateway: base ? `${base}/openclaw` : null,
         setup: base ? `${base}/setup` : null,
       },
+      corePublicUrlConfigured: Boolean(base),
+      corePublicUrlHint: base
+        ? null
+        : 'Set CORE_PUBLIC_URL in web service env to expose OpenClaw links.',
     });
   } catch (error) {
     if (error instanceof CoreClientError) {

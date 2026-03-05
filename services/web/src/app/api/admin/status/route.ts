@@ -4,7 +4,7 @@ import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
 import { coreFetch, CoreClientError } from '@/lib/core-client';
 import { getAuditLogCollection } from '@/lib/db/collections';
-import { getMongoClient } from '@/lib/db/mongo';
+import { getMongoDb } from '@/lib/db/mongo';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
 
   let mongo: 'connected' | 'unreachable' = 'connected';
   try {
-    const client = getMongoClient();
-    await client.db().command({ ping: 1 });
+    const db = await getMongoDb();
+    await db.command({ ping: 1 });
   } catch {
     mongo = 'unreachable';
   }
@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
         uid: session.id,
         role: session.role,
         rid: request.headers.get('x-request-id') ?? undefined,
+        timeoutMs: 12_000,
       },
     );
     coreComponents = health.components ?? {};

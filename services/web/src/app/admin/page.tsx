@@ -52,6 +52,8 @@ interface OpenClawSettingsPayload {
     gateway: string | null;
     setup: string | null;
   };
+  corePublicUrlConfigured?: boolean;
+  corePublicUrlHint?: string | null;
 }
 
 interface AuthOption {
@@ -610,6 +612,14 @@ export default function AdminPage() {
         <Alert>
           <AlertTitle>Unable to load OpenClaw settings.</AlertTitle>
           <AlertDescription>{settingsError}</AlertDescription>
+        </Alert>
+      ) : null}
+      {settings && !settings.links?.gateway ? (
+        <Alert>
+          <AlertTitle>Gateway URL not configured</AlertTitle>
+          <AlertDescription>
+            {settings.corePublicUrlHint ?? 'Set CORE_PUBLIC_URL in web service env so Admin can show gateway/setup buttons.'}
+          </AlertDescription>
         </Alert>
       ) : null}
 
