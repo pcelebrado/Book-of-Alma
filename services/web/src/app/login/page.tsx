@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,19 @@ import { Input } from '@/components/ui/input';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [showOnboardingClosed, setShowOnboardingClosed] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    setShowOnboardingClosed(params.get('onboarding') === 'closed');
+  }, []);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -51,6 +60,15 @@ export default function LoginPage() {
           <CardDescription>Book-first learning access for OpenClaw.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {showOnboardingClosed ? (
+            <Alert>
+              <AlertTitle>Onboarding locked</AlertTitle>
+              <AlertDescription>
+                Admin setup is complete. Sign in with an existing account.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">

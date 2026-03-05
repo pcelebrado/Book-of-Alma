@@ -14,13 +14,6 @@ interface RegisterBody {
   name?: string;
   email?: string;
   password?: string;
-  learningGoal?: string;
-  notificationChannel?: { type?: string; value?: string };
-  riskGuardrails?: {
-    maxTradesPerDay?: number;
-    maxLossPerDay?: number;
-    cooldownMinutes?: number;
-  };
 }
 
 function resolveIp(request: NextRequest): string {
@@ -38,6 +31,15 @@ function normalizeEmail(raw: string): string {
 
 function toPasswordHash(password: string): string {
   return createHash('sha256').update(password).digest('hex');
+}
+
+export async function GET() {
+  const users = await getUsersCollection();
+  const userCount = await users.countDocuments();
+  return Response.json({
+    onboardingOpen: userCount === 0,
+    userCount,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -71,56 +73,24 @@ export async function POST(request: NextRequest) {
   }
 
   const users = await getUsersCollection();
+  const userCount = await users.countDocuments();
+
+  if (userCount > 0) {
+    return apiError('onboarding_closed', 'Initial admin has already been created', 403);
+  }
+
   const existing = await users.findOne({ email });
   if (existing) {
     return apiError('email_taken', 'An account with that email already exists', 409);
   }
 
   const now = new Date();
-  const userCount = await users.countDocuments();
-
-  const channelType = String(body?.notificationChannel?.type ?? 'none').trim();
-  const channelValue = String(body?.notificationChannel?.value ?? '').trim();
-  const learningGoal = String(body?.learningGoal ?? '').trim();
-  const guardrails = body?.riskGuardrails ?? {};
-
-  const maxTradesPerDay = Number(guardrails.maxTradesPerDay ?? 3);
-  const maxLossPerDay = Number(guardrails.maxLossPerDay ?? 500);
-  const cooldownMinutes = Number(guardrails.cooldownMinutes ?? 60);
-
-  const prefs: {
-    learningGoal?: { sectionSlug: string };
-    notificationChannel?: { type: string; value: string };
-    riskGuardrails?: {
-      maxTradesPerDay: number;
-      maxLossPerDay: number;
-      cooldownMinutes: number;
-    };
-  } = {};
-
-  if (learningGoal) {
-    prefs.learningGoal = { sectionSlug: learningGoal };
-  }
-
-  if (channelType && channelType !== 'none' && channelValue) {
-    prefs.notificationChannel = {
-      type: channelType,
-      value: channelValue,
-    };
-  }
-
-  prefs.riskGuardrails = {
-    maxTradesPerDay: Number.isFinite(maxTradesPerDay) ? maxTradesPerDay : 3,
-    maxLossPerDay: Number.isFinite(maxLossPerDay) ? maxLossPerDay : 500,
-    cooldownMinutes: Number.isFinite(cooldownMinutes) ? cooldownMinutes : 60,
-  };
 
   const result = await users.insertOne({
     name,
     email,
-    role: userCount === 0 ? 'admin' : 'user',
+    role: 'admin',
     passwordHash: toPasswordHash(password),
-    prefs,
     createdAt: now,
     updatedAt: now,
   } as never);
@@ -131,7 +101,7 @@ export async function POST(request: NextRequest) {
     userId: result.insertedId.toHexString(),
     ip,
     details: {
-      role: userCount === 0 ? 'admin' : 'user',
+      role: 'admin',
       source: 'onboarding_register',
     },
   });
@@ -149,6 +119,6 @@ export async function POST(request: NextRequest) {
       name,
       email,
     },
-    role: userCount === 0 ? 'admin' : 'user',
+    role: 'admin',
   });
 }
