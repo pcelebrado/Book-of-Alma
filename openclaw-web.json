@@ -1,0 +1,62 @@
+{
+  "NEXT_TELEMETRY_DISABLED": {
+    "value": "1",
+    "description": "Disable Next.js telemetry in production/runtime environments."
+  },
+  "HOSTNAME": {
+    "value": "::",
+    "description": "Bind address for web server (IPv6-compatible for Railway networking)."
+  },
+  "MONGODB_URI": {
+    "value": "mongodb://${{openclaw-core.RAILWAY_PRIVATE_DOMAIN}}:27017/openclaw",
+    "description": "MongoDB URI for web-side data access via core private network endpoint."
+  },
+  "INTERNAL_CORE_BASE_URL": {
+    "value": "http://${{openclaw-core.RAILWAY_PRIVATE_DOMAIN}}:8080",
+    "description": "Private base URL used by web service to call core APIs."
+  },
+  "INTERNAL_SERVICE_TOKEN": {
+    "value": "${{openclaw-core.INTERNAL_SERVICE_TOKEN}}",
+    "description": "Shared internal token used to authenticate calls to core service."
+  },
+  "AUTH_SECRET": {
+    "value": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/\")}}=",
+    "description": "Auth.js/NextAuth signing secret for session and token security."
+  },
+  "AUTH_URL": {
+    "value": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+    "description": "Canonical external URL used by auth callbacks and redirects."
+  },
+  "NEXT_PUBLIC_APP_URL": {
+    "value": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+    "description": "Public frontend base URL exposed to browser/client-side code."
+  },
+  "BOOK_SOURCE_MODE": {
+    "value": "external",
+    "description": "Book ingestion mode expected by web workflows and admin tooling."
+  },
+  "BOOK_SOURCE_DIR": {
+    "value": "/data/book-source",
+    "description": "Path reference for source content location (kept aligned with core)."
+  },
+  "BOOK_IMPORT_MANIFEST": {
+    "value": "/data/book-source/manifest.json",
+    "description": "Manifest file path used by web-triggered import flows."
+  },
+  "BOOK_CANONICAL_COLLECTION": {
+    "value": "book_sections",
+    "description": "Collection name for canonical book section reads."
+  },
+  "BOOK_TOC_COLLECTION": {
+    "value": "book_toc",
+    "description": "Collection name for table-of-contents reads."
+  },
+  "BOOK_IMPORT_ENABLED": {
+    "value": "false",
+    "description": "Allow web-triggered import operations when enabled."
+  },
+  "BOOK_IMPORT_DRY_RUN": {
+    "value": "true",
+    "description": "Run import validation mode from web flows without persistent writes."
+  }
+}

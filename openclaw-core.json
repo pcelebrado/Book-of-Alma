@@ -1,0 +1,106 @@
+{
+  "SETUP_PASSWORD": {
+    "value": "",
+    "description": "Password required to access the /setup onboarding UI (set by deployer)."
+  },
+  "INTERNAL_SERVICE_TOKEN": {
+    "value": "${{secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+    "description": "Shared internal token for trusted web<->core API calls."
+  },
+  "OPENCLAW_GATEWAY_TOKEN": {
+    "value": "${{secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+    "description": "Bearer token used by wrapper/proxy to authenticate gateway traffic."
+  },
+  "OPENCLAW_STATE_DIR": {
+    "value": "/data/.openclaw",
+    "description": "Persistent directory for OpenClaw state, credentials, and runtime config."
+  },
+  "OPENCLAW_WORKSPACE_DIR": {
+    "value": "/data/workspace",
+    "description": "Persistent workspace path for generated files, tools, and project artifacts."
+  },
+  "RAILWAY_RUN_UID": {
+    "value": "0",
+    "description": "Run process as UID 0 to ensure write access to mounted Railway volume paths."
+  },
+  "MONGO_BIND_IP": {
+    "value": "::,0.0.0.0",
+    "description": "MongoDB bind addresses for Railway private networking (IPv6 + IPv4)."
+  },
+  "MONGODB_URI": {
+    "value": "mongodb://127.0.0.1:27017/openclaw",
+    "description": "Core service local MongoDB connection string used by OpenClaw runtime."
+  },
+  "SFTPGO_ENABLED": {
+    "value": "true",
+    "description": "Enable embedded SFTPGo service for secure book/content upload."
+  },
+  "SFTPGO_DATA_ROOT": {
+    "value": "/data/sftpgo",
+    "description": "Persistent root directory for SFTPGo data, keys, and user storage."
+  },
+  "SFTPGO_SFTPD__BINDINGS__0__PORT": {
+    "value": "2022",
+    "description": "TCP port for SFTP protocol endpoint."
+  },
+  "SFTPGO_HTTPD__BINDINGS__0__PORT": {
+    "value": "2080",
+    "description": "HTTP admin API/UI port for SFTPGo (internal by default)."
+  },
+  "SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN": {
+    "value": "true",
+    "description": "Automatically create initial SFTPGo admin on first boot."
+  },
+  "SFTPGO_DEFAULT_ADMIN_USERNAME": {
+    "value": "admin",
+    "description": "Username for default SFTPGo admin account."
+  },
+  "SFTPGO_DEFAULT_ADMIN_PASSWORD": {
+    "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+    "description": "Password for default SFTPGo admin account (auto-generated secret)."
+  },
+  "INTERNAL_GATEWAY_HOST": {
+    "value": "127.0.0.1",
+    "description": "Local host address where OpenClaw gateway process listens."
+  },
+  "INTERNAL_GATEWAY_PORT": {
+    "value": "18789",
+    "description": "Local port where OpenClaw gateway process listens."
+  },
+  "OPENCLAW_ENTRY": {
+    "value": "/openclaw/dist/entry.js",
+    "description": "Path to OpenClaw runtime entrypoint script inside container image."
+  },
+  "OPENCLAW_NODE": {
+    "value": "node",
+    "description": "Node.js executable used to launch OpenClaw runtime."
+  },
+  "BOOK_SOURCE_MODE": {
+    "value": "external",
+    "description": "Book ingestion mode (external volume/SFTP-based source by default)."
+  },
+  "BOOK_SOURCE_DIR": {
+    "value": "/data/book-source",
+    "description": "Filesystem directory containing source book content for ingestion."
+  },
+  "BOOK_IMPORT_MANIFEST": {
+    "value": "/data/book-source/manifest.json",
+    "description": "Path to manifest file describing book import inputs and structure."
+  },
+  "BOOK_CANONICAL_COLLECTION": {
+    "value": "book_sections",
+    "description": "MongoDB collection name for canonical imported book sections."
+  },
+  "BOOK_TOC_COLLECTION": {
+    "value": "book_toc",
+    "description": "MongoDB collection name for table-of-contents metadata."
+  },
+  "BOOK_IMPORT_ENABLED": {
+    "value": "false",
+    "description": "Enable automatic import job execution on startup."
+  },
+  "BOOK_IMPORT_DRY_RUN": {
+    "value": "true",
+    "description": "Validate import pipeline without writing permanent data."
+  }
+}
