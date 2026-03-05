@@ -7,6 +7,8 @@ export interface UserDocument {
   email: string;
   name: string;
   role: 'admin' | 'user';
+  password?: string;
+  passwordHash?: string;
   prefs?: {
     learningGoal?: { sectionSlug: string };
     notificationChannel?: { type: string; value: string };
