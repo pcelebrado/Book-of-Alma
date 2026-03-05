@@ -456,55 +456,49 @@ export default function AdminPage() {
       {/* ----------------------------------------------------------------- */}
       {/* Status bar */}
       {/* ----------------------------------------------------------------- */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <span className="text-sm font-medium">Configured</span>
-            <Badge variant={isConfigured ? 'secondary' : 'destructive'}>
-              {isConfigured ? 'yes' : 'no'}
-            </Badge>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <span className="text-sm font-medium">Core</span>
-            <Badge variant={status?.core === 'ok' ? 'secondary' : 'destructive'}>
-              {status?.core ?? 'unknown'}
-            </Badge>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <span className="text-sm font-medium">MongoDB</span>
-            <Badge variant={status?.mongo === 'connected' ? 'secondary' : 'destructive'}>
-              {status?.mongo ?? 'unknown'}
-            </Badge>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <span className="text-sm font-medium">Version</span>
-            <span className="text-xs text-muted-foreground">
-              {setupStatus?.openclawVersion ?? '—'}
-            </span>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap gap-3 text-sm">
+        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+          <span className="font-medium">Configured</span>
+          <Badge variant={isConfigured ? 'secondary' : 'destructive'}>
+            {isConfigured ? 'yes' : 'no'}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+          <span className="font-medium">Core</span>
+          <Badge variant={status?.core === 'ok' ? 'secondary' : 'destructive'}>
+            {status?.core ?? 'unknown'}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+          <span className="font-medium">MongoDB</span>
+          <Badge variant={status?.mongo === 'connected' ? 'secondary' : 'destructive'}>
+            {status?.mongo ?? 'unknown'}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+          <span className="font-medium">Version</span>
+          <span className="text-xs text-muted-foreground">
+            {setupStatus?.openclawVersion ?? '—'}
+          </span>
+        </div>
       </div>
 
       {/* ----------------------------------------------------------------- */}
       {/* Main tabs */}
       {/* ----------------------------------------------------------------- */}
       <Tabs defaultValue={isConfigured ? 'overview' : 'onboarding'} className="space-y-4">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
-          <TabsTrigger value="config">Config Editor</TabsTrigger>
-          <TabsTrigger value="console">Console</TabsTrigger>
-          <TabsTrigger value="gateway">Gateway</TabsTrigger>
-          <TabsTrigger value="devices">Devices</TabsTrigger>
-          <TabsTrigger value="channels">Channels</TabsTrigger>
-          <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex w-max">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+            <TabsTrigger value="config">Config</TabsTrigger>
+            <TabsTrigger value="console">Console</TabsTrigger>
+            <TabsTrigger value="gateway">Gateway</TabsTrigger>
+            <TabsTrigger value="devices">Devices</TabsTrigger>
+            <TabsTrigger value="channels">Channels</TabsTrigger>
+            <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ============================================================= */}
         {/* OVERVIEW TAB */}

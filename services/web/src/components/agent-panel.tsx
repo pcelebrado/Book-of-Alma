@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 
 type SkillKey =
   | 'explain'
@@ -97,7 +96,7 @@ export function AgentPanel({ sectionSlug }: { sectionSlug?: string }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <Tabs value={skill} onValueChange={(value) => setSkill(value as SkillKey)}>
-          <TabsList className="grid grid-cols-2 gap-1 bg-transparent p-0">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1">
             {skillOptions.map((option) => (
               <TabsTrigger key={option.key} value={option.key} className="h-8 text-xs">
                 {option.label}
@@ -107,11 +106,11 @@ export function AgentPanel({ sectionSlug }: { sectionSlug?: string }) {
         </Tabs>
 
         <div className="flex gap-2">
-          <Button onClick={runSkill} disabled={loading} className="flex-1">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {loading ? 'Running...' : 'Run skill'}
+          <Button size="sm" onClick={runSkill} disabled={loading} className="flex-1">
+            {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+            {loading ? 'Running…' : 'Run skill'}
           </Button>
-          <Button variant="outline" onClick={() => setOutput('')}>
+          <Button size="sm" variant="outline" onClick={() => setOutput('')}>
             Clear
           </Button>
         </div>
@@ -133,11 +132,9 @@ export function AgentPanel({ sectionSlug }: { sectionSlug?: string }) {
           </div>
         )}
 
-        <Textarea
-          readOnly
-          value="Educational use only. Assistant outputs are guidance, not financial advice."
-          className="min-h-[68px] text-xs"
-        />
+        <p className="text-xs text-muted-foreground">
+          Educational use only. Assistant outputs are guidance, not financial advice.
+        </p>
       </CardContent>
     </Card>
   );
