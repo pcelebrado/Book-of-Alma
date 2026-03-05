@@ -122,22 +122,38 @@ The right rail exposes **context-aware teaching tools** for whatever you're read
 
 ## Quick Start
 
-### 1. Deploy to Railway (One Click)
+### 1. Deploy to Railway
 
-Click the **Deploy on Railway** button above. That's it.
+Click the **Deploy on Railway** button above to import the repo.
 
-- Railway stages **two services**: `openclaw-web` (public) and `openclaw-core` (internal)
-- All environment variables, secrets, networking, and the data volume are **pre-configured**
-- You only need to set **one value**: `SETUP_PASSWORD` — a password to protect the setup wizard
+Railway will create a project with the repo attached. You need to configure
+**two services** from it — `openclaw-core` (internal) and `openclaw-web` (public).
 
-### 2. What's Pre-Configured For You
+#### Service setup
 
-Everything below is handled automatically. No manual wiring needed.
+| Step | Where | Action |
+|------|-------|--------|
+| 1 | Project canvas | Click the service → Settings → **Root Directory** → `services/core` |
+| 2 | Core service → Settings | Set **Healthcheck Path** to `/setup/healthz` |
+| 3 | Core service | Right-click → **Attach Volume** → Mount path: `/data` |
+| 4 | Core service → Networking | **No public domain** (internal only) |
+| 5 | Core service → Variables → **Raw Editor** | Paste contents of `services/core/.env.railway` |
+| 6 | Core service → Variables | Set `SETUP_PASSWORD` to a strong password you choose |
+| 7 | Project canvas | **+ New Service** → GitHub Repo → same repo → Root Directory: `services/web` |
+| 8 | Web service → Settings | Set **Healthcheck Path** to `/api/health` |
+| 9 | Web service → Networking | **Generate domain** (public HTTP) |
+| 10 | Web service → Variables → **Raw Editor** | Paste contents of `services/web/.env.railway` |
+
+> **Note:** The `.env.railway` files use Railway's `${{...}}` template
+> variable syntax. Secrets are auto-generated, service references resolve
+> automatically, and public URLs wire themselves to your Railway domain.
+
+### 2. What Gets Configured
 
 | What | How |
 |------|-----|
 | **MongoDB connection** | Web connects to core's embedded MongoDB via private networking |
-| **Service auth tokens** | Auto-generated and shared between web and core |
+| **Service auth tokens** | Auto-generated via `${{secret(...)}}` and shared between web and core |
 | **Auth.js session secret** | Auto-generated (equivalent to `openssl rand -base64 32`) |
 | **Public URL wiring** | `AUTH_URL` and `NEXT_PUBLIC_APP_URL` use your Railway domain |
 | **SFTPGo admin password** | Auto-generated |
@@ -149,17 +165,8 @@ Everything below is handled automatically. No manual wiring needed.
 
 1. Wait for both services to build and deploy (core first, then web)
 2. Visit `https://your-app.railway.app` — this is your learning platform
-3. Navigate to the `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
+3. You'll be redirected to `/setup` to configure your AI provider (OpenAI, Anthropic, Google, etc.)
 4. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
-
-### Manual Import (Advanced)
-
-If you import the repo directly instead of using the template button, copy the `.env.railway` files into each service's Raw Editor:
-
-- `services/core/.env.railway` → Core service Variables → Raw Editor
-- `services/web/.env.railway` → Web service Variables → Raw Editor
-
-Then manually: attach a volume at `/data` to core, generate a public domain for web, and keep core internal-only.
 
 ---
 
