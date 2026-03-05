@@ -48,11 +48,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const auditLog = await getAuditLogCollection();
-  const lastReindex = await auditLog.findOne(
-    { action: 'reindex' },
-    { sort: { createdAt: -1 } },
-  );
+  let lastReindex: { createdAt?: Date; details?: Record<string, unknown> } | null = null;
+  try {
+    const auditLog = await getAuditLogCollection();
+    lastReindex = await auditLog.findOne(
+      { action: 'reindex' },
+      { sort: { createdAt: -1 } },
+    );
+  } catch {
+    // Keep status endpoint available even when audit log storage is unavailable.
+    lastReindex = null;
+  }
 
   return Response.json({
     mongo,

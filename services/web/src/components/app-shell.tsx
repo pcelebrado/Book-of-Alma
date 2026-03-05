@@ -44,6 +44,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return pathname.replace('/book/', '');
   }, [pathname]);
 
+  const isAdminPage = pathname?.startsWith('/admin') ?? false;
+  const shellMaxWidthClass = isAdminPage ? 'max-w-[1600px]' : 'max-w-[1280px]';
+  const contentGridClass = isAdminPage
+    ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]'
+    : 'xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,760px)_360px]';
+
   if (isPublicPage) {
     return (
       <>
@@ -58,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <div className="min-h-screen bg-background text-foreground">
         <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
-          <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-3 px-4 lg:px-6">
+          <div className={`mx-auto flex h-16 items-center gap-3 px-4 lg:px-6 ${shellMaxWidthClass}`}>
             <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tightish">
               <BookOpen className="h-4 w-4" />
               OpenClaw
@@ -139,7 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="mx-auto grid max-w-[1280px] gap-6 px-4 py-4 lg:px-6 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,760px)_360px]">
+        <div className={`mx-auto grid gap-8 px-4 py-6 lg:px-6 ${shellMaxWidthClass} ${contentGridClass}`}>
           <aside className="hidden xl:block">
             <div className="sticky top-20">
               <TOCTree />
@@ -150,7 +156,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <main>{children}</main>
           </ScrollArea>
 
-          <aside className="hidden 2xl:block">
+          <aside className={isAdminPage ? 'hidden xl:block' : 'hidden 2xl:block'}>
             <div className="sticky top-20 h-[calc(100vh-96px)]">
               <AgentPanel sectionSlug={sectionSlug} />
             </div>
