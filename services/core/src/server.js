@@ -1313,6 +1313,7 @@ async function buildOnboardArgs(payload) {
     "--json",
     "--no-install-daemon",
     "--skip-health",
+    "--skip-skills",
     "--workspace",
     WORKSPACE_DIR,
     // The wrapper owns public networking; keep the gateway internal.
@@ -1380,6 +1381,9 @@ function runCmd(cmd, args, opts = {}) {
       ...opts,
       env: {
         ...process.env,
+        // Railway containers can be tight on memory during onboarding.
+        // Give Node-based OpenClaw subprocesses more headroom by default.
+        NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=1024",
         OPENCLAW_STATE_DIR: STATE_DIR,
         OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
       },
