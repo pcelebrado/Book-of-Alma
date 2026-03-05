@@ -358,7 +358,7 @@ export default function AdminPage() {
     () => authGroups.find((g) => g.value === selectedGroup),
     [authGroups, selectedGroup],
   );
-  const authOptions = currentGroup?.options ?? [];
+  const authOptions = useMemo(() => currentGroup?.options ?? [], [currentGroup]);
   const visibleAuthOptions = useMemo(
     () => (showAdvancedAuth ? authOptions : authOptions.filter((opt) => !isInteractiveAuthOption(opt))),
     [authOptions, showAdvancedAuth],
@@ -1038,7 +1038,7 @@ export default function AdminPage() {
               <div className="rounded-md border p-3">
                 <p className="text-xs font-medium">Telegram pairing rescue</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  If Telegram says "access not configured", approve the pairing code shown in Telegram.
+                  If Telegram says &quot;access not configured&quot;, approve the pairing code shown in Telegram.
                 </p>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <select
