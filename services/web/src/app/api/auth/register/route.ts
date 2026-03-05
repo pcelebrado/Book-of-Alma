@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
-import { signIn } from '@/lib/auth/auth-config';
 import { getUsersCollection } from '@/lib/db/collections';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
@@ -104,12 +103,6 @@ export async function POST(request: NextRequest) {
       role: 'admin',
       source: 'onboarding_register',
     },
-  });
-
-  await signIn('credentials', {
-    email,
-    password,
-    redirect: false,
   });
 
   return Response.json({

@@ -1,5 +1,6 @@
 'use client';
 
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -56,6 +57,19 @@ export function OnboardingForm() {
         }
 
         setError(payload.error?.message ?? 'Unable to create admin account.');
+        return;
+      }
+
+      const signInResult = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        setError('Account created, but sign-in failed. Please sign in manually.');
+        router.push('/login');
+        router.refresh();
         return;
       }
 

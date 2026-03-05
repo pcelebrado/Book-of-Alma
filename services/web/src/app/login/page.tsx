@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -31,15 +32,14 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
       });
 
-      const payload = (await response.json()) as { error?: { message?: string } };
-      if (!response.ok) {
-        setError(payload.error?.message ?? 'Login failed.');
+      if (result?.error) {
+        setError(result.error);
         return;
       }
 
