@@ -1035,6 +1035,43 @@ export default function AdminPage() {
                 Run Setup
               </Button>
 
+              <div className="rounded-md border p-3">
+                <p className="text-xs font-medium">Telegram pairing rescue</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  If Telegram says "access not configured", approve the pairing code shown in Telegram.
+                </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={pairingChannel}
+                    onChange={(e) => setPairingChannel(e.target.value)}
+                  >
+                    <option value="telegram">telegram</option>
+                    <option value="discord">discord</option>
+                  </select>
+                  <Input
+                    placeholder="Pairing code (e.g. Z374ZM93)"
+                    value={pairingCode}
+                    onChange={(e) => setPairingCode(e.target.value)}
+                  />
+                  <Button onClick={() => void approvePairing()} disabled={pairingBusy}>
+                    {pairingBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                    Approve pairing
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => void loadDevices()} disabled={devicesLoading}>
+                    {devicesLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                    Refresh pending devices
+                  </Button>
+                  {pendingDevices.slice(0, 3).map((id) => (
+                    <Button key={id} variant="secondary" size="sm" onClick={() => void approveDevice(id)}>
+                      Approve {id}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               {onboardLog ? (
                 <pre className="max-h-80 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
                   {onboardLog}
