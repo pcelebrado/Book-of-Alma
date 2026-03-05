@@ -172,11 +172,31 @@ function pickDefaultAuthOption(options: AuthOption[], includeInteractive: boolea
 
 async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: 'no-store', ...opts });
-  const data = await res.json();
+  const raw = await res.text();
+
+  let data: unknown = null;
+  let parseError: Error | null = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    parseError = error instanceof Error ? error : new Error(String(error));
+  }
+
   if (!res.ok) {
-    const msg = data?.error?.message ?? data?.output ?? `HTTP ${res.status}`;
+    const maybe = data as { error?: { message?: string }; output?: string } | null;
+    const msg = maybe?.error?.message ?? maybe?.output ?? (raw || `HTTP ${res.status}`);
+
+    if (parseError) {
+      throw new Error(`HTTP ${res.status} (invalid JSON error payload): ${parseError.message}. Raw: ${raw.slice(0, 300)}`);
+    }
+
     throw new Error(msg);
   }
+
+  if (parseError) {
+    throw new Error(`Invalid JSON success payload from ${url}: ${parseError.message}. Raw: ${raw.slice(0, 300)}`);
+  }
+
   return data as T;
 }
 
@@ -573,9 +593,9 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tightish">Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="space-y-2">
+        <h1 className="text-4xl leading-[1.1] tracking-[-0.02em] font-semibold">Admin</h1>
+        <p className="text-sm leading-[1.6] text-muted-foreground">
           OpenClaw control center — onboarding, config, gateway, channels, diagnostics.
         </p>
       </div>
@@ -596,7 +616,7 @@ export default function AdminPage() {
       {/* ----------------------------------------------------------------- */}
       {/* Status bar */}
       {/* ----------------------------------------------------------------- */}
-      <div className="flex flex-wrap gap-3 text-sm">
+      <div className="flex flex-wrap gap-2 text-sm">
         <div className="flex items-center gap-2 rounded-md border px-3 py-2">
           <span className="font-medium">Configured</span>
           <Badge variant={isConfigured ? 'secondary' : 'destructive'}>
@@ -766,15 +786,15 @@ export default function AdminPage() {
           ) : null}
 
           <Card>
-            <CardHeader>
-              <CardTitle>Onboarding Wizard</CardTitle>
-              <CardDescription>
-                Run initial OpenClaw setup. Select an auth provider, enter your API key, and optionally
-                configure channel tokens.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <Alert>
+              <CardHeader className="pb-2">
+                <CardTitle>Onboarding Wizard</CardTitle>
+                <CardDescription>
+                  Run initial OpenClaw setup. Select an auth provider, enter your API key, and optionally
+                  configure channel tokens.
+                </CardDescription>
+              </CardHeader>
+            <CardContent className="space-y-6 text-sm">
+              <Alert className="border-border/60">
                 <AlertTitle>Onboarding guidance (doc-backed)</AlertTitle>
                 <AlertDescription>
                   Prefer <strong>quickstart</strong> flow, API-key auth choices for non-interactive setup, and
@@ -880,7 +900,7 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <Separator />
+              <Separator className="opacity-40" />
               <p className="text-xs text-muted-foreground">Custom provider (optional, docs: /start/onboarding-overview)</p>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -946,7 +966,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="opacity-40" />
               <p className="text-xs text-muted-foreground">Channel tokens (optional)</p>
 
               <div className="grid gap-4 md:grid-cols-2">
