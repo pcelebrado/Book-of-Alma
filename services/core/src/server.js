@@ -644,22 +644,27 @@ app.post("/internal/openclaw/console/run", requireInternalApiAuth, async (req, r
   const cmd = String(payload.cmd || "").trim();
   const arg = String(payload.arg || "").trim();
 
+  // Use the same full allowlist as /setup/api/console/run
   const allowed = new Set([
     "gateway.restart",
+    "gateway.stop",
+    "gateway.start",
+    "openclaw.version",
     "openclaw.status",
     "openclaw.health",
     "openclaw.doctor",
     "openclaw.logs.tail",
     "openclaw.config.get",
+    "openclaw.devices.list",
+    "openclaw.devices.approve",
+    "openclaw.plugins.list",
+    "openclaw.plugins.enable",
   ]);
 
   if (!allowed.has(cmd)) {
     return res.status(400).json({
       ok: false,
-      error: {
-        code: "invalid_command",
-        message: "Command not allowed",
-      },
+      error: { code: "invalid_command", message: "Command not allowed" },
     });
   }
 
@@ -668,57 +673,359 @@ app.post("/internal/openclaw/console/run", requireInternalApiAuth, async (req, r
       await restartGateway();
       return res.json({ ok: true, output: "Gateway restarted (wrapper-managed).\n" });
     }
-
+    if (cmd === "gateway.stop") {
+      if (gatewayProc) {
+        try { gatewayProc.kill("SIGTERM"); } catch {}
+        await sleep(750);
+        gatewayProc = null;
+      }
+      return res.json({ ok: true, output: "Gateway stopped (wrapper-managed).\n" });
+    }
+    if (cmd === "gateway.start") {
+      const r = await ensureGatewayRunning();
+      return res.json({ ok: Boolean(r.ok), output: r.ok ? "Gateway started.\n" : `Gateway not started: ${r.reason}\n` });
+    }
+    if (cmd === "openclaw.version") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
     if (cmd === "openclaw.status") {
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["status"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
-
     if (cmd === "openclaw.health") {
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["health"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
-
     if (cmd === "openclaw.doctor") {
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
-
     if (cmd === "openclaw.logs.tail") {
       const lines = Math.max(50, Math.min(1000, Number.parseInt(arg || "200", 10) || 200));
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["logs", "--tail", String(lines)]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
-
     if (cmd === "openclaw.config.get") {
       if (!arg) {
-        return res.status(400).json({
-          ok: false,
-          error: {
-            code: "missing_argument",
-            message: "Config path is required",
-          },
-        });
+        return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Config path is required" } });
       }
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", arg]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
+    if (cmd === "openclaw.devices.list") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "list"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.devices.approve") {
+      const requestId = String(arg || "").trim();
+      if (!requestId) return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Missing device request ID" } });
+      if (!/^[A-Za-z0-9_-]+$/.test(requestId)) return res.status(400).json({ ok: false, error: { code: "invalid_argument", message: "Invalid device request ID" } });
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "approve", requestId]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.plugins.list") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "list"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.plugins.enable") {
+      const name = String(arg || "").trim();
+      if (!name) return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Missing plugin name" } });
+      if (!/^[A-Za-z0-9_-]+$/.test(name)) return res.status(400).json({ ok: false, error: { code: "invalid_argument", message: "Invalid plugin name" } });
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", name]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
 
-    return res.status(400).json({
-      ok: false,
-      error: {
-        code: "invalid_command",
-        message: "Unhandled command",
-      },
-    });
+    return res.status(400).json({ ok: false, error: { code: "invalid_command", message: "Unhandled command" } });
   } catch (error) {
     return res.status(500).json({
       ok: false,
-      error: {
-        code: "console_failed",
-        message: String(error),
+      error: { code: "console_failed", message: String(error) },
+    });
+  }
+});
+
+// --- Internal bridge endpoints for /setup/api/* (used by the web Admin page) ---
+// These mirror the existing /setup/api/* endpoints but use INTERNAL_SERVICE_TOKEN auth
+// instead of SETUP_PASSWORD Basic auth, so the web service can call them via coreFetch().
+
+app.get("/internal/openclaw/setup/status", requireInternalApiAuth, async (_req, res) => {
+  try {
+    const version = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
+    const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
+
+    res.json({
+      ok: true,
+      configured: isConfigured(),
+      gatewayTarget: GATEWAY_TARGET,
+      openclawVersion: version.output.trim(),
+      channelsAddHelp: channelsHelp.output,
+      authGroups: AUTH_GROUPS,
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: { code: "status_failed", message: String(error) } });
+  }
+});
+
+app.get("/internal/openclaw/setup/auth-groups", requireInternalApiAuth, (_req, res) => {
+  res.json({ ok: true, authGroups: AUTH_GROUPS });
+});
+
+app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res) => {
+  try {
+    const respondJson = (status, body) => {
+      if (res.writableEnded || res.headersSent) return;
+      res.status(status).json(body);
+    };
+    if (isConfigured()) {
+      await ensureGatewayRunning();
+      return respondJson(200, {
+        ok: true,
+        output: "Already configured.\nUse Reset setup if you want to rerun onboarding.\n",
+      });
+    }
+
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+    const payload = req.body || {};
+
+    let onboardArgs;
+    try {
+      onboardArgs = buildOnboardArgs(payload);
+    } catch (err) {
+      return respondJson(400, { ok: false, output: `Setup input error: ${String(err)}` });
+    }
+
+    const prefix = "[setup] running openclaw onboard...\n";
+    const onboard = await runCmd(OPENCLAW_NODE, clawArgs(onboardArgs));
+
+    let extra = "";
+    const ok = onboard.code === 0 && isConfigured();
+
+    if (ok) {
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
+
+      if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
+        const providerId = payload.customProviderId.trim();
+        const baseUrl = payload.customProviderBaseUrl.trim();
+        const api = (payload.customProviderApi || "openai-completions").trim();
+        const apiKeyEnv = (payload.customProviderApiKeyEnv || "").trim();
+        const modelId = (payload.customProviderModelId || "").trim();
+
+        if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
+          extra += `\n[custom provider] skipped: invalid provider id`;
+        } else if (!/^https?:\/\//.test(baseUrl)) {
+          extra += `\n[custom provider] skipped: baseUrl must start with http(s)://`;
+        } else if (api !== "openai-completions" && api !== "openai-responses") {
+          extra += `\n[custom provider] skipped: api must be openai-completions or openai-responses`;
+        } else if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
+          extra += `\n[custom provider] skipped: invalid api key env var name`;
+        } else {
+          const providerCfg = {
+            baseUrl,
+            api,
+            apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
+            models: modelId ? [{ id: modelId, name: modelId }] : undefined,
+          };
+          await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "models.mode", "merge"]));
+          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", `models.providers.${providerId}`, JSON.stringify(providerCfg)]));
+          extra += `\n[custom provider] exit=${set.code}\n${set.output || "(no output)"}`;
+        }
+      }
+
+      const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
+      const helpText = channelsHelp.output || "";
+      const supports = (name) => helpText.includes(name);
+
+      if (payload.telegramToken?.trim()) {
+        if (!supports("telegram")) {
+          extra += "\n[telegram] skipped (unsupported build)\n";
+        } else {
+          const token = payload.telegramToken.trim();
+          const cfgObj = { enabled: true, dmPolicy: "pairing", botToken: token, groupPolicy: "allowlist", streamMode: "partial" };
+          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
+          const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
+          const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
+          extra += `\n[telegram config] exit=${set.code}\n[telegram verify] exit=${get.code}\n[telegram plugin] exit=${plug.code}`;
+        }
+      }
+
+      if (payload.discordToken?.trim()) {
+        if (!supports("discord")) {
+          extra += "\n[discord] skipped (unsupported build)\n";
+        } else {
+          const token = payload.discordToken.trim();
+          const cfgObj = { enabled: true, token, groupPolicy: "allowlist", dm: { policy: "pairing" } };
+          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
+          const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
+          extra += `\n[discord config] exit=${set.code}\n[discord verify] exit=${get.code}`;
+        }
+      }
+
+      if (payload.slackBotToken?.trim() || payload.slackAppToken?.trim()) {
+        if (!supports("slack")) {
+          extra += "\n[slack] skipped (unsupported build)\n";
+        } else {
+          const cfgObj = {
+            enabled: true,
+            botToken: payload.slackBotToken?.trim() || undefined,
+            appToken: payload.slackAppToken?.trim() || undefined,
+          };
+          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.slack", JSON.stringify(cfgObj)]));
+          const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
+          extra += `\n[slack config] exit=${set.code}\n[slack verify] exit=${get.code}`;
+        }
+      }
+
+      await restartGateway();
+      const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
+      extra += `\n[doctor --fix] exit=${fix.code}`;
+      await restartGateway();
+    }
+
+    return respondJson(ok ? 200 : 500, {
+      ok,
+      output: `${prefix}${onboard.output}${extra}`,
+    });
+  } catch (err) {
+    console.error("[/internal/openclaw/setup/run] error:", err);
+    if (!res.headersSent) res.status(500).json({ ok: false, output: `Internal error: ${String(err)}` });
+  }
+});
+
+app.post("/internal/openclaw/setup/reset", requireInternalApiAuth, async (_req, res) => {
+  try {
+    try {
+      if (gatewayProc) {
+        try { gatewayProc.kill("SIGTERM"); } catch {}
+        await sleep(750);
+        gatewayProc = null;
+      }
+    } catch { /* ignore */ }
+
+    const candidates = typeof resolveConfigCandidates === "function" ? resolveConfigCandidates() : [configPath()];
+    for (const p of candidates) {
+      try { fs.rmSync(p, { force: true }); } catch {}
+    }
+
+    res.json({ ok: true, output: "Stopped gateway and deleted config file(s). You can rerun setup now." });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "reset_failed", message: String(err) } });
+  }
+});
+
+app.get("/internal/openclaw/setup/config/raw", requireInternalApiAuth, async (_req, res) => {
+  try {
+    const p = configPath();
+    const exists = fs.existsSync(p);
+    const content = exists ? fs.readFileSync(p, "utf8") : "";
+    res.json({ ok: true, path: p, exists, content });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "config_read_failed", message: String(err) } });
+  }
+});
+
+app.post("/internal/openclaw/setup/config/raw", requireInternalApiAuth, async (req, res) => {
+  try {
+    const content = String((req.body && req.body.content) || "");
+    if (content.length > 500_000) {
+      return res.status(413).json({ ok: false, error: { code: "config_too_large", message: "Config too large" } });
+    }
+
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    const p = configPath();
+    if (fs.existsSync(p)) {
+      const backupPath = `${p}.bak-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+      fs.copyFileSync(p, backupPath);
+    }
+    fs.writeFileSync(p, content, { encoding: "utf8", mode: 0o600 });
+
+    if (isConfigured()) {
+      await restartGateway();
+    }
+
+    res.json({ ok: true, path: p });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "config_write_failed", message: String(err) } });
+  }
+});
+
+app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, res) => {
+  try {
+    const v = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
+    const help = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
+    const tg = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
+    const dc = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
+
+    res.json({
+      ok: true,
+      wrapper: {
+        node: process.version,
+        port: PORT,
+        stateDir: STATE_DIR,
+        workspaceDir: WORKSPACE_DIR,
+        configured: isConfigured(),
+        configPathResolved: configPath(),
+        gatewayTarget: GATEWAY_TARGET,
+        gatewayRunning: Boolean(gatewayProc),
+        lastGatewayError,
+        lastGatewayExit,
+      },
+      openclaw: {
+        version: v.output.trim(),
+        channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
+        channels: {
+          telegram: { exit: tg.code, output: redactSecrets(tg.output) },
+          discord: { exit: dc.code, output: redactSecrets(dc.output) },
+        },
       },
     });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "debug_failed", message: String(err) } });
+  }
+});
+
+app.get("/internal/openclaw/setup/devices/pending", requireInternalApiAuth, async (_req, res) => {
+  try {
+    const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "list"]));
+    const output = redactSecrets(r.output);
+    const requestIds = extractDeviceRequestIds(output);
+    res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, requestIds, output });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "devices_failed", message: String(err) } });
+  }
+});
+
+app.post("/internal/openclaw/setup/devices/approve", requireInternalApiAuth, async (req, res) => {
+  try {
+    const requestId = String((req.body && req.body.requestId) || "").trim();
+    if (!requestId) return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Missing device request ID" } });
+    if (!/^[A-Za-z0-9_-]+$/.test(requestId)) return res.status(400).json({ ok: false, error: { code: "invalid_argument", message: "Invalid device request ID" } });
+    const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "approve", requestId]));
+    res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "devices_approve_failed", message: String(err) } });
+  }
+});
+
+app.post("/internal/openclaw/setup/pairing/approve", requireInternalApiAuth, async (req, res) => {
+  try {
+    const { channel, code } = req.body || {};
+    if (!channel || !code) {
+      return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Missing channel or code" } });
+    }
+    const r = await runCmd(OPENCLAW_NODE, clawArgs(["pairing", "approve", String(channel), String(code)]));
+    res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: r.output });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: { code: "pairing_approve_failed", message: String(err) } });
   }
 });
 

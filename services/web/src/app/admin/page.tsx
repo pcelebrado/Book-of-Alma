@@ -1,14 +1,22 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertTriangle, Loader2, Play, RefreshCw, RotateCcw, Square, Terminal } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface AdminStatusPayload {
   mongo?: string;
@@ -46,156 +54,398 @@ interface OpenClawSettingsPayload {
   };
 }
 
+interface AuthOption {
+  value: string;
+  label: string;
+}
+
+interface AuthGroup {
+  value: string;
+  label: string;
+  hint?: string;
+  options: AuthOption[];
+}
+
+interface SetupStatusPayload {
+  ok: boolean;
+  configured: boolean;
+  gatewayTarget: string;
+  openclawVersion: string;
+  channelsAddHelp?: string;
+  authGroups?: AuthGroup[];
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(url, { cache: 'no-store', ...opts });
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = data?.error?.message ?? data?.output ?? `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data as T;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function AdminPage() {
+  // --- System status ---
   const [status, setStatus] = useState<AdminStatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [reindexing, setReindexing] = useState(false);
-  const [restartingGateway, setRestartingGateway] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // --- OpenClaw settings (quick view) ---
+  const [settings, setSettings] = useState<OpenClawSettingsPayload | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [openClawSettings, setOpenClawSettings] = useState<OpenClawSettingsPayload | null>(null);
-  const [consoleRunning, setConsoleRunning] = useState(false);
-  const [consoleCommand, setConsoleCommand] = useState('openclaw.status');
+
+  // --- Setup status (detailed) ---
+  const [setupStatus, setSetupStatus] = useState<SetupStatusPayload | null>(null);
+
+  // --- Onboarding ---
+  const [authGroups, setAuthGroups] = useState<AuthGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedAuth, setSelectedAuth] = useState('');
+  const [authSecret, setAuthSecret] = useState('');
+  const [telegramToken, setTelegramToken] = useState('');
+  const [discordToken, setDiscordToken] = useState('');
+  const [slackBotToken, setSlackBotToken] = useState('');
+  const [slackAppToken, setSlackAppToken] = useState('');
+  const [onboardLog, setOnboardLog] = useState('');
+  const [onboarding, setOnboarding] = useState(false);
+
+  // --- Config editor ---
+  const [configContent, setConfigContent] = useState('');
+  const [configPath, setConfigPath] = useState('');
+  const [configExists, setConfigExists] = useState(false);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configSaving, setConfigSaving] = useState(false);
+
+  // --- Console ---
+  const [consoleCmd, setConsoleCmd] = useState('openclaw.status');
   const [consoleArg, setConsoleArg] = useState('');
   const [consoleOutput, setConsoleOutput] = useState('');
+  const [consoleRunning, setConsoleRunning] = useState(false);
 
-  const loadStatus = async () => {
+  // --- Gateway controls ---
+  const [gatewayBusy, setGatewayBusy] = useState(false);
+
+  // --- Devices ---
+  const [pendingDevices, setPendingDevices] = useState<string[]>([]);
+  const [devicesOutput, setDevicesOutput] = useState('');
+  const [devicesLoading, setDevicesLoading] = useState(false);
+
+  // --- Pairing ---
+  const [pairingChannel, setPairingChannel] = useState('telegram');
+  const [pairingCode, setPairingCode] = useState('');
+  const [pairingBusy, setPairingBusy] = useState(false);
+
+  // --- Debug ---
+  const [debugData, setDebugData] = useState<Record<string, unknown> | null>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
+
+  // --- Reset ---
+  const [resetting, setResetting] = useState(false);
+
+  // --- Reindex ---
+  const [reindexing, setReindexing] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // Ref to track initial load
+  const didInit = useRef(false);
+
+  // -----------------------------------------------------------------------
+  // Loaders
+  // -----------------------------------------------------------------------
+
+  const loadStatus = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/status', { cache: 'no-store' });
-      const payload = (await response.json()) as AdminStatusPayload | { error?: { message?: string } };
-      if (!response.ok) {
-        const message = 'error' in payload ? payload.error?.message : 'Unable to load admin status';
-        throw new Error(message ?? 'Unable to load admin status');
-      }
-
-      setStatus(payload as AdminStatusPayload);
+      const data = await apiFetch<AdminStatusPayload>('/api/admin/status');
+      setStatus(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load admin status');
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadOpenClawSettings = async () => {
-    setSettingsError(null);
-    try {
-      const response = await fetch('/api/admin/openclaw/settings', { cache: 'no-store' });
-      const payload = (await response.json()) as OpenClawSettingsPayload | { error?: { message?: string } };
-      if (!response.ok) {
-        const message = 'error' in payload ? payload.error?.message : 'Unable to load OpenClaw settings';
-        throw new Error(message ?? 'Unable to load OpenClaw settings');
-      }
-
-      setOpenClawSettings(payload as OpenClawSettingsPayload);
-    } catch (err) {
-      setSettingsError(err instanceof Error ? err.message : 'Unable to load OpenClaw settings');
-    }
-  };
-
-  useEffect(() => {
-    void loadStatus();
-    void loadOpenClawSettings();
   }, []);
 
-  const triggerReindex = async () => {
-    setReindexing(true);
-    setProgress(25);
+  const loadSettings = useCallback(async () => {
+    setSettingsError(null);
     try {
-      const response = await fetch('/api/admin/book/reindex', {
+      const data = await apiFetch<OpenClawSettingsPayload>('/api/admin/openclaw/settings');
+      setSettings(data);
+    } catch (err) {
+      setSettingsError(err instanceof Error ? err.message : 'Unable to load settings');
+    }
+  }, []);
+
+  const loadSetupStatus = useCallback(async () => {
+    try {
+      const data = await apiFetch<SetupStatusPayload>('/api/admin/openclaw/setup/status');
+      setSetupStatus(data);
+      if (data.authGroups && data.authGroups.length > 0) {
+        setAuthGroups(data.authGroups);
+        if (!selectedGroup) {
+          setSelectedGroup(data.authGroups[0].value);
+          const firstOpts = data.authGroups[0].options ?? [];
+          if (firstOpts.length > 0) setSelectedAuth(firstOpts[0].value);
+        }
+      }
+    } catch {
+      // Setup status may fail if core is down; don't block
+    }
+  }, [selectedGroup]);
+
+  const loadConfig = useCallback(async () => {
+    setConfigLoading(true);
+    try {
+      const data = await apiFetch<{ ok: boolean; path: string; exists: boolean; content: string }>(
+        '/api/admin/openclaw/setup/config/raw',
+      );
+      setConfigContent(data.content);
+      setConfigPath(data.path);
+      setConfigExists(data.exists);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load config');
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    void loadStatus();
+    void loadSettings();
+    void loadSetupStatus();
+  }, [loadStatus, loadSettings, loadSetupStatus]);
+
+  // -----------------------------------------------------------------------
+  // Auth group → options
+  // -----------------------------------------------------------------------
+
+  const currentGroup = authGroups.find((g) => g.value === selectedGroup);
+  const authOptions = currentGroup?.options ?? [];
+
+  // -----------------------------------------------------------------------
+  // Actions
+  // -----------------------------------------------------------------------
+
+  const runOnboarding = async () => {
+    setOnboarding(true);
+    setOnboardLog('Running onboarding...\n');
+    try {
+      const data = await apiFetch<{ ok: boolean; output: string }>('/api/admin/openclaw/setup/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dryRun: true }),
+        body: JSON.stringify({
+          flow: 'quickstart',
+          authChoice: selectedAuth,
+          authSecret,
+          telegramToken,
+          discordToken,
+          slackBotToken,
+          slackAppToken,
+        }),
       });
-      const payload = (await response.json()) as { started?: boolean; error?: { message?: string } };
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? 'Reindex failed. Retry.');
-      }
-      setProgress(100);
-      toast.success('Reindex started.');
-      await loadStatus();
+      setOnboardLog(data.output ?? JSON.stringify(data, null, 2));
+      toast.success(data.ok ? 'Onboarding completed!' : 'Onboarding finished with issues');
+      void loadSettings();
+      void loadSetupStatus();
     } catch (err) {
-      setProgress(0);
-      toast.error(err instanceof Error ? err.message : 'Reindex failed. Retry.');
+      const msg = err instanceof Error ? err.message : 'Onboarding failed';
+      setOnboardLog((prev) => prev + '\nError: ' + msg);
+      toast.error(msg);
     } finally {
-      setReindexing(false);
-      setTimeout(() => setProgress(0), 1200);
+      setOnboarding(false);
     }
   };
 
-  const restartGateway = async () => {
-    setRestartingGateway(true);
+  const saveConfig = async () => {
+    setConfigSaving(true);
     try {
-      const response = await fetch('/api/admin/openclaw/gateway/restart', {
+      await apiFetch('/api/admin/openclaw/setup/config/raw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: configContent }),
       });
-      const payload = (await response.json()) as { error?: { message?: string } };
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? 'Gateway restart failed');
-      }
-
-      toast.success('OpenClaw gateway restart triggered.');
-      await loadStatus();
-      await loadOpenClawSettings();
+      toast.success('Config saved and gateway restarted.');
+      void loadSettings();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gateway restart failed');
+      toast.error(err instanceof Error ? err.message : 'Failed to save config');
     } finally {
-      setRestartingGateway(false);
+      setConfigSaving(false);
     }
   };
 
   const runConsoleCommand = async () => {
     setConsoleRunning(true);
     try {
-      const response = await fetch('/api/admin/openclaw/console/run', {
+      const data = await apiFetch<{ ok: boolean; output?: string }>('/api/admin/openclaw/console/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cmd: consoleCommand,
-          arg: consoleArg,
-        }),
+        body: JSON.stringify({ cmd: consoleCmd, arg: consoleArg }),
       });
-
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        output?: string;
-        error?: { message?: string };
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? 'Console command failed');
-      }
-
-      setConsoleOutput(payload.output ?? 'Command completed with no output.');
-      toast.success('OpenClaw console command executed.');
-      await loadOpenClawSettings();
-      await loadStatus();
+      setConsoleOutput(data.output ?? 'Command completed.');
+      toast.success('Console command executed.');
+      void loadSettings();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Console command failed';
-      setConsoleOutput(message);
-      toast.error(message);
+      const msg = err instanceof Error ? err.message : 'Console command failed';
+      setConsoleOutput(msg);
+      toast.error(msg);
     } finally {
       setConsoleRunning(false);
     }
   };
 
+  const gatewayAction = async (action: 'restart' | 'stop' | 'start') => {
+    setGatewayBusy(true);
+    try {
+      if (action === 'restart') {
+        await apiFetch('/api/admin/openclaw/gateway/restart', { method: 'POST' });
+      } else {
+        await apiFetch('/api/admin/openclaw/console/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cmd: `gateway.${action}` }),
+        });
+      }
+      toast.success(`Gateway ${action} triggered.`);
+      void loadSettings();
+      void loadStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Gateway ${action} failed`);
+    } finally {
+      setGatewayBusy(false);
+    }
+  };
+
+  const loadDevices = async () => {
+    setDevicesLoading(true);
+    try {
+      const data = await apiFetch<{ ok: boolean; requestIds: string[]; output: string }>(
+        '/api/admin/openclaw/setup/devices/pending',
+      );
+      setPendingDevices(data.requestIds ?? []);
+      setDevicesOutput(data.output ?? '');
+    } catch (err) {
+      setDevicesOutput(err instanceof Error ? err.message : 'Failed to load devices');
+    } finally {
+      setDevicesLoading(false);
+    }
+  };
+
+  const approveDevice = async (requestId: string) => {
+    try {
+      await apiFetch('/api/admin/openclaw/setup/devices/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId }),
+      });
+      toast.success(`Device ${requestId} approved.`);
+      void loadDevices();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Device approval failed');
+    }
+  };
+
+  const approvePairing = async () => {
+    if (!pairingCode.trim()) {
+      toast.error('Enter a pairing code.');
+      return;
+    }
+    setPairingBusy(true);
+    try {
+      await apiFetch('/api/admin/openclaw/setup/pairing/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: pairingChannel, code: pairingCode.trim() }),
+      });
+      toast.success(`Pairing approved for ${pairingChannel}.`);
+      setPairingCode('');
+      void loadSettings();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Pairing approval failed');
+    } finally {
+      setPairingBusy(false);
+    }
+  };
+
+  const loadDebug = async () => {
+    setDebugLoading(true);
+    try {
+      const data = await apiFetch<Record<string, unknown>>('/api/admin/openclaw/setup/debug');
+      setDebugData(data);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Debug load failed');
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
+  const resetSetup = async () => {
+    setResetting(true);
+    try {
+      await apiFetch('/api/admin/openclaw/setup/reset', { method: 'POST' });
+      toast.success('Setup reset. You can re-run onboarding now.');
+      void loadSettings();
+      void loadSetupStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const triggerReindex = async () => {
+    setReindexing(true);
+    setProgress(25);
+    try {
+      await apiFetch('/api/admin/book/reindex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: true }),
+      });
+      setProgress(100);
+      toast.success('Reindex started.');
+      void loadStatus();
+    } catch (err) {
+      setProgress(0);
+      toast.error(err instanceof Error ? err.message : 'Reindex failed');
+    } finally {
+      setReindexing(false);
+      setTimeout(() => setProgress(0), 1200);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Render
+  // -----------------------------------------------------------------------
+
+  const isConfigured = settings?.configured ?? setupStatus?.configured ?? false;
+
   return (
     <div className="space-y-6 pb-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tightish">Admin</h1>
-        <p className="mt-2 text-sm text-muted-foreground">System health, reindex controls, and audit visibility.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          OpenClaw control center — onboarding, config, gateway, channels, diagnostics.
+        </p>
       </div>
 
       {error ? (
-        <Alert>
+        <Alert variant="destructive">
           <AlertTitle>Unable to load admin status.</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-
       {settingsError ? (
         <Alert>
           <AlertTitle>Unable to load OpenClaw settings.</AlertTitle>
@@ -203,208 +453,679 @@ export default function AdminPage() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* ----------------------------------------------------------------- */}
+      {/* Status bar */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Book Reindex</CardTitle>
-            <CardDescription>No silent failure: state + last run + retry.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <div className="flex items-center justify-between">
-              <span>Status</span>
-              <Badge variant={reindexing ? 'default' : 'secondary'}>{reindexing ? 'running' : 'idle'}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Last run</span>
-              <span>{status?.lastReindexRun?.at ? new Date(status.lastReindexRun.at).toLocaleString() : '—'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Last error</span>
-              <span>{status?.core === 'unreachable' ? 'Core service is asleep/unreachable.' : 'none'}</span>
-            </div>
-            <Progress value={progress} />
-            <Button onClick={() => void triggerReindex()} disabled={reindexing || loading}>
-              {reindexing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Reindex book
-            </Button>
+          <CardContent className="flex items-center justify-between p-4">
+            <span className="text-sm font-medium">Configured</span>
+            <Badge variant={isConfigured ? 'secondary' : 'destructive'}>
+              {isConfigured ? 'yes' : 'no'}
+            </Badge>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-            <CardDescription>Health from /api/admin/status.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <div className="flex items-center justify-between">
-              <span>Web</span>
-              <Badge variant="secondary">ok</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Core</span>
-              <Badge variant={status?.core === 'ok' ? 'secondary' : 'destructive'}>{status?.core ?? 'unknown'}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>MongoDB</span>
-              <Badge variant={status?.mongo === 'connected' ? 'secondary' : 'destructive'}>{status?.mongo ?? 'unknown'}</Badge>
-            </div>
-            <div className="rounded-md border p-3 text-xs">
-              <p>Last core check: {status?.lastCoreHealthCheck ?? '—'}</p>
-              <p>Last core unavailable: {status?.lastCoreUnavailableAt ?? '—'}</p>
-            </div>
+          <CardContent className="flex items-center justify-between p-4">
+            <span className="text-sm font-medium">Core</span>
+            <Badge variant={status?.core === 'ok' ? 'secondary' : 'destructive'}>
+              {status?.core ?? 'unknown'}
+            </Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <span className="text-sm font-medium">MongoDB</span>
+            <Badge variant={status?.mongo === 'connected' ? 'secondary' : 'destructive'}>
+              {status?.mongo ?? 'unknown'}
+            </Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <span className="text-sm font-medium">Version</span>
+            <span className="text-xs text-muted-foreground">
+              {setupStatus?.openclawVersion ?? '—'}
+            </span>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>OpenClaw Settings</CardTitle>
-          <CardDescription>Gateway configuration and channel state from the core wrapper.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>Configured</span>
-              <Badge variant={openClawSettings?.configured ? 'secondary' : 'destructive'}>
-                {openClawSettings?.configured ? 'yes' : 'no'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>Setup password</span>
-              <Badge variant={openClawSettings?.setupPasswordConfigured ? 'secondary' : 'destructive'}>
-                {openClawSettings?.setupPasswordConfigured ? 'set' : 'missing'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>Gateway auth mode</span>
-              <span>{openClawSettings?.settings.authMode ?? '—'}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>Gateway bind:port</span>
-              <span>
-                {(openClawSettings?.settings.bind ?? '—')}
-                :
-                {(openClawSettings?.settings.port ?? '—')}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>HTTP /v1/chat/completions</span>
-              <Badge variant={openClawSettings?.settings.chatCompletionsEnabled === 'true' ? 'secondary' : 'destructive'}>
-                {openClawSettings?.settings.chatCompletionsEnabled ?? 'unknown'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>HTTP /v1/responses</span>
-              <Badge variant={openClawSettings?.settings.responsesEnabled === 'true' ? 'secondary' : 'destructive'}>
-                {openClawSettings?.settings.responsesEnabled ?? 'unknown'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>Gateway auth token</span>
-              <Badge variant={openClawSettings?.secrets.authTokenConfigured ? 'secondary' : 'destructive'}>
-                {openClawSettings?.secrets.authTokenConfigured ? 'configured' : 'missing'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-2">
-              <span>Gateway remote token</span>
-              <Badge variant={openClawSettings?.secrets.remoteTokenConfigured ? 'secondary' : 'destructive'}>
-                {openClawSettings?.secrets.remoteTokenConfigured ? 'configured' : 'missing'}
-              </Badge>
-            </div>
-          </div>
+      {/* ----------------------------------------------------------------- */}
+      {/* Main tabs */}
+      {/* ----------------------------------------------------------------- */}
+      <Tabs defaultValue={isConfigured ? 'overview' : 'onboarding'} className="space-y-4">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          <TabsTrigger value="config">Config Editor</TabsTrigger>
+          <TabsTrigger value="console">Console</TabsTrigger>
+          <TabsTrigger value="gateway">Gateway</TabsTrigger>
+          <TabsTrigger value="devices">Devices</TabsTrigger>
+          <TabsTrigger value="channels">Channels</TabsTrigger>
+          <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+        </TabsList>
 
-          <div className="rounded-md border p-3 text-xs">
-            <p>Gateway target: {openClawSettings?.gatewayTarget ?? '—'}</p>
-            <p>Telegram channel: {openClawSettings?.channels.telegram ?? 'not configured'}</p>
-            <p>Discord channel: {openClawSettings?.channels.discord ?? 'not configured'}</p>
-            <p>Slack channel: {openClawSettings?.channels.slack ?? 'not configured'}</p>
-          </div>
+        {/* ============================================================= */}
+        {/* OVERVIEW TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>OpenClaw Settings</CardTitle>
+                <CardDescription>Current gateway configuration and channel state.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="flex items-center justify-between rounded-md border p-2">
+                    <span>Auth mode</span>
+                    <span>{settings?.settings.authMode ?? '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-2">
+                    <span>Bind:Port</span>
+                    <span>
+                      {settings?.settings.bind ?? '—'}:{settings?.settings.port ?? '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-2">
+                    <span>/v1/chat/completions</span>
+                    <Badge
+                      variant={
+                        settings?.settings.chatCompletionsEnabled === 'true'
+                          ? 'secondary'
+                          : 'destructive'
+                      }
+                    >
+                      {settings?.settings.chatCompletionsEnabled ?? 'unknown'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-2">
+                    <span>/v1/responses</span>
+                    <Badge
+                      variant={
+                        settings?.settings.responsesEnabled === 'true' ? 'secondary' : 'destructive'
+                      }
+                    >
+                      {settings?.settings.responsesEnabled ?? 'unknown'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-2">
+                    <span>Auth token</span>
+                    <Badge variant={settings?.secrets.authTokenConfigured ? 'secondary' : 'destructive'}>
+                      {settings?.secrets.authTokenConfigured ? 'set' : 'missing'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border p-2">
+                    <span>Remote token</span>
+                    <Badge variant={settings?.secrets.remoteTokenConfigured ? 'secondary' : 'destructive'}>
+                      {settings?.secrets.remoteTokenConfigured ? 'set' : 'missing'}
+                    </Badge>
+                  </div>
+                </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void loadOpenClawSettings()} disabled={loading || restartingGateway}>
-              Refresh OpenClaw settings
-            </Button>
-            <Button onClick={() => void restartGateway()} disabled={loading || restartingGateway}>
-              {restartingGateway ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Restart OpenClaw gateway
-            </Button>
-            {openClawSettings?.links?.gateway ? (
-              <Button asChild variant="secondary">
-                <a href={openClawSettings.links.gateway} target="_blank" rel="noreferrer">Open OpenClaw gateway</a>
-              </Button>
-            ) : null}
-            {openClawSettings?.links?.setup ? (
-              <Button asChild variant="outline">
-                <a href={openClawSettings.links.setup} target="_blank" rel="noreferrer">Open OpenClaw setup</a>
-              </Button>
-            ) : null}
-          </div>
+                <div className="rounded-md border p-3 text-xs">
+                  <p>Gateway target: {settings?.gatewayTarget ?? '—'}</p>
+                  <p>Telegram: {settings?.channels.telegram ?? 'not configured'}</p>
+                  <p>Discord: {settings?.channels.discord ?? 'not configured'}</p>
+                  <p>Slack: {settings?.channels.slack ?? 'not configured'}</p>
+                </div>
 
-          {!openClawSettings?.links?.gateway ? (
-            <p className="text-xs">
-              Gateway link unavailable. Set <code>CORE_PUBLIC_URL</code> on web service to expose direct OpenClaw links.
-            </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => void loadSettings()} disabled={loading}>
+                    <RefreshCw className="mr-1 h-3 w-3" /> Refresh
+                  </Button>
+                  {settings?.links?.gateway ? (
+                    <Button asChild variant="secondary" size="sm">
+                      <a href={settings.links.gateway} target="_blank" rel="noreferrer">
+                        Open Gateway UI
+                      </a>
+                    </Button>
+                  ) : null}
+                  {settings?.links?.setup ? (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={settings.links.setup} target="_blank" rel="noreferrer">
+                        Open Setup Wizard
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>System Status</CardTitle>
+                <CardDescription>Health and reindex controls.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <div className="rounded-md border p-3 text-xs">
+                  <p>Last core check: {status?.lastCoreHealthCheck ?? '—'}</p>
+                  <p>Last core unavailable: {status?.lastCoreUnavailableAt ?? '—'}</p>
+                  <p>Last reindex: {status?.lastReindexRun?.at ? new Date(status.lastReindexRun.at).toLocaleString() : '—'}</p>
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <Progress value={progress} />
+                  <Button size="sm" onClick={() => void triggerReindex()} disabled={reindexing || loading}>
+                    {reindexing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                    Reindex book
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* ONBOARDING TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="onboarding" className="space-y-4">
+          {isConfigured ? (
+            <Alert>
+              <AlertTitle>Already configured</AlertTitle>
+              <AlertDescription>
+                OpenClaw is already set up. Use the &quot;Reset&quot; action (Diagnostics tab) to delete the
+                config and re-run onboarding.
+              </AlertDescription>
+            </Alert>
           ) : null}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>OpenClaw Console</CardTitle>
-          <CardDescription>Run wrapper-allowlisted OpenClaw diagnostics from Admin.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="space-y-1">
-              <label htmlFor="openclaw-cmd" className="text-xs">Command</label>
-              <select
-                id="openclaw-cmd"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                value={consoleCommand}
-                onChange={(event) => setConsoleCommand(event.target.value)}
-              >
-                <option value="openclaw.status">openclaw.status</option>
-                <option value="openclaw.health">openclaw.health</option>
-                <option value="openclaw.doctor">openclaw.doctor</option>
-                <option value="openclaw.logs.tail">openclaw.logs.tail</option>
-                <option value="openclaw.config.get">openclaw.config.get</option>
-                <option value="gateway.restart">gateway.restart</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="openclaw-arg" className="text-xs">Argument (optional)</label>
-              <input
-                id="openclaw-arg"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="e.g. 200 or gateway.auth.mode"
-                value={consoleArg}
-                onChange={(event) => setConsoleArg(event.target.value)}
+          <Card>
+            <CardHeader>
+              <CardTitle>Onboarding Wizard</CardTitle>
+              <CardDescription>
+                Run initial OpenClaw setup. Select an auth provider, enter your API key, and optionally
+                configure channel tokens.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="auth-group">
+                    Auth Provider Group
+                  </label>
+                  <select
+                    id="auth-group"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={selectedGroup}
+                    onChange={(e) => {
+                      setSelectedGroup(e.target.value);
+                      const g = authGroups.find((ag) => ag.value === e.target.value);
+                      if (g?.options?.[0]) setSelectedAuth(g.options[0].value);
+                    }}
+                  >
+                    {authGroups.map((g) => (
+                      <option key={g.value} value={g.value}>
+                        {g.label}
+                        {g.hint ? ` — ${g.hint}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="auth-choice">
+                    Auth Choice
+                  </label>
+                  <select
+                    id="auth-choice"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={selectedAuth}
+                    onChange={(e) => setSelectedAuth(e.target.value)}
+                  >
+                    {authOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium" htmlFor="auth-secret">
+                  API Key / Auth Secret
+                </label>
+                <Input
+                  id="auth-secret"
+                  type="password"
+                  placeholder="sk-... or your provider API key"
+                  value={authSecret}
+                  onChange={(e) => setAuthSecret(e.target.value)}
+                />
+              </div>
+
+              <Separator />
+              <p className="text-xs text-muted-foreground">Channel tokens (optional)</p>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="telegram-token">
+                    Telegram Bot Token
+                  </label>
+                  <Input
+                    id="telegram-token"
+                    type="password"
+                    placeholder="123456:ABC-..."
+                    value={telegramToken}
+                    onChange={(e) => setTelegramToken(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="discord-token">
+                    Discord Bot Token
+                  </label>
+                  <Input
+                    id="discord-token"
+                    type="password"
+                    placeholder="Bot token"
+                    value={discordToken}
+                    onChange={(e) => setDiscordToken(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="slack-bot-token">
+                    Slack Bot Token
+                  </label>
+                  <Input
+                    id="slack-bot-token"
+                    type="password"
+                    placeholder="xoxb-..."
+                    value={slackBotToken}
+                    onChange={(e) => setSlackBotToken(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="slack-app-token">
+                    Slack App Token
+                  </label>
+                  <Input
+                    id="slack-app-token"
+                    type="password"
+                    placeholder="xapp-..."
+                    value={slackAppToken}
+                    onChange={(e) => setSlackAppToken(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <Button onClick={() => void runOnboarding()} disabled={onboarding || isConfigured}>
+                {onboarding ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
+                Run Setup
+              </Button>
+
+              {onboardLog ? (
+                <pre className="max-h-80 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
+                  {onboardLog}
+                </pre>
+              ) : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* CONFIG EDITOR TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="config" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Config Editor</CardTitle>
+              <CardDescription>
+                Read and write the raw OpenClaw config file (JSON5). Saving creates a timestamped backup
+                and restarts the gateway.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void loadConfig()}
+                  disabled={configLoading}
+                >
+                  {configLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                  Load config
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {configPath ? `File: ${configPath}` : ''}
+                  {configPath && !configExists ? ' (does not exist yet)' : ''}
+                </span>
+              </div>
+              <Textarea
+                className="min-h-[300px] font-mono text-xs"
+                value={configContent}
+                onChange={(e) => setConfigContent(e.target.value)}
+                placeholder="Load config first, or paste raw JSON5 here."
               />
-            </div>
+              <Button onClick={() => void saveConfig()} disabled={configSaving || !configContent.trim()}>
+                {configSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                Save config &amp; restart gateway
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* CONSOLE TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="console" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <Terminal className="mr-2 inline h-5 w-5" />
+                OpenClaw Console
+              </CardTitle>
+              <CardDescription>Run allowlisted OpenClaw CLI and gateway commands.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium" htmlFor="console-cmd">
+                    Command
+                  </label>
+                  <select
+                    id="console-cmd"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={consoleCmd}
+                    onChange={(e) => setConsoleCmd(e.target.value)}
+                  >
+                    <optgroup label="Gateway lifecycle">
+                      <option value="gateway.restart">gateway.restart</option>
+                      <option value="gateway.stop">gateway.stop</option>
+                      <option value="gateway.start">gateway.start</option>
+                    </optgroup>
+                    <optgroup label="OpenClaw CLI">
+                      <option value="openclaw.version">openclaw.version</option>
+                      <option value="openclaw.status">openclaw.status</option>
+                      <option value="openclaw.health">openclaw.health</option>
+                      <option value="openclaw.doctor">openclaw.doctor</option>
+                      <option value="openclaw.logs.tail">openclaw.logs.tail</option>
+                      <option value="openclaw.config.get">openclaw.config.get</option>
+                    </optgroup>
+                    <optgroup label="Devices">
+                      <option value="openclaw.devices.list">openclaw.devices.list</option>
+                      <option value="openclaw.devices.approve">openclaw.devices.approve</option>
+                    </optgroup>
+                    <optgroup label="Plugins">
+                      <option value="openclaw.plugins.list">openclaw.plugins.list</option>
+                      <option value="openclaw.plugins.enable">openclaw.plugins.enable</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium" htmlFor="console-arg">
+                    Argument (optional)
+                  </label>
+                  <Input
+                    id="console-arg"
+                    placeholder="e.g. 200, gateway.auth.mode, telegram"
+                    value={consoleArg}
+                    onChange={(e) => setConsoleArg(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <Button onClick={() => void runConsoleCommand()} disabled={consoleRunning || loading}>
+                {consoleRunning ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
+                Run command
+              </Button>
+
+              <pre className="max-h-64 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
+                {consoleOutput || 'No command run yet.'}
+              </pre>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* GATEWAY TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="gateway" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gateway Controls</CardTitle>
+              <CardDescription>Start, stop, or restart the OpenClaw gateway process.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="grid gap-2 md:grid-cols-3">
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <span className="font-medium">Configured</span>
+                  <Badge variant={isConfigured ? 'secondary' : 'destructive'}>
+                    {isConfigured ? 'yes' : 'no'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <span className="font-medium">Gateway target</span>
+                  <span className="text-xs">{settings?.gatewayTarget ?? '—'}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <span className="font-medium">Setup password</span>
+                  <Badge variant={settings?.setupPasswordConfigured ? 'secondary' : 'destructive'}>
+                    {settings?.setupPasswordConfigured ? 'set' : 'missing'}
+                  </Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => void gatewayAction('start')}
+                  disabled={gatewayBusy}
+                  variant="outline"
+                >
+                  {gatewayBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
+                  Start
+                </Button>
+                <Button
+                  onClick={() => void gatewayAction('stop')}
+                  disabled={gatewayBusy}
+                  variant="outline"
+                >
+                  <Square className="mr-1 h-4 w-4" />
+                  Stop
+                </Button>
+                <Button onClick={() => void gatewayAction('restart')} disabled={gatewayBusy}>
+                  {gatewayBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-1 h-4 w-4" />}
+                  Restart
+                </Button>
+              </div>
+
+              {!settings?.links?.gateway ? (
+                <p className="text-xs text-muted-foreground">
+                  Set <code>CORE_PUBLIC_URL</code> on the web service to expose direct gateway links.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* DEVICES TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="devices" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Device Management</CardTitle>
+              <CardDescription>
+                List pending device pairing requests and approve them.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <Button variant="outline" size="sm" onClick={() => void loadDevices()} disabled={devicesLoading}>
+                {devicesLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                Refresh devices
+              </Button>
+
+              {pendingDevices.length > 0 ? (
+                <div className="space-y-2">
+                  {pendingDevices.map((id) => (
+                    <div key={id} className="flex items-center gap-2 rounded-md border p-2">
+                      <code className="flex-1 text-xs">{id}</code>
+                      <Button size="sm" onClick={() => void approveDevice(id)}>
+                        Approve
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {devicesOutput ? devicesOutput : 'Click "Refresh devices" to check for pending requests.'}
+                </p>
+              )}
+
+              {devicesOutput && pendingDevices.length > 0 ? (
+                <pre className="max-h-40 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
+                  {devicesOutput}
+                </pre>
+              ) : null}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* CHANNELS TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="channels" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Channel Status</CardTitle>
+                <CardDescription>Current channel configuration from OpenClaw config.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between rounded-md border p-2">
+                  <span>Telegram</span>
+                  <Badge variant={settings?.channels.telegram ? 'secondary' : 'destructive'}>
+                    {settings?.channels.telegram ? 'configured' : 'not configured'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-2">
+                  <span>Discord</span>
+                  <Badge variant={settings?.channels.discord ? 'secondary' : 'destructive'}>
+                    {settings?.channels.discord ? 'configured' : 'not configured'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-2">
+                  <span>Slack</span>
+                  <Badge variant={settings?.channels.slack ? 'secondary' : 'destructive'}>
+                    {settings?.channels.slack ? 'configured' : 'not configured'}
+                  </Badge>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => void loadSettings()}>
+                  <RefreshCw className="mr-1 h-3 w-3" /> Refresh
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Approve Pairing</CardTitle>
+                <CardDescription>
+                  Approve a channel pairing request (Telegram or Discord DM pairing).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium" htmlFor="pairing-channel">
+                      Channel
+                    </label>
+                    <select
+                      id="pairing-channel"
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      value={pairingChannel}
+                      onChange={(e) => setPairingChannel(e.target.value)}
+                    >
+                      <option value="telegram">telegram</option>
+                      <option value="discord">discord</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium" htmlFor="pairing-code">
+                      Pairing Code
+                    </label>
+                    <Input
+                      id="pairing-code"
+                      placeholder="e.g. 3EY4PUYS"
+                      value={pairingCode}
+                      onChange={(e) => setPairingCode(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <Button onClick={() => void approvePairing()} disabled={pairingBusy}>
+                  {pairingBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                  Approve pairing
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* DIAGNOSTICS TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="diagnostics" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Debug Info</CardTitle>
+                <CardDescription>Full diagnostic dump from the core wrapper.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <Button variant="outline" size="sm" onClick={() => void loadDebug()} disabled={debugLoading}>
+                  {debugLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                  Load debug info
+                </Button>
+                {debugData ? (
+                  <pre className="max-h-80 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
+                    {JSON.stringify(debugData, null, 2)}
+                  </pre>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Click &quot;Load debug info&quot; to fetch diagnostics.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  Danger Zone
+                </CardTitle>
+                <CardDescription>
+                  Reset setup deletes the config file and stops the gateway. You will need to re-run
+                  onboarding afterwards.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <Button variant="destructive" onClick={() => void resetSetup()} disabled={resetting}>
+                  {resetting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                  Reset Setup
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  This stops the gateway and deletes config file(s) so onboarding can run again.
+                  Credentials, sessions, and workspace data are preserved.
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
-          <Button onClick={() => void runConsoleCommand()} disabled={consoleRunning || loading}>
-            {consoleRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Run OpenClaw console command
-          </Button>
-
-          <pre className="max-h-64 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
-            {consoleOutput || 'No command run yet.'}
-          </pre>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Audit Log (recent)</CardTitle>
-          <CardDescription>Most recent operational action evidence.</CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          <p>
-            Last reindex details: {JSON.stringify(status?.lastReindexRun?.details ?? {}, null, 0)}
-          </p>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit Log</CardTitle>
+              <CardDescription>Recent operational action evidence.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              <pre className="max-h-40 overflow-auto rounded-md border bg-muted p-3 text-xs text-foreground">
+                {JSON.stringify(status?.lastReindexRun?.details ?? {}, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
