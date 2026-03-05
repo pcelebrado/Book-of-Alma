@@ -40,6 +40,10 @@ interface OpenClawSettingsPayload {
     discord: string | null;
     slack: string | null;
   };
+  links?: {
+    gateway: string | null;
+    setup: string | null;
+  };
 }
 
 export default function AdminPage() {
@@ -324,7 +328,23 @@ export default function AdminPage() {
               {restartingGateway ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Restart OpenClaw gateway
             </Button>
+            {openClawSettings?.links?.gateway ? (
+              <Button asChild variant="secondary">
+                <a href={openClawSettings.links.gateway} target="_blank" rel="noreferrer">Open OpenClaw gateway</a>
+              </Button>
+            ) : null}
+            {openClawSettings?.links?.setup ? (
+              <Button asChild variant="outline">
+                <a href={openClawSettings.links.setup} target="_blank" rel="noreferrer">Open OpenClaw setup</a>
+              </Button>
+            ) : null}
           </div>
+
+          {!openClawSettings?.links?.gateway ? (
+            <p className="text-xs">
+              Gateway link unavailable. Set <code>CORE_PUBLIC_URL</code> on web service to expose direct OpenClaw links.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

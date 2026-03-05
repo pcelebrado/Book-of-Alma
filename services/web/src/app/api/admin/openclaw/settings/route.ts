@@ -27,6 +27,10 @@ interface OpenClawSettingsPayload {
     discord: string | null;
     slack: string | null;
   };
+  links: {
+    gateway: string | null;
+    setup: string | null;
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -47,7 +51,16 @@ export async function GET(request: NextRequest) {
       rid: request.headers.get('x-request-id') ?? undefined,
     });
 
-    return Response.json(payload);
+    const corePublicUrl = process.env.CORE_PUBLIC_URL?.trim();
+    const base = corePublicUrl?.replace(/\/+$/, '') ?? null;
+
+    return Response.json({
+      ...payload,
+      links: {
+        gateway: base ? `${base}/openclaw` : null,
+        setup: base ? `${base}/setup` : null,
+      },
+    });
   } catch (error) {
     if (error instanceof CoreClientError) {
       return apiError('core_unavailable', error.message, error.statusCode, {
