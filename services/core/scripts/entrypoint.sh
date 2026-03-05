@@ -16,22 +16,29 @@ MONGO_PORT="${MONGO_PORT:-27017}"
 # Default: ::,0.0.0.0 — required for Railway private networking (IPv6+IPv4).
 # See: https://docs.railway.com/networking/private-networking/library-configuration
 MONGO_BIND_IP="${MONGO_BIND_IP:-::,0.0.0.0}"
+MONGO_WT_CACHE_GB="${MONGO_WT_CACHE_GB:-0.25}"
 
 mkdir -p "$MONGO_DATA_DIR" "$MONGO_LOG_DIR"
+chown -R "$(id -u)":"$(id -g)" "$MONGO_DATA_DIR" "$MONGO_LOG_DIR" 2>/dev/null || true
+
+echo "[entrypoint] Runtime UID:GID $(id -u):$(id -g)"
 
 echo "[entrypoint] Starting MongoDB on ${MONGO_BIND_IP}:${MONGO_PORT} (data: ${MONGO_DATA_DIR})"
 
-# WiredTiger cache capped at 128MB to leave room for Node.js + SFTPGo on 500MB volume.
+# Railway docs baseline: mongod --ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false
+# Use background process (instead of --fork) for better container log visibility.
 mongod \
   --dbpath "$MONGO_DATA_DIR" \
   --port "$MONGO_PORT" \
   --bind_ip "$MONGO_BIND_IP" \
   --ipv6 \
-  --logpath "$MONGO_LOG_DIR/mongod.log" \
-  --logappend \
-  --wiredTigerCacheSizeGB 0.125 \
+  --wiredTigerCacheSizeGB "$MONGO_WT_CACHE_GB" \
+  --setParameter diagnosticDataCollectionEnabled=false \
   --noauth \
-  --fork
+  > "$MONGO_LOG_DIR/mongod.log" 2>&1 &
+
+MONGOD_PID=$!
+echo "[entrypoint] MongoDB launched (PID: ${MONGOD_PID}, WT cache: ${MONGO_WT_CACHE_GB}GB)"
 
 # Wait for MongoDB to be ready
 MONGO_WAIT_RETRIES=30

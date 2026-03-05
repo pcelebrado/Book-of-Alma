@@ -27,6 +27,10 @@
     "value": "::,0.0.0.0",
     "description": "MongoDB bind addresses for Railway private networking (IPv6 + IPv4)."
   },
+  "MONGO_WT_CACHE_GB": {
+    "value": "0.25",
+    "description": "WiredTiger cache size in GB (0.25 recommended minimum for stable startup)."
+  },
   "MONGODB_URI": {
     "value": "mongodb://127.0.0.1:27017/openclaw",
     "description": "Core service local MongoDB connection string used by OpenClaw runtime."
