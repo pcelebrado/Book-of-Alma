@@ -40,17 +40,37 @@ export async function middleware(request: NextRequest) {
   const requiresAuth = isProtectedPath(pathname) && !isPublicPath(pathname);
 
   if (requiresAuth) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET,
-    });
+    const token =
+      (await getToken({
+        req: request,
+        secret: process.env.AUTH_SECRET,
+      })) ??
+      (await getToken({
+        req: request,
+        secret: process.env.AUTH_SECRET,
+        cookieName: '__Secure-authjs.session-token',
+      })) ??
+      (await getToken({
+        req: request,
+        secret: process.env.AUTH_SECRET,
+        cookieName: 'authjs.session-token',
+      }));
 
     if (!token) {
-      const redirectUrl = new URL('/login', request.url);
-      redirectUrl.searchParams.set('next', pathname);
-      const redirect = NextResponse.redirect(redirectUrl);
-      redirect.headers.set(REQUEST_ID_HEADER, requestId);
-      return redirect;
+      const meResponse = await fetch(new URL('/api/auth/me', request.url), {
+        headers: {
+          cookie: request.headers.get('cookie') ?? '',
+        },
+        cache: 'no-store',
+      });
+
+      if (!meResponse.ok) {
+        const redirectUrl = new URL('/login', request.url);
+        redirectUrl.searchParams.set('next', pathname);
+        const redirect = NextResponse.redirect(redirectUrl);
+        redirect.headers.set(REQUEST_ID_HEADER, requestId);
+        return redirect;
+      }
     }
   }
 
