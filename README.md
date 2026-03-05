@@ -165,8 +165,9 @@ Railway will create a project with the repo attached. You need to configure
 
 1. Wait for both services to build and deploy (core first, then web)
 2. Visit `https://your-app.railway.app` — this is your learning platform
-3. You'll be redirected to `/setup` to configure your AI provider (OpenAI, Anthropic, Google, etc.)
-4. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
+3. Open `/onboarding` to create the first admin account, then sign in
+4. Open the Core service `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
+5. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
 
 ---
 
@@ -176,13 +177,13 @@ Railway will create a project with the repo attached. You need to configure
 
 1. Enable the SFTPGo service
 2. Connect via SFTP client (FileZilla, Cyberduck, etc.)
-3. Upload your Markdown files to `/data/content/`
+3. Upload your Markdown files to `/data/book-source/`
 4. Run reindex from Admin panel
 
 ### Option 2: Git-based Import
 
 1. Store your content in a Git repository
-2. Mount it as a Railway volume at `/data/content/`
+2. Mount it as a Railway volume at `/data/book-source/`
 3. Set `CONTENT_IMPORT_MANIFEST` to point to your manifest.json
 
 ### Content Format
@@ -414,8 +415,6 @@ Deploy a persistent AI agent that:
 
 ## Notes
 
-- This template provides **configuration and code scaffolding only**
-- No deployment action is required for local validation
 - All secrets must be configured via Railway Variables — never commit them to git
 - The learning philosophy prioritizes **understanding over consumption**
 

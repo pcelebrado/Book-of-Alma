@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { HighlightToolbar } from '@/components/highlight-toolbar';
 import { SectionBlocks } from '@/components/section-blocks';
+import { getBookSectionsCollection } from '@/lib/db/collections';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 
@@ -30,18 +31,34 @@ interface SectionPayload {
 }
 
 async function getSection(slug: string): Promise<SectionPayload | null> {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-
   try {
-    const response = await fetch(`${base}/api/book/section?slug=${encodeURIComponent(slug)}`, {
-      cache: 'no-store',
-    });
+    const sections = await getBookSectionsCollection();
+    const section =
+      (await sections.findOne({ slug, status: 'published' })) ??
+      (await sections.findOne({ slug }));
 
-    if (!response.ok) {
+    if (!section) {
       return null;
     }
 
-    return (await response.json()) as SectionPayload;
+    return {
+      section: {
+        slug: section.slug,
+        title: section.section.title,
+        part: section.part,
+        chapter: section.chapter,
+      },
+      frontmatter: section.frontmatter ?? {
+        summary: [],
+        checklist: [],
+        mistakes: [],
+        drill: {},
+      },
+      body: {
+        content: section.bodyMarkdown,
+      },
+      headings: section.headings ?? [],
+    };
   } catch {
     return null;
   }
@@ -108,7 +125,7 @@ export default async function ReaderPage({ params }: SectionPageProps) {
       </div>
 
       <div className="prose prose-invert max-w-none leading-relaxed2">
-        <p>{payload.body?.content ?? 'Body coming soon.'}</p>
+        <p>{payload.body?.content ?? 'No body content is available for this section.'}</p>
       </div>
 
       <div className="flex items-center justify-between border-t pt-4">

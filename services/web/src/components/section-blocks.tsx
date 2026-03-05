@@ -47,7 +47,7 @@ export function SectionBlocks({ frontmatter }: { frontmatter?: Frontmatter }) {
       <ListOrStub
         title="Checklist"
         items={frontmatter?.checklist}
-        fallback="Checklist (coming soon)."
+        fallback="No checklist is available for this section yet."
       />
 
       <Alert>
@@ -56,7 +56,7 @@ export function SectionBlocks({ frontmatter }: { frontmatter?: Frontmatter }) {
         <AlertDescription>
           {frontmatter?.mistakes && frontmatter.mistakes.length > 0
             ? frontmatter.mistakes.join(' | ')
-            : 'Mistakes (coming soon).'}
+            : 'No common mistakes are defined for this section.'}
         </AlertDescription>
       </Alert>
 
@@ -65,7 +65,7 @@ export function SectionBlocks({ frontmatter }: { frontmatter?: Frontmatter }) {
           <CardTitle className="text-base">Drill</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>{frontmatter?.drill?.prompt ?? 'Drill prompt coming soon.'}</p>
+          <p>{frontmatter?.drill?.prompt ?? 'No drill prompt is defined for this section.'}</p>
           {frontmatter?.drill?.answerKey ? (
             <p className="text-xs text-muted-foreground">Answer key: {frontmatter.drill.answerKey}</p>
           ) : null}
