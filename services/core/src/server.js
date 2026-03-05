@@ -345,6 +345,33 @@ function buildSkillInstruction(skill, context) {
   ].join("");
 }
 
+function getLastNonEmptyLine(raw) {
+  const lines = String(raw || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines[lines.length - 1] : "";
+}
+
+async function readOpenClawConfig(path) {
+  const result = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", path]), {
+    timeoutMs: 20_000,
+  });
+  if (result.code !== 0) {
+    return {
+      ok: false,
+      value: null,
+      raw: result.output,
+    };
+  }
+
+  return {
+    ok: true,
+    value: getLastNonEmptyLine(result.output),
+    raw: result.output,
+  };
+}
+
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
@@ -530,6 +557,165 @@ app.post("/internal/index/rebuild", requireInternalApiAuth, async (_req, res) =>
       started: false,
       error: {
         code: "reindex_failed",
+        message: String(error),
+      },
+    });
+  }
+});
+
+app.get("/internal/openclaw/settings", requireInternalApiAuth, async (_req, res) => {
+  try {
+    const paths = {
+      authMode: "gateway.auth.mode",
+      bind: "gateway.bind",
+      port: "gateway.port",
+      authToken: "gateway.auth.token",
+      remoteToken: "gateway.remote.token",
+      chatCompletionsEnabled: "gateway.http.endpoints.chatCompletions.enabled",
+      responsesEnabled: "gateway.http.endpoints.responses.enabled",
+      telegramChannel: "channels.telegram",
+      discordChannel: "channels.discord",
+      slackChannel: "channels.slack",
+    };
+
+    const entries = await Promise.all(
+      Object.entries(paths).map(async ([key, path]) => {
+        const result = await readOpenClawConfig(path);
+        return [key, result];
+      }),
+    );
+
+    const map = Object.fromEntries(entries);
+
+    return res.json({
+      ok: true,
+      configured: isConfigured(),
+      setupPasswordConfigured: Boolean(SETUP_PASSWORD),
+      gatewayTarget: GATEWAY_TARGET,
+      settings: {
+        authMode: map.authMode?.value ?? null,
+        bind: map.bind?.value ?? null,
+        port: map.port?.value ?? null,
+        chatCompletionsEnabled: map.chatCompletionsEnabled?.value ?? null,
+        responsesEnabled: map.responsesEnabled?.value ?? null,
+      },
+      secrets: {
+        authTokenConfigured: Boolean(map.authToken?.value),
+        remoteTokenConfigured: Boolean(map.remoteToken?.value),
+      },
+      channels: {
+        telegram: map.telegramChannel?.value ?? null,
+        discord: map.discordChannel?.value ?? null,
+        slack: map.slackChannel?.value ?? null,
+      },
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      error: {
+        code: "settings_unavailable",
+        message: String(error),
+      },
+    });
+  }
+});
+
+app.post("/internal/openclaw/gateway/restart", requireInternalApiAuth, async (_req, res) => {
+  try {
+    await restartGateway();
+    return res.json({
+      ok: true,
+      restarted: true,
+      at: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      error: {
+        code: "gateway_restart_failed",
+        message: String(error),
+      },
+    });
+  }
+});
+
+app.post("/internal/openclaw/console/run", requireInternalApiAuth, async (req, res) => {
+  const payload = req.body || {};
+  const cmd = String(payload.cmd || "").trim();
+  const arg = String(payload.arg || "").trim();
+
+  const allowed = new Set([
+    "gateway.restart",
+    "openclaw.status",
+    "openclaw.health",
+    "openclaw.doctor",
+    "openclaw.logs.tail",
+    "openclaw.config.get",
+  ]);
+
+  if (!allowed.has(cmd)) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_command",
+        message: "Command not allowed",
+      },
+    });
+  }
+
+  try {
+    if (cmd === "gateway.restart") {
+      await restartGateway();
+      return res.json({ ok: true, output: "Gateway restarted (wrapper-managed).\n" });
+    }
+
+    if (cmd === "openclaw.status") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["status"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+
+    if (cmd === "openclaw.health") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["health"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+
+    if (cmd === "openclaw.doctor") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+
+    if (cmd === "openclaw.logs.tail") {
+      const lines = Math.max(50, Math.min(1000, Number.parseInt(arg || "200", 10) || 200));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["logs", "--tail", String(lines)]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+
+    if (cmd === "openclaw.config.get") {
+      if (!arg) {
+        return res.status(400).json({
+          ok: false,
+          error: {
+            code: "missing_argument",
+            message: "Config path is required",
+          },
+        });
+      }
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", arg]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_command",
+        message: "Unhandled command",
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: {
+        code: "console_failed",
         message: String(error),
       },
     });
