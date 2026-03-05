@@ -1,6 +1,6 @@
 # OpenClaw Book Template
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/github?repo=https://github.com/pcelebrado/Book-of-Alma)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/N_f8ll?referralCode=BEkZzK&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 > **Give OpenClaw a Book. A topic. Let it become a master, then let it become your Teacher.**
 
