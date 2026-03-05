@@ -2,7 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,12 +16,72 @@ import { Input } from '@/components/ui/input';
 
 export function OnboardingForm() {
   const router = useRouter();
+  const [checkingState, setCheckingState] = useState(true);
+  const [stateErrorCode, setStateErrorCode] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<{
+    mongo?: string;
+    core?: string;
+    service_auth?: string;
+  } | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkOnboardingState = async () => {
+      setCheckingState(true);
+      setStateErrorCode(null);
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            onboardingOpen?: boolean;
+          };
+
+          if (payload.onboardingOpen === false) {
+            router.push('/login?onboarding=closed');
+            router.refresh();
+            return;
+          }
+
+          setCheckingState(false);
+          return;
+        }
+
+        const errorPayload = (await response.json()) as {
+          error?: { code?: string };
+        };
+        setStateErrorCode(errorPayload.error?.code ?? `http_${response.status}`);
+
+        const healthResponse = await fetch('/api/health', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (healthResponse.ok) {
+          const healthPayload = (await healthResponse.json()) as {
+            mongo?: string;
+            core?: string;
+            service_auth?: string;
+          };
+          setDiagnostics(healthPayload);
+        }
+      } catch {
+        setStateErrorCode('state_check_failed');
+      } finally {
+        setCheckingState(false);
+      }
+    };
+
+    void checkOnboardingState();
+  }, [router]);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,6 +153,28 @@ export function OnboardingForm() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {checkingState ? (
+            <p className="text-sm text-muted-foreground">Checking onboarding state...</p>
+          ) : null}
+
+          {!checkingState && stateErrorCode ? (
+            <div className="space-y-3 rounded-md border p-3 text-sm">
+              <p className="font-medium text-red-500">Onboarding state check failed</p>
+              <p>Code: <span className="font-mono">{stateErrorCode}</span></p>
+              {diagnostics ? (
+                <div className="space-y-1 text-muted-foreground">
+                  <p>mongo: <span className="font-mono">{diagnostics.mongo ?? 'unknown'}</span></p>
+                  <p>core: <span className="font-mono">{diagnostics.core ?? 'unknown'}</span></p>
+                  <p>service_auth: <span className="font-mono">{diagnostics.service_auth ?? 'unknown'}</span></p>
+                </div>
+              ) : null}
+              <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+                Retry check
+              </Button>
+            </div>
+          ) : null}
+
+          {!checkingState && !stateErrorCode ? (
           <form className="space-y-4" onSubmit={onSubmit}>
             <Input
               value={name}
@@ -130,6 +212,7 @@ export function OnboardingForm() {
               {submitting ? 'Creating admin...' : 'Create admin account'}
             </Button>
           </form>
+          ) : null}
         </CardContent>
       </Card>
     </div>

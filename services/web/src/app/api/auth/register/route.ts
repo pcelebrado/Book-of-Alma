@@ -2,8 +2,11 @@ import { createHash } from 'node:crypto';
 
 import type { NextRequest } from 'next/server';
 
+import type { Collection } from 'mongodb';
+
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
 import { getUsersCollection } from '@/lib/db/collections';
+import type { UserDocument } from '@/lib/db/collections';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -33,12 +36,16 @@ function toPasswordHash(password: string): string {
 }
 
 export async function GET() {
-  const users = await getUsersCollection();
-  const userCount = await users.countDocuments();
-  return Response.json({
-    onboardingOpen: userCount === 0,
-    userCount,
-  });
+  try {
+    const users = await getUsersCollection();
+    const userCount = await users.countDocuments();
+    return Response.json({
+      onboardingOpen: userCount === 0,
+      userCount,
+    });
+  } catch {
+    return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -71,8 +78,15 @@ export async function POST(request: NextRequest) {
     return apiRateLimited(RATE_LIMIT_RULES.login.message, registerLimit.retryAfterSeconds);
   }
 
-  const users = await getUsersCollection();
-  const userCount = await users.countDocuments();
+  let users: Collection<UserDocument>;
+  let userCount: number;
+
+  try {
+    users = await getUsersCollection();
+    userCount = await users.countDocuments();
+  } catch {
+    return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
+  }
 
   if (userCount > 0) {
     return apiError('onboarding_closed', 'Initial admin has already been created', 403);
