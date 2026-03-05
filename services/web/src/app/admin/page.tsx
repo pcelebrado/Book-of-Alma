@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, Loader2, Play, RefreshCw, RotateCcw, Square, Terminal } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -128,6 +128,44 @@ const FALLBACK_AUTH_GROUPS: AuthGroup[] = [
   ]},
 ];
 
+const INTERACTIVE_AUTH_CHOICES = new Set([
+  'codex-cli',
+  'openai-codex',
+  'claude-cli',
+  'google-antigravity',
+  'google-gemini-cli',
+  'qwen-portal',
+  'github-copilot',
+  'copilot-proxy',
+]);
+
+const SECRET_REQUIRED_CHOICES = new Set([
+  'openai-api-key',
+  'apiKey',
+  'token',
+  'openrouter-api-key',
+  'ai-gateway-api-key',
+  'moonshot-api-key',
+  'kimi-code-api-key',
+  'gemini-api-key',
+  'zai-api-key',
+  'minimax-api',
+  'minimax-api-lightning',
+  'synthetic-api-key',
+  'opencode-zen',
+]);
+
+function isInteractiveAuthOption(option: AuthOption): boolean {
+  return INTERACTIVE_AUTH_CHOICES.has(option.value);
+}
+
+function pickDefaultAuthOption(options: AuthOption[], includeInteractive: boolean): string {
+  if (!options.length) return '';
+  if (includeInteractive) return options[0]?.value ?? '';
+  const nonInteractive = options.find((opt) => !isInteractiveAuthOption(opt));
+  return nonInteractive?.value ?? options[0]?.value ?? '';
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -162,8 +200,17 @@ export default function AdminPage() {
   // --- Onboarding ---
   const [authGroups, setAuthGroups] = useState<AuthGroup[]>(FALLBACK_AUTH_GROUPS);
   const [selectedGroup, setSelectedGroup] = useState(FALLBACK_AUTH_GROUPS[0]?.value ?? '');
-  const [selectedAuth, setSelectedAuth] = useState(FALLBACK_AUTH_GROUPS[0]?.options[0]?.value ?? '');
+  const [showAdvancedAuth, setShowAdvancedAuth] = useState(false);
+  const [onboardFlow, setOnboardFlow] = useState<'quickstart' | 'manual'>('quickstart');
+  const [selectedAuth, setSelectedAuth] = useState(
+    pickDefaultAuthOption(FALLBACK_AUTH_GROUPS[0]?.options ?? [], false),
+  );
   const [authSecret, setAuthSecret] = useState('');
+  const [customProviderId, setCustomProviderId] = useState('');
+  const [customProviderBaseUrl, setCustomProviderBaseUrl] = useState('');
+  const [customProviderApi, setCustomProviderApi] = useState<'openai-completions' | 'openai-responses'>('openai-completions');
+  const [customProviderApiKeyEnv, setCustomProviderApiKeyEnv] = useState('');
+  const [customProviderModelId, setCustomProviderModelId] = useState('');
   const [telegramToken, setTelegramToken] = useState('');
   const [discordToken, setDiscordToken] = useState('');
   const [slackBotToken, setSlackBotToken] = useState('');
@@ -244,16 +291,17 @@ export default function AdminPage() {
       setSetupStatus(data);
       if (data.authGroups && data.authGroups.length > 0) {
         setAuthGroups(data.authGroups);
-        if (!selectedGroup) {
-          setSelectedGroup(data.authGroups[0].value);
-          const firstOpts = data.authGroups[0].options ?? [];
-          if (firstOpts.length > 0) setSelectedAuth(firstOpts[0].value);
+        const selectedExists = data.authGroups.some((group) => group.value === selectedGroup);
+        if (!selectedGroup || !selectedExists) {
+          const nextGroup = data.authGroups[0];
+          setSelectedGroup(nextGroup.value);
+          setSelectedAuth(pickDefaultAuthOption(nextGroup.options ?? [], showAdvancedAuth));
         }
       }
     } catch {
       // Setup status may fail if core is down; don't block
     }
-  }, [selectedGroup]);
+  }, [selectedGroup, showAdvancedAuth]);
 
   const loadConfig = useCallback(async () => {
     setConfigLoading(true);
@@ -284,14 +332,48 @@ export default function AdminPage() {
   // Auth group → options
   // -----------------------------------------------------------------------
 
-  const currentGroup = authGroups.find((g) => g.value === selectedGroup);
+  const currentGroup = useMemo(
+    () => authGroups.find((g) => g.value === selectedGroup),
+    [authGroups, selectedGroup],
+  );
   const authOptions = currentGroup?.options ?? [];
+  const visibleAuthOptions = useMemo(
+    () => (showAdvancedAuth ? authOptions : authOptions.filter((opt) => !isInteractiveAuthOption(opt))),
+    [authOptions, showAdvancedAuth],
+  );
+
+  useEffect(() => {
+    if (!visibleAuthOptions.length) {
+      setSelectedAuth('');
+      return;
+    }
+    const stillValid = visibleAuthOptions.some((opt) => opt.value === selectedAuth);
+    if (!stillValid) {
+      setSelectedAuth(pickDefaultAuthOption(authOptions, showAdvancedAuth));
+    }
+  }, [authOptions, selectedAuth, showAdvancedAuth, visibleAuthOptions]);
+
+  const requiresAuthSecret = SECRET_REQUIRED_CHOICES.has(selectedAuth);
+  const onboardingBlocked =
+    onboarding ||
+    (settings?.configured ?? setupStatus?.configured ?? false) ||
+    !selectedGroup ||
+    !selectedAuth ||
+    (requiresAuthSecret && !authSecret.trim());
 
   // -----------------------------------------------------------------------
   // Actions
   // -----------------------------------------------------------------------
 
   const runOnboarding = async () => {
+    if (!selectedAuth) {
+      toast.error('Select an auth choice before running setup.');
+      return;
+    }
+    if (requiresAuthSecret && !authSecret.trim()) {
+      toast.error('This auth choice requires an API key / auth secret.');
+      return;
+    }
     setOnboarding(true);
     setOnboardLog('Running onboarding...\n');
     try {
@@ -299,9 +381,14 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          flow: 'quickstart',
+          flow: onboardFlow,
           authChoice: selectedAuth,
           authSecret,
+          customProviderId,
+          customProviderBaseUrl,
+          customProviderApi,
+          customProviderApiKeyEnv,
+          customProviderModelId,
           telegramToken,
           discordToken,
           slackBotToken,
@@ -687,6 +774,46 @@ export default function AdminPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
+              <Alert>
+                <AlertTitle>Onboarding guidance (doc-backed)</AlertTitle>
+                <AlertDescription>
+                  Prefer <strong>quickstart</strong> flow, API-key auth choices for non-interactive setup, and
+                  keep gateway auth in token mode. Telegram token comes from @BotFather; Discord token comes
+                  from the Discord Developer Portal bot settings.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="onboard-flow">
+                    Onboarding Flow
+                  </label>
+                  <select
+                    id="onboard-flow"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={onboardFlow}
+                    onChange={(e) => setOnboardFlow(e.target.value as 'quickstart' | 'manual')}
+                  >
+                    <option value="quickstart">quickstart (recommended)</option>
+                    <option value="manual">manual (advanced)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="advanced-auth-toggle">
+                    Auth Choice Visibility
+                  </label>
+                  <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-sm" htmlFor="advanced-auth-toggle">
+                    <input
+                      id="advanced-auth-toggle"
+                      type="checkbox"
+                      checked={showAdvancedAuth}
+                      onChange={(e) => setShowAdvancedAuth(e.target.checked)}
+                    />
+                    Show interactive OAuth options
+                  </label>
+                </div>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-xs font-medium" htmlFor="auth-group">
@@ -699,7 +826,8 @@ export default function AdminPage() {
                     onChange={(e) => {
                       setSelectedGroup(e.target.value);
                       const g = authGroups.find((ag) => ag.value === e.target.value);
-                      if (g?.options?.[0]) setSelectedAuth(g.options[0].value);
+                      const nextOptions = g?.options ?? [];
+                      setSelectedAuth(pickDefaultAuthOption(nextOptions, showAdvancedAuth));
                     }}
                   >
                     {authGroups.map((g) => (
@@ -720,12 +848,17 @@ export default function AdminPage() {
                     value={selectedAuth}
                     onChange={(e) => setSelectedAuth(e.target.value)}
                   >
-                    {authOptions.map((o) => (
+                    {visibleAuthOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
                     ))}
                   </select>
+                  {visibleAuthOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No non-interactive choices available for this group. Enable interactive options above.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -740,6 +873,77 @@ export default function AdminPage() {
                   value={authSecret}
                   onChange={(e) => setAuthSecret(e.target.value)}
                 />
+                {requiresAuthSecret ? (
+                  <p className="text-xs text-muted-foreground">Required for this auth choice.</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Optional for OAuth/interactive auth choices.</p>
+                )}
+              </div>
+
+              <Separator />
+              <p className="text-xs text-muted-foreground">Custom provider (optional, docs: /start/onboarding-overview)</p>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="custom-provider-id">
+                    Custom Provider ID
+                  </label>
+                  <Input
+                    id="custom-provider-id"
+                    placeholder="my-custom"
+                    value={customProviderId}
+                    onChange={(e) => setCustomProviderId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="custom-provider-base-url">
+                    Custom Base URL
+                  </label>
+                  <Input
+                    id="custom-provider-base-url"
+                    placeholder="https://llm.example.com/v1"
+                    value={customProviderBaseUrl}
+                    onChange={(e) => setCustomProviderBaseUrl(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="custom-provider-api">
+                    Custom API Type
+                  </label>
+                  <select
+                    id="custom-provider-api"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={customProviderApi}
+                    onChange={(e) =>
+                      setCustomProviderApi(e.target.value as 'openai-completions' | 'openai-responses')
+                    }
+                  >
+                    <option value="openai-completions">openai-completions</option>
+                    <option value="openai-responses">openai-responses</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium" htmlFor="custom-provider-api-key-env">
+                    Custom API Key ENV (optional)
+                  </label>
+                  <Input
+                    id="custom-provider-api-key-env"
+                    placeholder="CUSTOM_API_KEY"
+                    value={customProviderApiKeyEnv}
+                    onChange={(e) => setCustomProviderApiKeyEnv(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-medium" htmlFor="custom-provider-model-id">
+                    Custom Model ID (optional)
+                  </label>
+                  <Input
+                    id="custom-provider-model-id"
+                    placeholder="foo-large"
+                    value={customProviderModelId}
+                    onChange={(e) => setCustomProviderModelId(e.target.value)}
+                  />
+                </div>
               </div>
 
               <Separator />
@@ -796,7 +1000,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <Button onClick={() => void runOnboarding()} disabled={onboarding || isConfigured}>
+              <Button onClick={() => void runOnboarding()} disabled={onboardingBlocked}>
                 {onboarding ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
                 Run Setup
               </Button>
