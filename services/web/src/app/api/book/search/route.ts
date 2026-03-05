@@ -35,66 +35,71 @@ export async function GET(request: NextRequest) {
     return apiError('invalid_request', 'q is required', 400);
   }
 
-  const sections = await getBookSectionsCollection();
-
-  let results: Array<{
-    sectionSlug: string;
-    anchorId: string;
-    score: number;
-    snippet: string;
-  }> = [];
-
   try {
-    const docs = await sections
-      .find(
-        { $text: { $search: q } },
-        {
-          projection: {
-            slug: 1,
-            bodyMarkdown: 1,
-            headings: 1,
-            score: { $meta: 'textScore' },
+    const sections = await getBookSectionsCollection();
+
+    let results: Array<{
+      sectionSlug: string;
+      anchorId: string;
+      score: number;
+      snippet: string;
+    }> = [];
+
+    try {
+      const docs = await sections
+        .find(
+          { $text: { $search: q } },
+          {
+            projection: {
+              slug: 1,
+              bodyMarkdown: 1,
+              headings: 1,
+              score: { $meta: 'textScore' },
+            },
+            sort: { score: { $meta: 'textScore' } },
+            limit: 20,
           },
-          sort: { score: { $meta: 'textScore' } },
-          limit: 20,
-        },
-      )
-      .toArray();
+        )
+        .toArray();
 
-    results = docs.map((doc) => {
-      const snippet = (doc.bodyMarkdown ?? '').slice(0, 240);
-      const firstHeading = doc.headings?.[0]?.id ?? '';
-      return {
+      results = docs.map((doc) => {
+        const snippet = (doc.bodyMarkdown ?? '').slice(0, 240);
+        const firstHeading = doc.headings?.[0]?.id ?? '';
+        return {
+          sectionSlug: doc.slug,
+          anchorId: firstHeading,
+          score: Number((doc as { score?: number }).score ?? 0),
+          snippet,
+        };
+      });
+    } catch {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const docs = await sections
+        .find(
+          {
+            $or: [
+              { slug: { $regex: safe, $options: 'i' } },
+              { bodyMarkdown: { $regex: safe, $options: 'i' } },
+            ],
+          },
+          {
+            projection: { slug: 1, bodyMarkdown: 1, headings: 1 },
+            limit: 20,
+          },
+        )
+        .toArray();
+
+      results = docs.map((doc) => ({
         sectionSlug: doc.slug,
-        anchorId: firstHeading,
-        score: Number((doc as { score?: number }).score ?? 0),
-        snippet,
-      };
-    });
-  } catch {
-    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const docs = await sections
-      .find(
-        {
-          $or: [
-            { slug: { $regex: safe, $options: 'i' } },
-            { bodyMarkdown: { $regex: safe, $options: 'i' } },
-          ],
-        },
-        {
-          projection: { slug: 1, bodyMarkdown: 1, headings: 1 },
-          limit: 20,
-        },
-      )
-      .toArray();
+        anchorId: doc.headings?.[0]?.id ?? '',
+        score: 0,
+        snippet: (doc.bodyMarkdown ?? '').slice(0, 240),
+      }));
+    }
 
-    results = docs.map((doc) => ({
-      sectionSlug: doc.slug,
-      anchorId: doc.headings?.[0]?.id ?? '',
-      score: 0,
-      snippet: (doc.bodyMarkdown ?? '').slice(0, 240),
-    }));
+    return Response.json({ q, results });
+  } catch (error) {
+    console.error('[api/book/search][GET] database_error', error);
+    return apiError('database_error', 'Unable to search sections', 503);
   }
-
-  return Response.json({ q, results });
 }

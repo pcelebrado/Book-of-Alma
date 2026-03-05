@@ -39,6 +39,7 @@ interface TocResponse {
 
 export function TOCTree({ className }: { className?: string }) {
   const [parts, setParts] = useState<TocPart[]>([]);
+  const [progressBySection, setProgressBySection] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,13 +48,31 @@ export function TOCTree({ className }: { className?: string }) {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch('/api/book/toc', { cache: 'no-store' });
-        if (!response.ok) {
+        const [tocResponse, progressResponse] = await Promise.all([
+          fetch('/api/book/toc', { cache: 'no-store' }),
+          fetch('/api/progress/summary', { cache: 'no-store' }),
+        ]);
+
+        if (!tocResponse.ok) {
           throw new Error('TOC failed to load');
         }
 
-        const payload = (await response.json()) as TocResponse;
+        const payload = (await tocResponse.json()) as TocResponse;
         setParts(payload.tocTree?.parts ?? []);
+
+        if (progressResponse.ok) {
+          const progressPayload = (await progressResponse.json()) as {
+            recent?: Array<{ sectionSlug: string; percent: number }>;
+          };
+          const nextProgress = (progressPayload.recent ?? []).reduce<Record<string, number>>(
+            (acc, entry) => {
+              acc[entry.sectionSlug] = entry.percent;
+              return acc;
+            },
+            {},
+          );
+          setProgressBySection(nextProgress);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'TOC failed to load');
       } finally {
@@ -121,7 +140,13 @@ export function TOCTree({ className }: { className?: string }) {
                       <p className="text-xs font-medium text-muted-foreground">{chapter.title}</p>
                       <Badge variant="secondary">{chapter.sections?.length ?? 0}</Badge>
                     </div>
-                    <Progress value={0} className="h-1.5" />
+                    <Progress
+                      value={(chapter.sections ?? []).length > 0
+                        ? (chapter.sections ?? []).reduce((sum, section) => sum + (progressBySection[section.slug] ?? 0), 0)
+                          / (chapter.sections ?? []).length
+                        : 0}
+                      className="h-1.5"
+                    />
                     <div className="space-y-1">
                       {(chapter.sections ?? []).map((section) => (
                         <Link

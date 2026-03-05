@@ -26,28 +26,33 @@ export async function POST(request: NextRequest) {
     return apiError('invalid_request', 'title is required', 400);
   }
 
-  const now = new Date();
-  const playbook = {
-    status: 'draft' as const,
-    title: body.title,
-    triggers: body.triggers ?? [],
-    checklist: body.checklist ?? [],
-    scenarioTree: body.scenarioTree ?? '',
-    linkedSections: body.linkedSections ?? [],
-    tags: body.tags ?? [],
-    createdBy: userObjectId,
-    createdAt: now,
-    updatedAt: now,
-  };
+  try {
+    const now = new Date();
+    const playbook = {
+      status: 'draft' as const,
+      title: body.title,
+      triggers: body.triggers ?? [],
+      checklist: body.checklist ?? [],
+      scenarioTree: body.scenarioTree ?? '',
+      linkedSections: body.linkedSections ?? [],
+      tags: body.tags ?? [],
+      createdBy: userObjectId,
+      createdAt: now,
+      updatedAt: now,
+    };
 
-  const playbooks = await getPlaybooksCollection();
-  const result = await playbooks.insertOne(playbook);
+    const playbooks = await getPlaybooksCollection();
+    const result = await playbooks.insertOne(playbook);
 
-  return Response.json({
-    playbook: {
-      ...playbook,
-      _id: result.insertedId.toHexString(),
-      createdBy: userObjectId.toHexString(),
-    },
-  });
+    return Response.json({
+      playbook: {
+        ...playbook,
+        _id: result.insertedId.toHexString(),
+        createdBy: userObjectId.toHexString(),
+      },
+    });
+  } catch (error) {
+    console.error('[api/playbooks/draft][POST] database_error', error);
+    return apiError('database_error', 'Unable to create draft playbook', 503);
+  }
 }

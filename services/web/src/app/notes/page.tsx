@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 
 interface NoteItem {
   _id: string;
@@ -62,8 +62,6 @@ export default function NotesPage() {
           placeholder="Search notes"
           className="max-w-md"
         />
-        <Badge variant="outline">Tag chips</Badge>
-        <Badge variant="outline">Section filter</Badge>
       </div>
 
       {filtered.length > 0 ? (

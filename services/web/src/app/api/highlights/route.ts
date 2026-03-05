@@ -27,30 +27,35 @@ export async function POST(request: NextRequest) {
     return apiError('invalid_request', 'sectionSlug, text, and range are required', 400);
   }
 
-  const noteId = body.noteId && ObjectId.isValid(body.noteId)
-    ? new ObjectId(body.noteId)
-    : undefined;
+  try {
+    const noteId = body.noteId && ObjectId.isValid(body.noteId)
+      ? new ObjectId(body.noteId)
+      : undefined;
 
-  const highlight = {
-    userId: userObjectId,
-    sectionSlug: body.sectionSlug,
-    anchorId: body.anchorId,
-    range: body.range,
-    text: body.text,
-    color: body.color ?? 'yellow',
-    noteId,
-    createdAt: new Date(),
-  };
+    const highlight = {
+      userId: userObjectId,
+      sectionSlug: body.sectionSlug,
+      anchorId: body.anchorId,
+      range: body.range,
+      text: body.text,
+      color: body.color ?? 'yellow',
+      noteId,
+      createdAt: new Date(),
+    };
 
-  const highlights = await getHighlightsCollection();
-  const result = await highlights.insertOne(highlight);
+    const highlights = await getHighlightsCollection();
+    const result = await highlights.insertOne(highlight);
 
-  return Response.json({
-    highlight: {
-      ...highlight,
-      _id: result.insertedId.toHexString(),
-      userId: userObjectId.toHexString(),
-      noteId: noteId?.toHexString(),
-    },
-  });
+    return Response.json({
+      highlight: {
+        ...highlight,
+        _id: result.insertedId.toHexString(),
+        userId: userObjectId.toHexString(),
+        noteId: noteId?.toHexString(),
+      },
+    });
+  } catch (error) {
+    console.error('[api/highlights][POST] database_error', error);
+    return apiError('database_error', 'Unable to create highlight', 503);
+  }
 }

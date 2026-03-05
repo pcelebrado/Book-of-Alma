@@ -22,23 +22,28 @@ export async function POST(request: NextRequest) {
     return apiError('invalid_request', 'sectionSlug is required', 400);
   }
 
-  const bookmarks = await getBookmarksCollection();
-  const filter = {
-    userId: userObjectId,
-    sectionSlug: body.sectionSlug,
-    anchorId: body.anchorId ?? '',
-  };
+  try {
+    const bookmarks = await getBookmarksCollection();
+    const filter = {
+      userId: userObjectId,
+      sectionSlug: body.sectionSlug,
+      anchorId: body.anchorId,
+    };
 
-  const existing = await bookmarks.findOne(filter);
-  if (existing) {
-    await bookmarks.deleteOne({ _id: existing._id });
-    return Response.json({ bookmarked: false });
+    const existing = await bookmarks.findOne(filter);
+    if (existing) {
+      await bookmarks.deleteOne({ _id: existing._id });
+      return Response.json({ bookmarked: false });
+    }
+
+    await bookmarks.insertOne({
+      ...filter,
+      createdAt: new Date(),
+    });
+
+    return Response.json({ bookmarked: true });
+  } catch (error) {
+    console.error('[api/bookmarks/toggle][POST] database_error', error);
+    return apiError('database_error', 'Unable to toggle bookmark', 503);
   }
-
-  await bookmarks.insertOne({
-    ...filter,
-    createdAt: new Date(),
-  });
-
-  return Response.json({ bookmarked: true });
 }

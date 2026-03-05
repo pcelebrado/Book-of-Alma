@@ -51,25 +51,30 @@ export async function PATCH(
     updates.title = body.title;
   }
 
-  const notes = await getNotesCollection();
+  try {
+    const notes = await getNotesCollection();
 
-  const result = await notes.findOneAndUpdate(
-    { _id: noteId, userId: userObjectId },
-    { $set: updates },
-    { returnDocument: 'after' },
-  );
+    const result = await notes.findOneAndUpdate(
+      { _id: noteId, userId: userObjectId },
+      { $set: updates },
+      { returnDocument: 'after' },
+    );
 
-  if (!result) {
-    return apiError('not_found', 'Note not found', 404);
+    if (!result) {
+      return apiError('not_found', 'Note not found', 404);
+    }
+
+    return Response.json({
+      note: {
+        ...result,
+        _id: result._id.toHexString(),
+        userId: result.userId.toHexString(),
+      },
+    });
+  } catch (error) {
+    console.error('[api/notes/:id][PATCH] database_error', error);
+    return apiError('database_error', 'Unable to update note', 503);
   }
-
-  return Response.json({
-    note: {
-      ...result,
-      _id: result._id.toHexString(),
-      userId: result.userId.toHexString(),
-    },
-  });
 }
 
 export async function DELETE(
@@ -86,12 +91,17 @@ export async function DELETE(
     return apiError('invalid_request', 'Invalid note id', 400);
   }
 
-  const notes = await getNotesCollection();
-  const result = await notes.deleteOne({ _id: noteId, userId: userObjectId });
+  try {
+    const notes = await getNotesCollection();
+    const result = await notes.deleteOne({ _id: noteId, userId: userObjectId });
 
-  if (result.deletedCount === 0) {
-    return apiError('not_found', 'Note not found', 404);
+    if (result.deletedCount === 0) {
+      return apiError('not_found', 'Note not found', 404);
+    }
+
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error('[api/notes/:id][DELETE] database_error', error);
+    return apiError('database_error', 'Unable to delete note', 503);
   }
-
-  return Response.json({ ok: true });
 }

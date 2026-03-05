@@ -5,7 +5,7 @@ import { NotebookPen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function JournalPlaceholderPage() {
+export default function JournalPage() {
   return (
     <div className="mx-auto max-w-3xl py-8">
       <Card>
@@ -14,11 +14,14 @@ export default function JournalPlaceholderPage() {
             <NotebookPen className="h-5 w-5" />
             Journal
           </CardTitle>
-          <CardDescription>Coming soon. Your journal entries will appear here.</CardDescription>
+          <CardDescription>Capture and review trade-learning notes from the reader.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/notes">View Notes</Link>
+        <CardContent className="space-y-3">
+          <Button asChild className="w-full justify-start">
+            <Link href="/notes">View all notes</Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full justify-start">
+            <Link href="/book">Open Reader and add note</Link>
           </Button>
         </CardContent>
       </Card>

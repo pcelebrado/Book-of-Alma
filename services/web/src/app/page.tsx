@@ -32,28 +32,30 @@ export default function LibraryPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const [tocRes, progressRes, notesRes] = await Promise.all([
+        const [tocResult, progressResult, notesResult] = await Promise.allSettled([
           fetch('/api/book/toc', { cache: 'no-store' }),
           fetch('/api/progress/summary', { cache: 'no-store' }),
           fetch('/api/notes', { cache: 'no-store' }),
         ]);
 
-        if (tocRes.ok) {
-          const tocPayload = (await tocRes.json()) as { tocTree?: { parts?: PartItem[] } };
+        if (tocResult.status === 'fulfilled' && tocResult.value.ok) {
+          const tocPayload = (await tocResult.value.json()) as { tocTree?: { parts?: PartItem[] } };
           setParts(tocPayload.tocTree?.parts ?? []);
         }
 
-        if (progressRes.ok) {
-          const progressPayload = (await progressRes.json()) as {
+        if (progressResult.status === 'fulfilled' && progressResult.value.ok) {
+          const progressPayload = (await progressResult.value.json()) as {
             continue?: { sectionSlug: string; percent: number };
           };
           setContinueItem(progressPayload.continue ?? null);
         }
 
-        if (notesRes.ok) {
-          const notesPayload = (await notesRes.json()) as { notes?: NoteItem[] };
+        if (notesResult.status === 'fulfilled' && notesResult.value.ok) {
+          const notesPayload = (await notesResult.value.json()) as { notes?: NoteItem[] };
           setNotes(notesPayload.notes ?? []);
         }
+      } catch (error) {
+        console.error('[LibraryPage] load error', error);
       } finally {
         setLoading(false);
       }

@@ -13,24 +13,29 @@ export async function GET(request: NextRequest) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
-  const playbooks = await getPlaybooksCollection();
-  const filter: Filter<PlaybookDocument> =
-    session.role === 'admin'
-      ? {}
-      : {
-          $or: [
-            { status: 'published' as const },
-            { status: 'draft' as const, createdBy: userObjectId },
-          ],
-        };
+  try {
+    const playbooks = await getPlaybooksCollection();
+    const filter: Filter<PlaybookDocument> =
+      session.role === 'admin'
+        ? {}
+        : {
+            $or: [
+              { status: 'published' as const },
+              { status: 'draft' as const, createdBy: userObjectId },
+            ],
+          };
 
-  const docs = await playbooks.find(filter).sort({ updatedAt: -1 }).toArray();
+    const docs = await playbooks.find(filter).sort({ updatedAt: -1 }).toArray();
 
-  return Response.json({
-    playbooks: docs.map((doc) => ({
-      ...doc,
-      _id: doc._id.toHexString(),
-      createdBy: doc.createdBy.toHexString(),
-    })),
-  });
+    return Response.json({
+      playbooks: docs.map((doc) => ({
+        ...doc,
+        _id: doc._id.toHexString(),
+        createdBy: doc.createdBy.toHexString(),
+      })),
+    });
+  } catch (error) {
+    console.error('[api/playbooks][GET] database_error', error);
+    return apiError('database_error', 'Unable to load playbooks', 503);
+  }
 }

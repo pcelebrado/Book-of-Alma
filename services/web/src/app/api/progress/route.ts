@@ -23,31 +23,36 @@ export async function POST(request: NextRequest) {
     return apiError('invalid_request', 'sectionSlug and percent are required', 400);
   }
 
-  const progress = await getReadingProgressCollection();
-  const now = new Date();
-  const result = await progress.findOneAndUpdate(
-    { userId: userObjectId, sectionSlug: body.sectionSlug },
-    {
-      $set: {
-        userId: userObjectId,
-        sectionSlug: body.sectionSlug,
-        percent: Math.max(0, Math.min(100, body.percent)),
-        lastAnchorId: body.lastAnchorId,
-        updatedAt: now,
+  try {
+    const progress = await getReadingProgressCollection();
+    const now = new Date();
+    const result = await progress.findOneAndUpdate(
+      { userId: userObjectId, sectionSlug: body.sectionSlug },
+      {
+        $set: {
+          userId: userObjectId,
+          sectionSlug: body.sectionSlug,
+          percent: Math.max(0, Math.min(100, body.percent)),
+          lastAnchorId: body.lastAnchorId,
+          updatedAt: now,
+        },
       },
-    },
-    { upsert: true, returnDocument: 'after' },
-  );
+      { upsert: true, returnDocument: 'after' },
+    );
 
-  if (!result) {
-    return apiError('internal_error', 'Unable to store progress', 500);
+    if (!result) {
+      return apiError('internal_error', 'Unable to store progress', 500);
+    }
+
+    return Response.json({
+      progress: {
+        ...result,
+        _id: result._id.toHexString(),
+        userId: result.userId.toHexString(),
+      },
+    });
+  } catch (error) {
+    console.error('[api/progress][POST] database_error', error);
+    return apiError('database_error', 'Unable to store progress', 503);
   }
-
-  return Response.json({
-    progress: {
-      ...result,
-      _id: result._id.toHexString(),
-      userId: result.userId.toHexString(),
-    },
-  });
 }

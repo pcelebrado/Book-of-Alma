@@ -2,6 +2,7 @@
 
 import { BookOpen, Command, Menu, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 import { Toaster } from 'sonner';
@@ -38,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const sectionSlug = useMemo(() => {
     if (!pathname?.startsWith('/book/')) {
-      return 'part-1-foundations/ch-1/01-gamma-basics';
+      return undefined;
     }
     return pathname.replace('/book/', '');
   }, [pathname]);
@@ -124,6 +125,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/login">Sign in</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void signOut({ callbackUrl: '/login' });
+                    }}
+                  >
+                    Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

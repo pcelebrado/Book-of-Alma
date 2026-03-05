@@ -28,6 +28,70 @@ interface SectionPayload {
     content?: string;
   };
   headings?: Array<{ id: string; text: string }>;
+  previousSlug?: string;
+  nextSlug?: string;
+}
+
+function escapeHtml(raw: string): string {
+  return raw
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderMarkdown(markdown: string): string {
+  const lines = markdown.split('\n');
+  const output: string[] = [];
+  let listOpen = false;
+
+  const closeListIfOpen = () => {
+    if (listOpen) {
+      output.push('</ul>');
+      listOpen = false;
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      closeListIfOpen();
+      continue;
+    }
+
+    if (trimmed.startsWith('- ')) {
+      if (!listOpen) {
+        output.push('<ul>');
+        listOpen = true;
+      }
+      output.push(`<li>${escapeHtml(trimmed.slice(2))}</li>`);
+      continue;
+    }
+
+    closeListIfOpen();
+
+    if (trimmed.startsWith('### ')) {
+      output.push(`<h3>${escapeHtml(trimmed.slice(4))}</h3>`);
+      continue;
+    }
+
+    if (trimmed.startsWith('## ')) {
+      output.push(`<h2>${escapeHtml(trimmed.slice(3))}</h2>`);
+      continue;
+    }
+
+    if (trimmed.startsWith('# ')) {
+      output.push(`<h1>${escapeHtml(trimmed.slice(2))}</h1>`);
+      continue;
+    }
+
+    output.push(`<p>${escapeHtml(trimmed)}</p>`);
+  }
+
+  closeListIfOpen();
+  return output.join('');
 }
 
 async function getSection(slug: string): Promise<SectionPayload | null> {
@@ -40,6 +104,33 @@ async function getSection(slug: string): Promise<SectionPayload | null> {
     if (!section) {
       return null;
     }
+
+    const orderedSections = await sections
+      .find(
+        { status: 'published' },
+        {
+          projection: {
+            slug: 1,
+            part: 1,
+            chapter: 1,
+            section: 1,
+          },
+          sort: {
+            'part.index': 1,
+            'chapter.index': 1,
+            'section.index': 1,
+          },
+        },
+      )
+      .toArray();
+
+    const slugs = orderedSections.map((entry) => entry.slug);
+    const sectionPosition = slugs.findIndex((entrySlug) => entrySlug === section.slug);
+    const previousSlug = sectionPosition > 0 ? slugs[sectionPosition - 1] : undefined;
+    const nextSlug =
+      sectionPosition >= 0 && sectionPosition < slugs.length - 1
+        ? slugs[sectionPosition + 1]
+        : undefined;
 
     return {
       section: {
@@ -58,6 +149,8 @@ async function getSection(slug: string): Promise<SectionPayload | null> {
         content: section.bodyMarkdown,
       },
       headings: section.headings ?? [],
+      previousSlug,
+      nextSlug,
     };
   } catch {
     return null;
@@ -125,22 +218,44 @@ export default async function ReaderPage({ params }: SectionPageProps) {
       </div>
 
       <div className="prose prose-invert max-w-none leading-relaxed2">
-        <p>{payload.body?.content ?? 'No body content is available for this section.'}</p>
+        <div
+          dangerouslySetInnerHTML={{
+            __html: renderMarkdown(
+              payload.body?.content ?? 'No body content is available for this section.',
+            ),
+          }}
+        />
       </div>
 
       <div className="flex items-center justify-between border-t pt-4">
-        <Button asChild variant="outline">
-          <Link href="/book">
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Link>
-        </Button>
-        <Button asChild>
-          <Link href="/book">
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        {payload.previousSlug ? (
+          <Button asChild variant="outline">
+            <Link href={`/book/${payload.previousSlug}`}>
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="outline">
+            <Link href="/book">
+              <ChevronLeft className="h-4 w-4" />
+              Library
+            </Link>
+          </Button>
+        )}
+
+        {payload.nextSlug ? (
+          <Button asChild>
+            <Link href={`/book/${payload.nextSlug}`}>
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href="/book">Reader home</Link>
+          </Button>
+        )}
       </div>
     </article>
   );

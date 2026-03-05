@@ -42,6 +42,7 @@ const WORKSPACE_DIR =
 
 // Protect /setup with a user-provided password.
 const SETUP_PASSWORD = process.env.SETUP_PASSWORD?.trim();
+const INTERNAL_SERVICE_TOKEN = process.env.INTERNAL_SERVICE_TOKEN?.trim() || "";
 
 // Gateway admin token (protects OpenClaw gateway + Control UI).
 // Must be stable across restarts. If not provided via env, persist it in the state dir.
@@ -295,6 +296,55 @@ function requireSetupAuth(req, res, next) {
   return next();
 }
 
+function requireInternalApiAuth(req, res, next) {
+  if (!INTERNAL_SERVICE_TOKEN) {
+    return res.status(503).json({
+      ok: false,
+      error: {
+        code: "internal_auth_not_configured",
+        message: "INTERNAL_SERVICE_TOKEN is not configured",
+      },
+    });
+  }
+
+  const header = req.headers.authorization || "";
+  const [scheme, token] = header.split(" ");
+  if (scheme !== "Bearer" || !token || token !== INTERNAL_SERVICE_TOKEN) {
+    return res.status(401).json({
+      ok: false,
+      error: {
+        code: "unauthorized",
+        message: "Invalid internal service token",
+      },
+    });
+  }
+
+  return next();
+}
+
+function buildSkillInstruction(skill, context) {
+  const skillPrompts = {
+    explain: "Explain the selected section clearly and concisely.",
+    socratic: "Ask 3-5 Socratic questions to test understanding of this section.",
+    flashcards: "Generate concise flashcards from this section.",
+    checklist: "Create a practical checklist from this section.",
+    scenario_tree: "Build an if/then scenario tree from this section.",
+    notes_assist: "Summarize this section into note-ready bullets.",
+  };
+
+  const selectedText = context?.selectedText ? `\nSelected text:\n${context.selectedText}` : "";
+  const anchorId = context?.anchorId ? `\nAnchor: ${context.anchorId}` : "";
+  const mode = context?.mode ? `\nMode: ${context.mode}` : "";
+
+  return [
+    skillPrompts[skill] || "Help with this section.",
+    `\nSection slug: ${context?.sectionSlug || "unknown"}`,
+    anchorId,
+    mode,
+    selectedText,
+  ].join("");
+}
+
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
@@ -352,6 +402,138 @@ app.get("/healthz", async (_req, res) => {
       lastDoctorAt,
     },
   });
+});
+
+app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
+  let gatewayReachable = false;
+  try {
+    gatewayReachable = await probeGateway();
+  } catch {
+    gatewayReachable = false;
+  }
+
+  return res.json({
+    ok: true,
+    components: {
+      wrapper: {
+        configured: isConfigured(),
+      },
+      gateway: {
+        reachable: gatewayReachable,
+        target: GATEWAY_TARGET,
+      },
+      httpApi: {
+        chatCompletions: "/v1/chat/completions",
+        responses: "/v1/responses",
+        toolsInvoke: "/tools/invoke",
+      },
+    },
+  });
+});
+
+app.post("/internal/agent/run", requireInternalApiAuth, async (req, res) => {
+  const payload = req.body || {};
+  const skill = typeof payload.skill === "string" ? payload.skill : "";
+  const context = payload.context && typeof payload.context === "object" ? payload.context : {};
+
+  if (!skill) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "skill is required",
+      },
+    });
+  }
+
+  try {
+    await ensureGatewayRunning();
+
+    const userMessage = buildSkillInstruction(skill, context);
+
+    const responsesResult = await fetch(`${GATEWAY_TARGET}/v1/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
+        "x-openclaw-agent-id": "main",
+      },
+      body: JSON.stringify({
+        model: "openclaw:main",
+        input: userMessage,
+      }),
+    });
+
+    if (responsesResult.ok) {
+      const data = await responsesResult.json();
+      return res.json({
+        ok: true,
+        skill,
+        output: data,
+        source: "gateway.responses",
+      });
+    }
+
+    const chatResult = await fetch(`${GATEWAY_TARGET}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
+        "x-openclaw-agent-id": "main",
+      },
+      body: JSON.stringify({
+        model: "openclaw:main",
+        messages: [{ role: "user", content: userMessage }],
+      }),
+    });
+
+    if (!chatResult.ok) {
+      const body = await chatResult.text();
+      return res.status(503).json({
+        ok: false,
+        error: {
+          code: "gateway_unavailable",
+          message: "Gateway HTTP APIs are not available",
+          details: body,
+        },
+      });
+    }
+
+    const chatData = await chatResult.json();
+    return res.json({
+      ok: true,
+      skill,
+      output: chatData,
+      source: "gateway.chat_completions",
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      error: {
+        code: "core_unavailable",
+        message: String(error),
+      },
+    });
+  }
+});
+
+app.post("/internal/index/rebuild", requireInternalApiAuth, async (_req, res) => {
+  try {
+    await restartGateway();
+    return res.json({
+      started: true,
+      jobId: `gateway-restart-${Date.now()}`,
+      mode: "gateway_restart",
+    });
+  } catch (error) {
+    return res.status(503).json({
+      started: false,
+      error: {
+        code: "reindex_failed",
+        message: String(error),
+      },
+    });
+  }
 });
 
 app.get("/setup/app.js", requireSetupAuth, (_req, res) => {
@@ -745,6 +927,14 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]),
+    );
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
+    );
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
 
@@ -1439,6 +1629,14 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]),
+      );
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
+      );
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);

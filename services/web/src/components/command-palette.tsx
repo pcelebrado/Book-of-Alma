@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, FileText, LayoutDashboard, NotebookPen, Shield, Siren, Sparkles } from 'lucide-react';
+import { BookOpen, FileText, NotebookPen, Shield, Sparkles } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -27,9 +27,6 @@ const navigationActions: ActionItem[] = [
   { label: 'Go to Notes', href: '/notes', icon: <NotebookPen className="h-4 w-4" />, shortcut: 'G N' },
   { label: 'Go to Playbooks', href: '/playbooks', icon: <FileText className="h-4 w-4" />, shortcut: 'G P' },
   { label: 'Go to Admin', href: '/admin', icon: <Shield className="h-4 w-4" />, shortcut: 'G A' },
-  { label: 'Go to Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: 'Go to Journal', href: '/journal', icon: <NotebookPen className="h-4 w-4" /> },
-  { label: 'Go to Alerts', href: '/alerts', icon: <Siren className="h-4 w-4" /> },
 ];
 
 const creationActions: ActionItem[] = [

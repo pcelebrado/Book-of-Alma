@@ -12,23 +12,28 @@ export async function GET(request: NextRequest) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
-  const progress = await getReadingProgressCollection();
-  const docs = await progress
-    .find({ userId: userObjectId })
-    .sort({ updatedAt: -1 })
-    .limit(10)
-    .toArray();
+  try {
+    const progress = await getReadingProgressCollection();
+    const docs = await progress
+      .find({ userId: userObjectId })
+      .sort({ updatedAt: -1 })
+      .limit(10)
+      .toArray();
 
-  const mapped = docs.map((doc) => ({
-    _id: doc._id.toHexString(),
-    sectionSlug: doc.sectionSlug,
-    percent: doc.percent,
-    lastAnchorId: doc.lastAnchorId ?? null,
-    updatedAt: doc.updatedAt,
-  }));
+    const mapped = docs.map((doc) => ({
+      _id: doc._id.toHexString(),
+      sectionSlug: doc.sectionSlug,
+      percent: doc.percent,
+      lastAnchorId: doc.lastAnchorId ?? null,
+      updatedAt: doc.updatedAt,
+    }));
 
-  return Response.json({
-    continue: mapped[0] ?? null,
-    recent: mapped,
-  });
+    return Response.json({
+      continue: mapped[0] ?? null,
+      recent: mapped,
+    });
+  } catch (error) {
+    console.error('[api/progress/summary][GET] database_error', error);
+    return apiError('database_error', 'Unable to load progress summary', 503);
+  }
 }

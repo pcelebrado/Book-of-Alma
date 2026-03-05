@@ -1,4 +1,3 @@
-import { ObjectId } from 'mongodb';
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
@@ -27,29 +26,34 @@ export async function POST(request: NextRequest) {
     return apiError('invalid_request', 'sectionSlug and noteText are required', 400);
   }
 
-  const now = new Date();
-  const notes = await getNotesCollection();
-  const note = {
-    userId: userObjectId,
-    sectionSlug: body.sectionSlug,
-    anchorId: body.anchorId,
-    selection: body.selection,
-    title: body.title,
-    body: body.noteText,
-    tags: body.tags ?? [],
-    createdAt: now,
-    updatedAt: now,
-  };
+  try {
+    const now = new Date();
+    const notes = await getNotesCollection();
+    const note = {
+      userId: userObjectId,
+      sectionSlug: body.sectionSlug,
+      anchorId: body.anchorId,
+      selection: body.selection,
+      title: body.title,
+      body: body.noteText,
+      tags: body.tags ?? [],
+      createdAt: now,
+      updatedAt: now,
+    };
 
-  const result = await notes.insertOne(note);
+    const result = await notes.insertOne(note);
 
-  return Response.json({
-    note: {
-      ...note,
-      _id: result.insertedId.toHexString(),
-      userId: userObjectId.toHexString(),
-    },
-  });
+    return Response.json({
+      note: {
+        ...note,
+        _id: result.insertedId.toHexString(),
+        userId: userObjectId.toHexString(),
+      },
+    });
+  } catch (error) {
+    console.error('[api/notes][POST] database_error', error);
+    return apiError('database_error', 'Unable to create note', 503);
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -58,21 +62,26 @@ export async function GET(request: NextRequest) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
-  const sectionSlug = request.nextUrl.searchParams.get('sectionSlug');
-  const notes = await getNotesCollection();
+  try {
+    const sectionSlug = request.nextUrl.searchParams.get('sectionSlug');
+    const notes = await getNotesCollection();
 
-  const filter: Record<string, unknown> = { userId: userObjectId };
-  if (sectionSlug) {
-    filter.sectionSlug = sectionSlug;
+    const filter: Record<string, unknown> = { userId: userObjectId };
+    if (sectionSlug) {
+      filter.sectionSlug = sectionSlug;
+    }
+
+    const docs = await notes.find(filter).sort({ updatedAt: -1 }).toArray();
+
+    return Response.json({
+      notes: docs.map((doc) => ({
+        ...doc,
+        _id: doc._id.toHexString(),
+        userId: doc.userId.toHexString(),
+      })),
+    });
+  } catch (error) {
+    console.error('[api/notes][GET] database_error', error);
+    return apiError('database_error', 'Unable to load notes', 503);
   }
-
-  const docs = await notes.find(filter).sort({ updatedAt: -1 }).toArray();
-
-  return Response.json({
-    notes: docs.map((doc) => ({
-      ...doc,
-      _id: doc._id.toHexString(),
-      userId: doc.userId.toHexString(),
-    })),
-  });
 }

@@ -112,7 +112,7 @@ export function verifyPassword(password: string, user: Record<string, unknown>):
   const digest = createHash('sha256').update(password).digest('hex');
 
   const hash = user.passwordHash;
-  if (typeof hash === 'string' && (hash === password || hash === digest)) {
+  if (typeof hash === 'string' && hash === digest) {
     return true;
   }
 

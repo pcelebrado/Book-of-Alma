@@ -54,13 +54,17 @@ export function AgentPanel({ sectionSlug }: { sectionSlug?: string }) {
     setOutput('');
 
     try {
+      if (!sectionSlug) {
+        throw new Error('No section selected. Open a book section first.');
+      }
+
       const response = await fetch('/api/agent/skill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           skill,
           context: {
-            sectionSlug: sectionSlug ?? 'part-1-foundations/ch-1/01-gamma-basics',
+            sectionSlug,
             mode: 'simple',
           },
         }),

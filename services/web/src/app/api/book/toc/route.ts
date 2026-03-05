@@ -27,14 +27,19 @@ export async function GET(request: NextRequest) {
     return apiError('unauthorized', 'Authentication required to access book contents', 401);
   }
 
-  const tocCollection = await getBookTocCollection();
+  try {
+    const tocCollection = await getBookTocCollection();
 
-  const toc =
-    (await tocCollection.findOne({ _id: 'default' })) ??
-    (await tocCollection.find({}).sort({ updatedAt: -1 }).limit(1).next());
+    const toc =
+      (await tocCollection.findOne({ _id: 'default' })) ??
+      (await tocCollection.find({}).sort({ updatedAt: -1 }).limit(1).next());
 
-  return Response.json({
-    tocTree: toc?.tree ?? {},
-    updatedAt: toc?.updatedAt ?? null,
-  });
+    return Response.json({
+      tocTree: toc?.tree ?? {},
+      updatedAt: toc?.updatedAt ?? null,
+    });
+  } catch (error) {
+    console.error('[api/book/toc][GET] database_error', error);
+    return apiError('database_error', 'Unable to load table of contents', 503);
+  }
 }
