@@ -57,20 +57,11 @@ export async function middleware(request: NextRequest) {
       }));
 
     if (!token) {
-      const meResponse = await fetch(new URL('/api/auth/me', request.url), {
-        headers: {
-          cookie: request.headers.get('cookie') ?? '',
-        },
-        cache: 'no-store',
-      });
-
-      if (!meResponse.ok) {
-        const redirectUrl = new URL('/login', request.url);
-        redirectUrl.searchParams.set('next', pathname);
-        const redirect = NextResponse.redirect(redirectUrl);
-        redirect.headers.set(REQUEST_ID_HEADER, requestId);
-        return redirect;
-      }
+      const redirectUrl = new URL('/login', request.url);
+      redirectUrl.searchParams.set('next', pathname);
+      const redirect = NextResponse.redirect(redirectUrl);
+      redirect.headers.set(REQUEST_ID_HEADER, requestId);
+      return redirect;
     }
   }
 
