@@ -655,6 +655,8 @@ app.post("/internal/openclaw/console/run", requireInternalApiAuth, async (req, r
     "openclaw.doctor",
     "openclaw.logs.tail",
     "openclaw.config.get",
+    "openclaw.models.list",
+    "openclaw.models.set",
     "openclaw.devices.list",
     "openclaw.devices.approve",
     "openclaw.plugins.list",
@@ -711,6 +713,18 @@ app.post("/internal/openclaw/console/run", requireInternalApiAuth, async (req, r
         return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Config path is required" } });
       }
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", arg]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.models.list") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["models", "list", "--all"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.models.set") {
+      const model = String(arg || "").trim();
+      if (!model) {
+        return res.status(400).json({ ok: false, error: { code: "missing_argument", message: "Model id is required (provider/model-id)" } });
+      }
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["models", "set", model]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.devices.list") {
@@ -1089,6 +1103,8 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
         <option value="openclaw.doctor">openclaw doctor</option>
         <option value="openclaw.logs.tail">openclaw logs --tail N</option>
         <option value="openclaw.config.get">openclaw config get &lt;path&gt;</option>
+        <option value="openclaw.models.list">openclaw models list --all</option>
+        <option value="openclaw.models.set">openclaw models set &lt;provider/model-id&gt;</option>
         <option value="openclaw.version">openclaw --version</option>
         <option value="openclaw.devices.list">openclaw devices list</option>
         <option value="openclaw.devices.approve">openclaw devices approve &lt;requestId&gt;</option>
@@ -1702,6 +1718,8 @@ const ALLOWED_CONSOLE_COMMANDS = new Set([
   "openclaw.doctor",
   "openclaw.logs.tail",
   "openclaw.config.get",
+  "openclaw.models.list",
+  "openclaw.models.set",
 
   // Device management (for fixing "disconnected (1008): pairing required")
   "openclaw.devices.list",
@@ -1763,6 +1781,16 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
     if (cmd === "openclaw.config.get") {
       if (!arg) return res.status(400).json({ ok: false, error: "Missing config path" });
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", arg]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.models.list") {
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["models", "list", "--all"]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.models.set") {
+      const model = String(arg || "").trim();
+      if (!model) return res.status(400).json({ ok: false, error: "Missing model id (provider/model-id)" });
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["models", "set", model]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
 

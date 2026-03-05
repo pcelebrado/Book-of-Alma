@@ -1159,6 +1159,8 @@ export default function AdminPage() {
                       <option value="openclaw.doctor">openclaw.doctor</option>
                       <option value="openclaw.logs.tail">openclaw.logs.tail</option>
                       <option value="openclaw.config.get">openclaw.config.get</option>
+                      <option value="openclaw.models.list">openclaw.models.list</option>
+                      <option value="openclaw.models.set">openclaw.models.set</option>
                     </optgroup>
                     <optgroup label="Devices">
                       <option value="openclaw.devices.list">openclaw.devices.list</option>
@@ -1176,7 +1178,7 @@ export default function AdminPage() {
                   </label>
                   <Input
                     id="console-arg"
-                    placeholder="e.g. 200, gateway.auth.mode, telegram"
+                    placeholder="e.g. 200, gateway.auth.mode, moonshot/kimi-k2"
                     value={consoleArg}
                     onChange={(e) => setConsoleArg(e.target.value)}
                   />
