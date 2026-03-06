@@ -6,6 +6,22 @@ import { logSecurityEvent } from '@/lib/logger';
 const DEFAULT_TIMEOUT_MS = 12_000;
 const RETRY_TIMEOUT_MS = 30_000;
 
+function getCoreBaseUrlCandidates(): string[] {
+  const candidates: string[] = [];
+  const internal = getCoreBaseUrl().trim();
+  const fallback = getCorePublicUrl().trim();
+
+  if (internal) {
+    candidates.push(internal);
+  }
+
+  if (fallback && !candidates.includes(fallback)) {
+    candidates.push(fallback);
+  }
+
+  return candidates;
+}
+
 async function wakeCoreFromPublicEdge(requestId: string, route: string) {
   const publicUrl = getCorePublicUrl();
   if (!publicUrl) {
@@ -91,8 +107,8 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
   path: string,
   options: CoreFetchOptions<TBody> = {},
 ): Promise<TResponse> {
-  const baseUrl = getCoreBaseUrl();
-  if (!baseUrl) {
+  const baseUrls = getCoreBaseUrlCandidates();
+  if (baseUrls.length === 0) {
     throw new Error('Missing INTERNAL_CORE_BASE_URL');
   }
 
@@ -121,7 +137,7 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const runAttempt = async (timeoutMs: number) => {
+  const runAttempt = async (baseUrl: string, timeoutMs: number) => {
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
 
@@ -141,16 +157,41 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
   try {
     let response: Response;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const firstBaseUrl = baseUrls[0] as string;
 
     try {
-      response = await runAttempt(timeoutMs);
+      response = await runAttempt(firstBaseUrl, timeoutMs);
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         await wakeCoreFromPublicEdge(requestId, path);
-        response = await runAttempt(Math.max(timeoutMs, RETRY_TIMEOUT_MS));
+        let lastError: unknown = null;
+        for (const candidate of baseUrls) {
+          try {
+            response = await runAttempt(candidate, Math.max(timeoutMs, RETRY_TIMEOUT_MS));
+            lastError = null;
+            break;
+          } catch (retryError) {
+            lastError = retryError;
+          }
+        }
+        if (lastError) {
+          throw lastError;
+        }
       } else if (error instanceof TypeError) {
         await wakeCoreFromPublicEdge(requestId, path);
-        response = await runAttempt(Math.max(timeoutMs, RETRY_TIMEOUT_MS));
+        let lastError: unknown = null;
+        for (const candidate of baseUrls) {
+          try {
+            response = await runAttempt(candidate, Math.max(timeoutMs, RETRY_TIMEOUT_MS));
+            lastError = null;
+            break;
+          } catch (retryError) {
+            lastError = retryError;
+          }
+        }
+        if (lastError) {
+          throw lastError;
+        }
       } else {
         throw error;
       }
