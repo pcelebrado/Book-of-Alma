@@ -1,0 +1,289 @@
+{
+	"ontology_enums": {
+		"TopicEnum": [
+			"FOUNDATIONS",
+			"VOLATILITY",
+			"LIQUIDITY",
+			"MICROSTRUCTURE",
+			"DEALER_FLOWS",
+			"OPTIONS_GREEKS",
+			"REGIMES",
+			"MACRO",
+			"GEOPOLITICS",
+			"CREDIT",
+			"BUBBLES",
+			"TAIL_RISK",
+			"SYSTEMATIC_STRATEGIES",
+			"PSYCHOLOGY",
+			"RISK_MANAGEMENT"
+		],
+		"MechanismEnum": [
+			"GAMMA",
+			"GAMMA_FLIP",
+			"VANNA",
+			"SPEED",
+			"CHARM",
+			"COLOR",
+			"THETA_DECAY",
+			"DELTA_HEDGING",
+			"VEGA_DYNAMICS",
+			"VOL_SUPPRESSION",
+			"KURTOSIS_COMPRESSION",
+			"KURTOSIS_EXPANSION",
+			"LIQUIDITY_EVAPORATION",
+			"RANGEBOUND_OSCILLATION",
+			"NEGATIVE_DRIFT",
+			"FEEDBACK_LOOP",
+			"FORCED_DELEVERAGING",
+			"TERM_PREMIUM"
+		],
+		"TimeframeEnum": [ "INTRADAY", "DAILY", "WEEKLY", "OPEX_CYCLE", "MONTHLY", "REGIME_SCALE" ],
+		"InstrumentEnum": [
+			"EQUITIES",
+			"INDEX_OPTIONS",
+			"VOLATILITY_PRODUCTS",
+			"RATES",
+			"FX",
+			"COMMODITIES"
+		],
+		"StrategyEnum": [
+			"MEAN_REVERSION",
+			"MOMENTUM_CONFIRMATION",
+			"VOLATILITY_TRADING",
+			"SCENARIO_MODELING",
+			"POSITION_SIZING",
+			"CAPITAL_PRESERVATION"
+		],
+		"RiskEnum": [
+			"TAIL_RISK",
+			"LEFT_TAIL",
+			"CONVEXITY",
+			"ASMMETRIC_PAYOFFS",
+			"SYSTEMIC_RISK",
+			"LIQUIDITY_RISK",
+			"MODEL_RISK"
+		],
+		"MindsetEnum": [
+			"PROBABILISTIC",
+			"CONDITIONAL_THINKING",
+			"ANTI_BIAS",
+			"FRAMEWORK_SWITCHING",
+			"STRUCTURE_OVER_STORY",
+			"VOLATILITY_FIRST"
+		],
+		"MacroDriverEnum": [
+			"INFLATION_REGIME",
+			"GROWTH_REGIME",
+			"DE_DOLLARIZATION",
+			"SUPPLY_CHAIN_FRAGMENTATION",
+			"CREDIT_DEREGULATION",
+			"SYNTHETIC_QE",
+			"AI_CAPEX"
+		],
+		"ActorEnum": [
+			"DEALERS",
+			"MARKET_MAKERS",
+			"INSTITUTIONS",
+			"SYSTEMATIC_CTAS",
+			"VOL_CONTROL_FUNDS",
+			"RETAIL"
+		],
+		"StructurePatternEnum": [
+			"VOTING_VS_WEIGHING",
+			"POST_HOC_NARRATIVE",
+			"PINNING_MISCONCEPTION",
+			"SPOT_DECAY",
+			"OSCILLATION_NEGATIVE_DRIFT",
+			"MANAGED_MARKETS",
+			"HIDDEN_LEFT_TAIL",
+			"ASYMMETRIC_RISK_STACKING"
+		]
+	},
+	"semantic_weight_index": {
+		"weight_scale": {
+			"0.20": "weak contextual tag",
+			"0.40": "useful filter tag",
+			"0.60": "strong retrieval anchor",
+			"0.80": "primary concept",
+			"1.00": "section-defining concept"
+		},
+		"dimension_weights": {
+			"MechanismEnum": 1.0,
+			"TopicEnum": 0.85,
+			"StructurePatternEnum": 0.85,
+			"TimeframeEnum": 0.65,
+			"ActorEnum": 0.65,
+			"MacroDriverEnum": 0.60,
+			"StrategyEnum": 0.55,
+			"InstrumentEnum": 0.45,
+			"MindsetEnum": 0.45,
+			"RiskEnum": 0.70
+		},
+		"canonical_term_weights": {
+			"GAMMA": 1.0,
+			"GAMMA_FLIP": 1.0,
+			"VANNA": 1.0,
+			"SPEED": 0.95,
+			"CHARM": 0.95,
+			"COLOR": 0.85,
+			"THETA_DECAY": 0.85,
+			"DELTA_HEDGING": 0.90,
+			"VEGA_DYNAMICS": 0.80,
+			"VOL_SUPPRESSION": 0.95,
+			"KURTOSIS_COMPRESSION": 0.90,
+			"KURTOSIS_EXPANSION": 0.90,
+			"LIQUIDITY_EVAPORATION": 0.95,
+			"SPOT_DECAY": 0.95,
+			"OSCILLATION_NEGATIVE_DRIFT": 0.85,
+			"TERM_PREMIUM": 0.85,
+			"CREDIT_SATURATION": 0.80,
+			"HIDDEN_LEFT_TAIL": 0.95,
+			"CTA_ASYMMETRY": 0.90,
+			"VOL_CONTROL_FUNDS": 0.90,
+			"FORCED_DELEVERAGING": 0.95,
+			"FEEDBACK_LOOP": 0.90,
+			"CONDITIONAL_THINKING": 0.85,
+			"PROBABILISTIC": 0.85,
+			"STRUCTURE_OVER_STORY": 0.85,
+			"VOLATILITY_FIRST": 0.80
+		},
+		"synonym_groups_for_query_expansion": {
+			"GAMMA": [ "dealer gamma", "gamma exposure", "GEX", "gamma positioning" ],
+			"GAMMA_FLIP": [ "gamma flip", "flip level", "gamma sign change", "dealer regime change" ],
+			"VANNA": [ "vanna exposure", "cross-gamma", "spot-vol sensitivity" ],
+			"SPEED": [ "gamma convexity", "second order gamma", "speed profile" ],
+			"CHARM": [ "delta decay", "charm flow", "time-to-expiry delta shift" ],
+			"COLOR": [ "gamma decay", "color flow", "gamma change over time" ],
+			"VOL_SUPPRESSION": [ "vol control", "managed vol", "volatility capping" ],
+			"KURTOSIS_COMPRESSION": [ "thin tails", "compressed tails", "tail dampening" ],
+			"KURTOSIS_EXPANSION": [ "fat tails", "tail widening", "tail repricing" ],
+			"LIQUIDITY_EVAPORATION": [ "liquidity dries up", "one-sided positioning", "no bid" ],
+			"SPOT_DECAY": [ "grind lower", "slow drift", "controlled drawdown" ],
+			"OSCILLATION_NEGATIVE_DRIFT": [ "rangebound with drift", "chop + drift", "managed oscillation" ],
+			"HIDDEN_LEFT_TAIL": [ "latent crash risk", "embedded tail", "left tail risk" ],
+			"CTA_ASYMMETRY": [ "systematic selling asymmetry", "trend de-risking", "CTA deleveraging" ],
+			"FORCED_DELEVERAGING": [ "liquidation cascade", "forced selling", "margin unwind" ],
+			"STRUCTURE_OVER_STORY": [ "ignore narrative", "tape first", "flow first" ]
+		},
+		"query_intent_boost_rules": [
+			{
+				"intent": "microstructure_intraday",
+				"boost": {
+					"MechanismEnum": [
+						"GAMMA",
+						"GAMMA_FLIP",
+						"VANNA",
+						"SPEED",
+						"CHARM",
+						"COLOR",
+						"DELTA_HEDGING"
+					],
+					"TimeframeEnum": [ "INTRADAY", "DAILY" ],
+					"ActorEnum": [ "DEALERS", "MARKET_MAKERS" ]
+				},
+				"boost_multiplier": 1.25
+			},
+			{
+				"intent": "macro_regime",
+				"boost": {
+					"TopicEnum": [ "MACRO", "GEOPOLITICS", "CREDIT", "TAIL_RISK", "REGIMES" ],
+					"MacroDriverEnum": [
+						"DE_DOLLARIZATION",
+						"SUPPLY_CHAIN_FRAGMENTATION",
+						"CREDIT_DEREGULATION",
+						"SYNTHETIC_QE",
+						"AI_CAPEX"
+					],
+					"MechanismEnum": [ "TERM_PREMIUM", "KURTOSIS_EXPANSION" ]
+				},
+				"boost_multiplier": 1.18
+			},
+			{
+				"intent": "risk_management_psychology",
+				"boost": {
+					"TopicEnum": [ "PSYCHOLOGY", "RISK_MANAGEMENT" ],
+					"MindsetEnum": [
+						"PROBABILISTIC",
+						"CONDITIONAL_THINKING",
+						"ANTI_BIAS",
+						"FRAMEWORK_SWITCHING",
+						"VOLATILITY_FIRST"
+					],
+					"StrategyEnum": [ "POSITION_SIZING", "CAPITAL_PRESERVATION" ]
+				},
+				"boost_multiplier": 1.15
+			}
+		]
+	},
+	"section_semantic_map": [
+		{
+			"section": "Positive vs Negative gamma",
+			"enums": {
+				"TopicEnum": [ "MICROSTRUCTURE", "DEALER_FLOWS", "OPTIONS_GREEKS" ],
+				"MechanismEnum": [ "GAMMA", "DELTA_HEDGING" ],
+				"TimeframeEnum": [ "INTRADAY", "DAILY" ],
+				"ActorEnum": [ "DEALERS", "MARKET_MAKERS" ],
+				"RiskEnum": [ "CONVEXITY" ]
+			},
+			"anchors": [
+				{
+					"term": "GAMMA",
+					"weight": 1.0
+				},
+				{
+					"term": "DELTA_HEDGING",
+					"weight": 0.9
+				}
+			]
+		},
+		{
+			"section": "Spot decay mechanics",
+			"enums": {
+				"TopicEnum": [ "LIQUIDITY", "VOLATILITY", "MICROSTRUCTURE" ],
+				"MechanismEnum": [ "SPOT_DECAY", "VOL_SUPPRESSION" ],
+				"TimeframeEnum": [ "DAILY", "WEEKLY" ],
+				"StructurePatternEnum": [ "SPOT_DECAY" ]
+			},
+			"anchors": [
+				{
+					"term": "SPOT_DECAY",
+					"weight": 0.95
+				},
+				{
+					"term": "VOL_SUPPRESSION",
+					"weight": 0.85
+				}
+			]
+		},
+		{
+			"section": "Kurtosis compression",
+			"enums": {
+				"TopicEnum": [ "VOLATILITY", "TAIL_RISK", "REGIMES" ],
+				"MechanismEnum": [ "KURTOSIS_COMPRESSION", "VOL_SUPPRESSION" ],
+				"RiskEnum": [ "TAIL_RISK", "LEFT_TAIL" ]
+			},
+			"anchors": [
+				{
+					"term": "KURTOSIS_COMPRESSION",
+					"weight": 0.9
+				},
+				{
+					"term": "VOL_SUPPRESSION",
+					"weight": 0.8
+				}
+			]
+		}
+	],
+	"implementation_notes": {
+		"recommended_storage": {
+			"enums": "static code enums + JSON mirror for tooling",
+			"weights": "configuration layer for ranker/retriever",
+			"sections": "documents with metadata = enums + anchor terms"
+		},
+		"recommended_retrieval": [
+			"Hybrid search: BM25 + embeddings",
+			"Metadata filtering by enums (TopicEnum/MechanismEnum/TimeframeEnum)",
+			"Re-rank using anchor weights and intent boost rules"
+		]
+	}
+}

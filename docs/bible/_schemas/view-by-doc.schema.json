@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "view-by-doc.schema.json",
+  "title": "View By Document",
+  "type": "object",
+  "required": ["schemaVersion", "shard"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "shard": {"type": "string"},
+    "docs": {"type": "object"}
+  }
+}

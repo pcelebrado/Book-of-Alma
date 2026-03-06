@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "book-section.schema.json",
+  "title": "Book Section",
+  "type": "object",
+  "required": ["schemaVersion", "sectionId", "title"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "sectionId": {"type": "string", "pattern": "^part-(i|ii|iii|iv|v)-ch-[0-9]{1,2}-[a-z0-9-]+$"},
+    "title": {"type": "string"},
+    "description": {"type": "string"},
+    "order": {"type": "integer"}
+  }
+}

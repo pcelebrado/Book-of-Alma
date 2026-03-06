@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "1.0.0",
+  "indexVersion": "4.0.0",
+  "generatedAt": "2026-03-03T05:51:16.460Z",
+  "sourceDecision": "DECISION_163",
+  "sourceDecisionOverride": "DECISION_164 (path only)",
+  "schemas": [
+    {
+      "id": "manifest",
+      "relativePath": "_schemas/manifest.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "bible-doc",
+      "relativePath": "_schemas/bible-doc.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "substack-doc",
+      "relativePath": "_schemas/substack-doc.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "teaching-atom",
+      "relativePath": "_schemas/teaching-atom.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "book-section",
+      "relativePath": "_schemas/book-section.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "view-by-section",
+      "relativePath": "_schemas/view-by-section.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "view-by-doc",
+      "relativePath": "_schemas/view-by-doc.schema.json",
+      "version": "1.0.0"
+    },
+    {
+      "id": "atom-lookup",
+      "relativePath": "_schemas/atom-lookup.schema.json",
+      "version": "1.0.0"
+    }
+  ],
+  "shards": [
+    {
+      "type": "corpus-substack",
+      "schemaId": "substack-doc",
+      "schemaVersion": "1.0.0",
+      "relativePath": "corpus/substack/docs.json",
+      "recordCount": 340,
+      "byteSize": 391792
+    },
+    {
+      "type": "corpus-bible",
+      "schemaId": "bible-doc",
+      "schemaVersion": "1.0.0",
+      "relativePath": "corpus/bible/docs.json",
+      "recordCount": 0,
+      "byteSize": 3,
+      "note": "No bible corpus files yet"
+    },
+    {
+      "type": "atoms-teachings",
+      "schemaId": "teaching-atom",
+      "schemaVersion": "1.0.0",
+      "relativePath": "atoms/teachings/2026-02.json",
+      "recordCount": 0,
+      "byteSize": 3,
+      "dataTimeMin": "2026-02-01T00:00:00Z",
+      "dataTimeMax": "2026-02-26T23:59:59Z",
+      "note": "Atoms to be added by ALMA"
+    },
+    {
+      "type": "semantic-substack",
+      "schemaId": "substack-semantic-index",
+      "schemaVersion": "1.0.0",
+      "relativePath": "indices/substack-semantic-index.json",
+      "recordCount": 340,
+      "byteSize": 1443904
+    }
+  ],
+  "views": [
+    {
+      "type": "by-section",
+      "schemaId": "view-by-section",
+      "relativePath": "views/by-section/",
+      "note": "To be generated from atoms"
+    },
+    {
+      "type": "by-doc",
+      "schemaId": "view-by-doc",
+      "relativePath": "views/by-doc/",
+      "note": "To be generated from atoms"
+    },
+    {
+      "type": "atom-lookup",
+      "schemaId": "atom-lookup",
+      "relativePath": "views/atom-lookup/",
+      "note": "To be generated from atoms"
+    }
+  ],
+  "ontology": {
+    "relativePath": "ontology/weights.json",
+    "source": "legacy"
+  },
+  "mappings": {
+    "bookSections": {
+      "relativePath": "mappings/book-sections.json",
+      "sectionCount": 18
+    }
+  },
+  "sizeCaps": {
+    "manifestMaxBytes": 204800,
+    "viewMaxBytes": 2097152,
+    "shardMaxBytes": 5242880
+  },
+  "sizeValidation": {
+    "manifestBytes": 4521,
+    "manifestStatus": "PASS (< 200 KB)"
+  },
+  "notes": [
+    "Index v4 structure created per DECISION_163",
+    "Path root updated per DECISION_164 (bible/ instead of index/)",
+    "340 substack doc records migrated from STR4TEG15T archive, 18 canonical book sections defined",
+    "Sprint 1: structure + doc records + book mappings - COMPLETE",
+    "Atoms to be added by ALMA append protocol",
+    "2026-03-03: Rewired substack docs with real sha256 IDs + substack-resolved dates and promoted semantic index runtime shard"
+  ]
+}

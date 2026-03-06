@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-03-03T00:00:00Z",
+  "source": "DECISION_163, DECISION_164",
+  "sections": [
+    {"sectionId": "part-i-ch-1-why-fundamentals-mislead", "title": "Why Fundamentals Mislead", "order": 1},
+    {"sectionId": "part-i-ch-2-the-volatility-framework", "title": "The Volatility Framework", "order": 2},
+    {"sectionId": "part-i-ch-3-liquidity-is-everything", "title": "Liquidity Is Everything", "order": 3},
+    {"sectionId": "part-ii-ch-4-gamma-the-markets-gravity", "title": "Gamma: The Market's Gravity", "order": 4},
+    {"sectionId": "part-ii-ch-5-vanna-and-speed-profiles", "title": "Vanna and Speed Profiles", "order": 5},
+    {"sectionId": "part-ii-ch-6-charm-color-and-dealer-hedging", "title": "Charm, Color and Dealer Hedging", "order": 6},
+    {"sectionId": "part-ii-ch-7-the-intraday-playbook", "title": "The Intraday Playbook", "order": 7},
+    {"sectionId": "part-iii-ch-8-geopolitics-and-volatility-regimes", "title": "Geopolitics and Volatility Regimes", "order": 8},
+    {"sectionId": "part-iii-ch-9-financing-the-bubble", "title": "Financing the Bubble", "order": 9},
+    {"sectionId": "part-iii-ch-10-the-hidden-left-tail", "title": "The Hidden Left Tail", "order": 10},
+    {"sectionId": "part-iv-ch-11-the-crisis-blueprint", "title": "The Crisis Blueprint", "order": 11},
+    {"sectionId": "part-iv-ch-12-managed-stability", "title": "Managed Stability", "order": 12},
+    {"sectionId": "part-v-ch-13-the-wall-street-casino", "title": "The Wall Street Casino", "order": 13},
+    {"sectionId": "part-v-ch-14-probability-over-prediction", "title": "Probability Over Prediction", "order": 14},
+    {"sectionId": "part-v-ch-15-do-not-marry-a-side", "title": "Do Not Marry a Side", "order": 15},
+    {"sectionId": "appendix-a-glossary", "title": "Appendix A: Glossary", "order": 16},
+    {"sectionId": "appendix-b-jpm-collar-case-study", "title": "Appendix B: JPM Collar Case Study", "order": 17},
+    {"sectionId": "appendix-c-model-philosophy", "title": "Appendix C: Model Philosophy", "order": 18}
+  ],
+  "totalSections": 18
+}

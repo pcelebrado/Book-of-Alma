@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "manifest.schema.json",
+  "title": "Index Manifest",
+  "description": "Canonical entrypoint for Index v4",
+  "type": "object",
+  "required": ["schemaVersion", "indexVersion", "generatedAt", "shards"],
+  "properties": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\.0\\.0$"},
+    "indexVersion": {"type": "string", "pattern": "^4\\.0\\.0$"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "sourceDecision": {"type": "string"},
+    "schemas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "relativePath", "version"],
+        "properties": {
+          "id": {"type": "string"},
+          "relativePath": {"type": "string"},
+          "version": {"type": "string"}
+        }
+      }
+    },
+    "shards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "schemaId", "relativePath"],
+        "properties": {
+          "type": {"type": "string"},
+          "schemaId": {"type": "string"},
+          "schemaVersion": {"type": "string"},
+          "relativePath": {"type": "string"},
+          "sha256": {"type": "string"},
+          "byteSize": {"type": "integer"},
+          "recordCount": {"type": "integer"},
+          "dataTimeMin": {"type": "string", "format": "date-time"},
+          "dataTimeMax": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

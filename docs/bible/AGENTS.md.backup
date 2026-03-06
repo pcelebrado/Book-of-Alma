@@ -1,0 +1,101 @@
+# ALMA Bible - Agent Deployment Guide
+
+This directory is a deterministic semantic file-finding system for 340 Substack
+teaching documents. No RAG, no vector DB, no embedding server - only flat JSON
+indexes that fit inside a 200K token agent context window.
+
+## Architecture
+
+```
+bible/
+|-- AGENTS.md                     <- coordinator
+|-- _manifest/manifest.json       <- build metadata, shard inventory
+|-- _schemas/                     <- JSON schema contracts
+|-- corpus/substack/              <- 340 markdown files + docs.json + identity.json
+|-- ontology/weights.json         <- enum vocabulary + semantic weights
+|-- mappings/book-sections.json   <- 15 chapters + 3 appendices (18 total)
+|-- indices/                      <- runtime indexes
+|   |-- compact-index.json        <- Tier 1: one object per doc
+|   |-- section-doc-map.json      <- Tier 2: section -> docs grouping
+|   `-- substack-semantic-index.json  <- archive legacy index
+|-- digest.json                   <- per-doc concept summaries
+|-- views/                        <- downstream generated views
+|-- atoms/                        <- teaching atoms (append protocol)
+`-- work/                         <- partition + merge workspaces
+    |-- partition-1/
+    |-- partition-2/
+    |-- partition-3/
+    |-- partition-4/
+    `-- merge/
+```
+
+## The Problem Being Solved
+
+The old indexes are unusable for retrieval:
+- `indices/substack-semantic-index.json` is too large/noisy for routine context use
+- prior digest output was over-tagged and low precision
+
+The rebuild produces compact JSON outputs with strict ontology constraints:
+- enum-constrained tags only (from `ontology/weights.json`)
+- max 10 discriminating keywords per document
+- max 200-char excerpt per document
+- section mappings to canonical 18-section structure
+
+## Deployment: Run 5 Agents in Order
+
+### Phase 1: Index (4 agents in parallel)
+
+Deploy one agent per partition folder. Each agent:
+1. Opens `work/partition-N/AGENTS.md`
+2. Reads `file-list.txt` (85 files)
+3. Reads each corpus markdown + matching identity record from `identity.json`
+4. Reads `ontology/weights.json` + `mappings/book-sections.json`
+5. Produces `compact-index.json` + `digest.json` in its partition folder
+
+These 4 agents can run in parallel. Each handles only its assigned 85 files.
+
+### Phase 2: Merge (1 agent, after all 4 complete)
+
+Deploy the merge agent in `work/merge/`:
+1. Opens `work/merge/AGENTS.md`
+2. Reads all 4 partition outputs
+3. Validates, deduplicates, merges
+4. Produces:
+   - `indices/compact-index.json` (340 objects)
+   - `digest.json` (340 keys)
+   - `indices/section-doc-map.json`
+   - `work/merge/validation-report.md`
+
+### Phase 3: Verify
+
+After merge, run:
+
+```bash
+node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('C:/P4NTH30N/OP3NF1XER/nate-alma/dev/memory/alma-teachings/bible/indices/compact-index.json','utf8'));const d=JSON.parse(fs.readFileSync('C:/P4NTH30N/OP3NF1XER/nate-alma/dev/memory/alma-teachings/bible/digest.json','utf8'));const s=JSON.parse(fs.readFileSync('C:/P4NTH30N/OP3NF1XER/nate-alma/dev/memory/alma-teachings/bible/indices/section-doc-map.json','utf8'));console.log('compact-index entries:',c.length);console.log('digest entries:',Object.keys(d).length);console.log('sections:',Object.keys(s.sections).length,'unmapped:',s.unmapped?.length||0);"
+```
+
+Expected:
+- `compact-index entries: 340`
+- `digest entries: 340`
+- `sections: 18`
+
+## Runtime Retrieval Path
+
+1. Load `indices/compact-index.json`
+2. Filter by `topics`, `mechanisms`, `keywords`, `postType`, `timeframe`
+3. Optionally load `indices/section-doc-map.json` for section-level grouping
+4. Read selected markdown files in `corpus/substack/`
+5. Cite identity from `corpus/substack/identity.json`
+
+## Data Integrity Rules
+
+- `docId` format is `sha256:<64-hex>` and is copied from `identity.json`
+- `date` format is `YYYY-MM-DD` and is copied from `identity.json`
+- `file` must match exactly across compact index, digest, and identity
+- corpus markdown files are read-only during indexing
+- `indices/substack-semantic-index.json` is archive only, not runtime input
+
+## One-Line Rule
+
+Compact index finds candidates, section map groups by chapter, corpus markdown
+proves the quote, identity provides citation.

@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "atom-lookup.schema.json",
+  "title": "Atom Lookup",
+  "type": "object",
+  "required": ["schemaVersion", "shard"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "shard": {"type": "string"},
+    "atoms": {"type": "object"}
+  }
+}

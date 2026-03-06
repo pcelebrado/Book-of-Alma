@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "teaching-atom.schema.json",
+  "title": "Teaching Atom",
+  "type": "object",
+  "required": ["schemaVersion", "id", "recordHash", "contentHash", "createdAt", "source", "text"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "id": {"type": "string", "pattern": "^atom_[0-9a-f]{20}$"},
+    "recordHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "contentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "source": {
+      "type": "object",
+      "required": ["kind", "docKey", "docId", "relativePath"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["bible", "substack"]},
+        "docKey": {"type": "string"},
+        "docId": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "relativePath": {"type": "string"},
+        "loc": {"type": "object"}
+      }
+    },
+    "text": {"type": "string"},
+    "summary": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "ontology": {"type": "object"},
+    "links": {"type": "object"},
+    "status": {"type": "string", "enum": ["active", "stale"]}
+  }
+}

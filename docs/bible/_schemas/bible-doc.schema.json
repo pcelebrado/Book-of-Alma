@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bible-doc.schema.json",
+  "title": "Bible Document Record",
+  "type": "object",
+  "required": ["schemaVersion", "docId", "docKey", "file", "relativePath"],
+  "properties": {
+    "schemaVersion": {"type": "string"},
+    "docId": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "docKey": {"type": "string", "pattern": "^bible:.*$"},
+    "file": {"type": "string"},
+    "relativePath": {"type": "string"},
+    "title": {"type": "string"},
+    "date": {"type": "string"},
+    "status": {"type": "string", "enum": ["active", "deprecated"]}
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "indexVersion": "4.0.0",
+  "manifest": "_manifest/manifest.json",
+  "note": "Index v4 shim - all consumers should read _manifest/manifest.json"
+}

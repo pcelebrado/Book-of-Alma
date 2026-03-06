@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "buildId": "index-v4-rewire-20260303",
+  "generatedAt": "2026-03-03T05:50:01.489Z",
+  "decisionId": "DECISION_163",
+  "decisionIdOverride": "DECISION_164",
+  "tool": "powershell-script",
+  "toolVersion": "5.1",
+  "mode": "remediation-rewire",
+  "corpusStats": {
+    "substackDocs": 340,
+    "bibleDocs": 0,
+    "atoms": 0
+  },
+  "status": "rewire-complete"
+}
