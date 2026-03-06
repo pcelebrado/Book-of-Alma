@@ -891,7 +891,7 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
     const ok = onboard.code === 0 && isConfigured();
 
     if (ok) {
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "none"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
@@ -1541,9 +1541,8 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   // Optional setup (only after successful onboarding).
   if (ok) {
-    // Wrapper terminates access control with SETUP_PASSWORD and proxies only to loopback.
-    // Keep gateway auth mode at `none` to prevent Control UI token mismatch loops behind wrapper.
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "none"]));
+    // Keep gateway in token mode and sync both auth + remote tokens for UI compatibility.
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
     await runCmd(
@@ -2190,9 +2189,11 @@ function maybeBootstrapControlUiToken(req, res) {
 
   try {
     const current = new URL(req.originalUrl || req.url || "/", "http://local");
-    if (current.searchParams.get("token")) return false;
-    current.searchParams.set("token", OPENCLAW_GATEWAY_TOKEN);
-    res.redirect(302, current.pathname + current.search);
+    if (current.searchParams.get("_oclboot") === "1") return false;
+
+    current.searchParams.set("_oclboot", "1");
+    const location = `${current.pathname}${current.search}#token=${encodeURIComponent(OPENCLAW_GATEWAY_TOKEN)}`;
+    res.redirect(302, location);
     return true;
   } catch {
     return false;
@@ -2293,7 +2294,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
     console.log("[wrapper] syncing gateway tokens in config...");
     try {
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "none"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(
