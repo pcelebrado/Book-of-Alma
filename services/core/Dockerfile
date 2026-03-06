@@ -119,6 +119,7 @@ ENV NPM_CONFIG_CACHE=/tmp/npm-cache
 ENV PNPM_HOME=/data/pnpm
 ENV PNPM_STORE_DIR=/tmp/pnpm-store
 ENV PATH="/data/npm/bin:/data/pnpm:${PATH}"
+ENV PORT=8080
 
 WORKDIR /app
 
