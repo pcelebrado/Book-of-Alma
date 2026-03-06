@@ -155,7 +155,7 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
   };
 
   try {
-    let response: Response;
+    let response: Response | null = null;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const firstBaseUrl = baseUrls[0] as string;
 
@@ -195,6 +195,10 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
       } else {
         throw error;
       }
+    }
+
+    if (!response) {
+      throw new CoreClientError('Core request failed before response', 503, requestId);
     }
 
     if (!response.ok) {
