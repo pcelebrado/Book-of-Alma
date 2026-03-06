@@ -2176,6 +2176,13 @@ function attachGatewayAuthHeader(req) {
   }
 }
 
+function gatewayProxyHeaders(req) {
+  if (!OPENCLAW_GATEWAY_TOKEN) return undefined;
+  const existing = req?.headers?.authorization || "";
+  if (existing && !/^Basic\s+/i.test(existing)) return undefined;
+  return { authorization: `Bearer ${OPENCLAW_GATEWAY_TOKEN}` };
+}
+
 function attachGatewayAuthHeaderWs(proxyReq, req) {
   if (!OPENCLAW_GATEWAY_TOKEN) return;
   const existing = req?.headers?.authorization || "";
@@ -2216,7 +2223,10 @@ app.use(requireDashboardAuth, async (req, res) => {
   }
 
   attachGatewayAuthHeader(req);
-  return proxy.web(req, res, { target: GATEWAY_TARGET });
+  return proxy.web(req, res, {
+    target: GATEWAY_TARGET,
+    headers: gatewayProxyHeaders(req),
+  });
 });
 
 const server = app.listen(PORT, "0.0.0.0", async () => {
@@ -2311,7 +2321,10 @@ server.on("upgrade", async (req, socket, head) => {
     return;
   }
   attachGatewayAuthHeader(req);
-  proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
+  proxy.ws(req, socket, head, {
+    target: GATEWAY_TARGET,
+    headers: gatewayProxyHeaders(req),
+  });
 });
 
 process.on("SIGTERM", () => {
