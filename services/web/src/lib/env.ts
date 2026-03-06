@@ -19,6 +19,25 @@ export function getCoreBaseUrl(): string {
   return process.env.INTERNAL_CORE_BASE_URL ?? '';
 }
 
+/** Public core URL used for cold-start wake probes (server-side only). */
+export function getCorePublicUrl(): string {
+  const direct = process.env.CORE_PUBLIC_URL?.trim();
+  if (direct) {
+    return direct;
+  }
+
+  const railwayHost = process.env.RAILWAY_SERVICE_OPENCLAW_CORE_URL?.trim();
+  if (!railwayHost) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(railwayHost)) {
+    return railwayHost;
+  }
+
+  return `https://${railwayHost}`;
+}
+
 /** Internal service-to-service auth token (server-side only). */
 export function getServiceToken(): string {
   return process.env.INTERNAL_SERVICE_TOKEN ?? '';

@@ -1,6 +1,6 @@
 import { MongoClient, type Db } from 'mongodb';
 
-import { getMongoUri } from '@/lib/env';
+import { getCorePublicUrl, getMongoUri } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/logger';
 
 let client: MongoClient | undefined;
@@ -13,9 +13,31 @@ const MONGO_CLIENT_OPTIONS = {
   maxPoolSize: 20,
   minPoolSize: 0,
   maxIdleTimeMS: 60_000,
-  serverSelectionTimeoutMS: 5_000,
-  connectTimeoutMS: 5_000,
+  serverSelectionTimeoutMS: 20_000,
+  connectTimeoutMS: 20_000,
 } as const;
+
+async function wakeCoreForMongo() {
+  const corePublicUrl = getCorePublicUrl();
+  if (!corePublicUrl) {
+    return;
+  }
+
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => abortController.abort(), 10_000);
+
+  try {
+    await fetch(new URL('/healthz', corePublicUrl), {
+      method: 'GET',
+      cache: 'no-store',
+      signal: abortController.signal,
+    });
+  } catch {
+    // Best-effort wake only.
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
 
 export function getMongoClient(): MongoClient {
   const uri = getMongoUri();
@@ -38,10 +60,23 @@ export function getMongoClient(): MongoClient {
 
 export async function getMongoDb(dbName?: string): Promise<Db> {
   const mongoClient = getMongoClient();
-  try {
+
+  const connectOnce = async () => {
     await mongoClient.connect();
     return mongoClient.db(dbName);
+  };
+
+  try {
+    return await connectOnce();
   } catch (error) {
+    await wakeCoreForMongo();
+
+    try {
+      return await connectOnce();
+    } catch {
+      // fall through to structured logging using original error context below
+    }
+
     await logSecurityEvent('mongo.connect.fail', {
       route: 'mongo.connect',
       details: {

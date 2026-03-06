@@ -1,9 +1,40 @@
 import { REQUEST_ID_HEADER, resolveRequestId } from '@/lib/auth/request-id';
 import { signServiceToken } from '@/lib/auth/service-token';
-import { getCoreBaseUrl, getServiceToken } from '@/lib/env';
+import { getCoreBaseUrl, getCorePublicUrl, getServiceToken } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/logger';
 
-const DEFAULT_TIMEOUT_MS = 5_000;
+const DEFAULT_TIMEOUT_MS = 12_000;
+const RETRY_TIMEOUT_MS = 30_000;
+
+async function wakeCoreFromPublicEdge(requestId: string, route: string) {
+  const publicUrl = getCorePublicUrl();
+  if (!publicUrl) {
+    return;
+  }
+
+  const wakeAbort = new AbortController();
+  const wakeTimeout = setTimeout(() => wakeAbort.abort(), 10_000);
+
+  try {
+    await fetch(new URL('/healthz', publicUrl), {
+      method: 'GET',
+      cache: 'no-store',
+      signal: wakeAbort.signal,
+    });
+
+    await logSecurityEvent('core.wake_probe.sent', {
+      requestId,
+      route,
+      details: {
+        publicUrl,
+      },
+    });
+  } catch {
+    // Wake probe is best-effort only.
+  } finally {
+    clearTimeout(wakeTimeout);
+  }
+}
 
 export class CoreClientError extends Error {
   statusCode: number;
@@ -65,42 +96,64 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
   }
 
   const requestId = resolveRequestId(options.rid);
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const abortController = new AbortController();
-  const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+  const token = await getBearerToken({
+    sub: options.sub,
+    uid: options.uid,
+    role: options.role,
+    rid: requestId,
+  });
+
+  const headers = new Headers(options.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  headers.set(REQUEST_ID_HEADER, requestId);
+
+  if (options.uid) {
+    headers.set('X-User-Id', options.uid);
+  }
+
+  if (options.role) {
+    headers.set('X-User-Role', options.role);
+  }
+
+  const hasBody = typeof options.body !== 'undefined';
+  if (hasBody && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const runAttempt = async (timeoutMs: number) => {
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+
+    try {
+      return await fetch(new URL(path, baseUrl), {
+        method: options.method ?? 'GET',
+        headers,
+        body: hasBody ? JSON.stringify(options.body) : undefined,
+        signal: abortController.signal,
+        cache: 'no-store',
+      });
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+  };
 
   try {
-    const token = await getBearerToken({
-      sub: options.sub,
-      uid: options.uid,
-      role: options.role,
-      rid: requestId,
-    });
+    let response: Response;
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-    const headers = new Headers(options.headers);
-    headers.set('Authorization', `Bearer ${token}`);
-    headers.set(REQUEST_ID_HEADER, requestId);
-
-    if (options.uid) {
-      headers.set('X-User-Id', options.uid);
+    try {
+      response = await runAttempt(timeoutMs);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        await wakeCoreFromPublicEdge(requestId, path);
+        response = await runAttempt(Math.max(timeoutMs, RETRY_TIMEOUT_MS));
+      } else if (error instanceof TypeError) {
+        await wakeCoreFromPublicEdge(requestId, path);
+        response = await runAttempt(Math.max(timeoutMs, RETRY_TIMEOUT_MS));
+      } else {
+        throw error;
+      }
     }
-
-    if (options.role) {
-      headers.set('X-User-Role', options.role);
-    }
-
-    const hasBody = typeof options.body !== 'undefined';
-    if (hasBody && !headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-
-    const response = await fetch(new URL(path, baseUrl), {
-      method: options.method ?? 'GET',
-      headers,
-      body: hasBody ? JSON.stringify(options.body) : undefined,
-      signal: abortController.signal,
-      cache: 'no-store',
-    });
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
@@ -159,6 +212,6 @@ export async function coreFetch<TResponse = unknown, TBody = unknown>(
 
     throw error;
   } finally {
-    clearTimeout(timeoutHandle);
+    // no-op; per-attempt timers are cleared in runAttempt()
   }
 }

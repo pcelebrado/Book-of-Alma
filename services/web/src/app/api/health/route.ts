@@ -30,9 +30,19 @@ export async function GET() {
     }
   }
 
-  // Check internal core reachability config (non-blocking)
+  // Check internal core reachability (non-blocking)
   const coreUrl = process.env.INTERNAL_CORE_BASE_URL;
-  checks.core = coreUrl ? 'configured' : 'not_configured';
+  if (!coreUrl) {
+    checks.core = 'not_configured';
+  } else {
+    try {
+      const { coreFetch } = await import('@/lib/core-client');
+      await coreFetch('/internal/health', { timeoutMs: 20_000 });
+      checks.core = 'reachable';
+    } catch {
+      checks.core = 'unreachable';
+    }
+  }
 
   // Check service auth config
   const serviceToken = process.env.INTERNAL_SERVICE_TOKEN;
