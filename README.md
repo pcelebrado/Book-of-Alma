@@ -64,7 +64,7 @@ This Railway template deploys a complete **AI-powered learning platform** in min
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Two-service architecture:** Browsers talk only to `web`. The `core` service runs OpenClaw, MongoDB, and QMD together on a single 500MB persistent volume — optimized for Railway's free plan.
+**Two-service architecture (recommended):** use `core` as the OpenClaw runtime/control plane and `web` as the Book UI. In live Railway deployments, `core` is commonly public for OpenClaw operations (`/setup`, `/admin`) while `web` serves book workflows on a separate domain.
 
 ---
 
@@ -126,8 +126,8 @@ The right rail exposes **context-aware teaching tools** for whatever you're read
 
 Click the **Deploy on Railway** button above to import the repo.
 
-Railway will create a project with the repo attached. You need to configure
-**two services** from it — `openclaw-core` (internal) and `openclaw-web` (public).
+Railway will create a project with the repo attached. Configure
+**two services** from it — `openclaw-core` (OpenClaw runtime) and `openclaw-web` (Book UI).
 
 #### Service setup
 
@@ -136,7 +136,7 @@ Railway will create a project with the repo attached. You need to configure
 | 1 | Project canvas | Click the service → Settings → **Root Directory** → `services/core` |
 | 2 | Core service → Settings | Set **Healthcheck Path** to `/setup/healthz` |
 | 3 | Core service | Right-click → **Attach Volume** → Mount path: `/data` |
-| 4 | Core service → Networking | **No public domain** (internal only) |
+| 4 | Core service → Networking | Generate a domain if you want direct OpenClaw ops UI (`/setup`, `/admin`) |
 | 5 | Core service → Variables → **Raw Editor** | Paste contents of `services/core/.env.railway` |
 | 6 | Core service → Variables | Set `SETUP_PASSWORD` to a strong password you choose |
 | 7 | Project canvas | **+ New Service** → GitHub Repo → same repo → Root Directory: `services/web` |
@@ -168,6 +168,14 @@ Railway will create a project with the repo attached. You need to configure
 3. Open `/onboarding` to create the first admin account, then sign in
 4. Open the Core service `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
 5. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
+
+### URL Surfaces (Important)
+
+- `https://<core-domain>/setup` = OpenClaw setup control plane (provider/channel config)
+- `https://<core-domain>/admin` = OpenClaw dashboard/control UI
+- `https://<web-domain>/admin` = Book app admin page (if `services/web` is deployed)
+
+If your core domain opens OpenClaw pages at `/setup` and `/admin`, that is expected behavior.
 
 ---
 

@@ -2,7 +2,9 @@
 
 ## Overview
 
-The OpenClaw Railway Template implements a **three-service architecture** designed for secure, scalable deployment on Railway. This architecture enforces a strict security boundary where only the web service is publicly exposed, while internal services remain protected behind Railway's internal networking.
+The OpenClaw Railway Template supports a **core + web architecture** on Railway.
+In current operations, core is often public to expose OpenClaw control surfaces
+(`/setup` and `/admin`), while web serves the Book UI on a separate domain.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -82,11 +84,11 @@ The web service communicates with Core using:
 
 ---
 
-### 2. Core Service (Internal)
+### 2. Core Service (OpenClaw Runtime)
 
 **Type:** Docker container with bundled services  
 **Components:** OpenClaw + QMD + SFTPGo  
-**Exposure:** Internal-only (no public HTTP)
+**Exposure:** Usually public for OpenClaw operations (`/setup`, `/admin`), and always reachable over Railway private networking
 
 **Responsibilities:**
 - Executes agent skills via `/internal/agent/run`
@@ -206,10 +208,10 @@ const mongoClient = new MongoClient(
 
 | Traffic Pattern | Allowed | Notes |
 |----------------|---------|-------|
-| Browser → Web | ✅ Yes | Only public entry point |
+| Browser → Web | ✅ Yes | Public Book UI entry point |
 | Web → Core | ✅ Yes | Internal only, authenticated |
 | Web → MongoDB | ✅ Yes | Internal only, authenticated |
-| Browser → Core | ❌ No | Forbidden—no public port |
+| Browser → Core | ✅ Yes (common) | OpenClaw setup/dashboard surface on core domain |
 | Browser → MongoDB | ❌ No | Forbidden—no public port |
 
 ### Authentication Layers
