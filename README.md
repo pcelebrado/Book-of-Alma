@@ -188,6 +188,17 @@ If your core domain opens OpenClaw pages at `/setup` and `/admin`, that is expec
 3. Upload your Markdown files to `/data/book-source/`
 4. Run reindex from Admin panel
 
+SFTP connection profile (core service):
+
+- Host: your core public domain (for example `openclaw-core-production.up.railway.app`)
+- Port: `2022` (requires Railway TCP Proxy enabled for core service)
+- Username: value of `SFTPGO_PORTABLE_USERNAME` (default: `book-uploader`)
+- Password: value of `SFTPGO_PORTABLE_PASSWORD`
+- Remote directory: `/`
+
+If full SFTPGo mode cannot start in the runtime image, core automatically falls
+back to `sftpgo portable` so SFTP uploads remain available for testing.
+
 ### Option 2: Git-based Import
 
 1. Store your content in a Git repository
@@ -231,6 +242,28 @@ railway run npm run dev
 
 # Open http://localhost:3000
 ```
+
+### Multi-service Railway Ops (Core + Web)
+
+Use root helper scripts to switch context and SSH each service deterministically:
+
+```bash
+# Link local folders to each Railway service
+npm run ops:core:link
+npm run ops:web:link
+
+# Verify status/domains
+npm run ops:core:status
+npm run ops:web:status
+npm run ops:core:domain
+npm run ops:web:domain
+
+# SSH into each service
+npm run ops:core:ssh -- "openclaw status --all"
+npm run ops:web:ssh -- "ls -la /app"
+```
+
+These helpers run Railway commands from the correct service directory so core/web context drift does not hide deployment issues.
 
 ### Without Railway CLI
 

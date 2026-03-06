@@ -13,6 +13,18 @@
     "build:web": "cd services/web && npm run build",
     "build:core": "cd services/core && npm run build",
     "railpack:web": "cd services/web && railpack build .",
-    "railpack:core": "cd services/core && railpack build ."
+    "railpack:core": "cd services/core && railpack build .",
+    "ops:core:link": "node tools/railway-ops.mjs link core",
+    "ops:web:link": "node tools/railway-ops.mjs link web",
+    "ops:core:status": "node tools/railway-ops.mjs status core",
+    "ops:web:status": "node tools/railway-ops.mjs status web",
+    "ops:core:domain": "node tools/railway-ops.mjs domain core",
+    "ops:web:domain": "node tools/railway-ops.mjs domain web",
+    "ops:core:deploys": "node tools/railway-ops.mjs deploys core",
+    "ops:web:deploys": "node tools/railway-ops.mjs deploys web",
+    "ops:core:logs": "node tools/railway-ops.mjs logs core",
+    "ops:web:logs": "node tools/railway-ops.mjs logs web",
+    "ops:core:ssh": "node tools/railway-ops.mjs ssh core --",
+    "ops:web:ssh": "node tools/railway-ops.mjs ssh web --"
   }
 }

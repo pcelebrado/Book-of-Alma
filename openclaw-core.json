@@ -63,6 +63,18 @@
     "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
     "description": "Password for default SFTPGo admin account (auto-generated secret)."
   },
+  "SFTPGO_PORTABLE_USERNAME": {
+    "value": "book-uploader",
+    "description": "Fallback SFTP username used when full SFTPGo mode is unavailable and portable mode is activated."
+  },
+  "SFTPGO_PORTABLE_PASSWORD": {
+    "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+    "description": "Fallback SFTP password used in portable mode (set explicitly for deterministic testing)."
+  },
+  "SFTPGO_PORTABLE_DIRECTORY": {
+    "value": "/data/book-source",
+    "description": "Directory exposed via SFTP portable mode for content upload and ingestion."
+  },
   "INTERNAL_GATEWAY_HOST": {
     "value": "127.0.0.1",
     "description": "Local host address where OpenClaw gateway process listens."

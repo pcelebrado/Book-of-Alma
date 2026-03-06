@@ -102,9 +102,36 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   export SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN="${SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN:-true}"
 
   # Start SFTPGo in the background, logging to the shared log directory.
-  sftpgo serve > "$SFTPGO_LOG_DIR/sftpgo.log" 2>&1 &
+  # If full serve fails (for example missing embedded templates in slim image),
+  # fall back to portable mode so SFTP upload remains operational.
+  sftpgo serve -c /srv/sftpgo > "$SFTPGO_LOG_DIR/sftpgo.log" 2>&1 &
   SFTPGO_PID=$!
-  echo "[entrypoint] SFTPGo started (PID: ${SFTPGO_PID})"
+  sleep 2
+
+  if kill -0 "$SFTPGO_PID" 2>/dev/null; then
+    echo "[entrypoint] SFTPGo started (PID: ${SFTPGO_PID})"
+  else
+    echo "[entrypoint] SFTPGo full mode failed, starting portable SFTP fallback"
+
+    PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-book-uploader}"
+    PORTABLE_PASS="${SFTPGO_PORTABLE_PASSWORD:-${SFTPGO_DEFAULT_ADMIN_PASSWORD:-change-me-now}}"
+    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-/data/book-source}"
+    mkdir -p "$PORTABLE_DIR"
+
+    sftpgo portable \
+      --directory "$PORTABLE_DIR" \
+      --sftpd-port "$SFTPGO_SFTP_PORT" \
+      --httpd-port -1 \
+      --webdav-port -1 \
+      --ftpd-port -1 \
+      --username "$PORTABLE_USER" \
+      --password "$PORTABLE_PASS" \
+      --permissions "*" \
+      > "$SFTPGO_LOG_DIR/sftpgo.log" 2>&1 &
+
+    SFTPGO_PID=$!
+    echo "[entrypoint] SFTPGo portable mode started (PID: ${SFTPGO_PID}, user: ${PORTABLE_USER}, dir: ${PORTABLE_DIR})"
+  fi
 else
   echo "[entrypoint] SFTPGo disabled or not installed — skipping"
 fi
