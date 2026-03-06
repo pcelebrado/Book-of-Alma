@@ -2174,8 +2174,20 @@ function attachGatewayAuthHeader(req) {
   }
 }
 
-proxy.on("proxyReqWs", (_proxyReq, req) => {
+function attachGatewayAuthHeaderWs(proxyReq, req) {
+  if (!OPENCLAW_GATEWAY_TOKEN) return;
+  const existing = req?.headers?.authorization;
+  if (existing) return;
+  try {
+    proxyReq.setHeader("Authorization", `Bearer ${OPENCLAW_GATEWAY_TOKEN}`);
+  } catch {
+    // ignore
+  }
+}
+
+proxy.on("proxyReqWs", (proxyReq, req) => {
   attachGatewayAuthHeader(req);
+  attachGatewayAuthHeaderWs(proxyReq, req);
 });
 
 app.use(requireDashboardAuth, async (req, res) => {
