@@ -1,9 +1,13 @@
+/**
+ * GET /api/book/search?q=... — Full-text search across book sections.
+ * DECISION_197: MongoDB → SQLite migration. Uses FTS5 with LIKE fallback.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
 import { apiRateLimited } from '@/lib/api/response';
-import { getBookSectionsCollection } from '@/lib/db/collections';
+import { bookSections } from '@/lib/db/repositories';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -36,66 +40,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const sections = await getBookSectionsCollection();
+    const docs = bookSections.search(q, 20);
 
-    let results: Array<{
-      sectionSlug: string;
-      anchorId: string;
-      score: number;
-      snippet: string;
-    }> = [];
-
-    try {
-      const docs = await sections
-        .find(
-          { $text: { $search: q } },
-          {
-            projection: {
-              slug: 1,
-              bodyMarkdown: 1,
-              headings: 1,
-              score: { $meta: 'textScore' },
-            },
-            sort: { score: { $meta: 'textScore' } },
-            limit: 20,
-          },
-        )
-        .toArray();
-
-      results = docs.map((doc) => {
-        const snippet = (doc.bodyMarkdown ?? '').slice(0, 240);
-        const firstHeading = doc.headings?.[0]?.id ?? '';
-        return {
-          sectionSlug: doc.slug,
-          anchorId: firstHeading,
-          score: Number((doc as { score?: number }).score ?? 0),
-          snippet,
-        };
-      });
-    } catch {
-      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const docs = await sections
-        .find(
-          {
-            $or: [
-              { slug: { $regex: safe, $options: 'i' } },
-              { bodyMarkdown: { $regex: safe, $options: 'i' } },
-            ],
-          },
-          {
-            projection: { slug: 1, bodyMarkdown: 1, headings: 1 },
-            limit: 20,
-          },
-        )
-        .toArray();
-
-      results = docs.map((doc) => ({
+    const results = docs.map((doc) => {
+      const headings = doc.headings ? JSON.parse(doc.headings) : [];
+      const snippet = (doc.body_markdown ?? '').slice(0, 240);
+      const firstHeading = headings[0]?.id ?? '';
+      return {
         sectionSlug: doc.slug,
-        anchorId: doc.headings?.[0]?.id ?? '',
-        score: 0,
-        snippet: (doc.bodyMarkdown ?? '').slice(0, 240),
-      }));
-    }
+        anchorId: firstHeading,
+        score: Math.abs(doc.rank),
+        snippet,
+      };
+    });
 
     return Response.json({ q, results });
   } catch (error) {

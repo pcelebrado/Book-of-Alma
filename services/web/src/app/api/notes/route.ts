@@ -1,8 +1,13 @@
+/**
+ * POST /api/notes — Create a note.
+ * GET  /api/notes — List notes for current user.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getNotesCollection } from '@/lib/db/collections';
+import { notes } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +21,8 @@ interface CreateNoteBody {
 }
 
 export async function POST(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
@@ -27,27 +32,28 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const now = new Date();
-    const notes = await getNotesCollection();
-    const note = {
-      userId: userObjectId,
+    const note = notes.insert({
+      userId,
       sectionSlug: body.sectionSlug,
       anchorId: body.anchorId,
       selection: body.selection,
       title: body.title,
       body: body.noteText,
-      tags: body.tags ?? [],
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const result = await notes.insertOne(note);
+      tags: body.tags,
+    });
 
     return Response.json({
       note: {
-        ...note,
-        _id: result.insertedId.toHexString(),
-        userId: userObjectId.toHexString(),
+        _id: note.id,
+        userId: note.user_id,
+        sectionSlug: note.section_slug,
+        anchorId: note.anchor_id,
+        selection: note.selection ? JSON.parse(note.selection) : null,
+        title: note.title,
+        body: note.body,
+        tags: JSON.parse(note.tags),
+        createdAt: note.created_at,
+        updatedAt: note.updated_at,
       },
     });
   } catch (error) {
@@ -57,27 +63,27 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
   try {
-    const sectionSlug = request.nextUrl.searchParams.get('sectionSlug');
-    const notes = await getNotesCollection();
-
-    const filter: Record<string, unknown> = { userId: userObjectId };
-    if (sectionSlug) {
-      filter.sectionSlug = sectionSlug;
-    }
-
-    const docs = await notes.find(filter).sort({ updatedAt: -1 }).toArray();
+    const sectionSlug = request.nextUrl.searchParams.get('sectionSlug') ?? undefined;
+    const docs = notes.findByUser(userId, sectionSlug);
 
     return Response.json({
       notes: docs.map((doc) => ({
-        ...doc,
-        _id: doc._id.toHexString(),
-        userId: doc.userId.toHexString(),
+        _id: doc.id,
+        userId: doc.user_id,
+        sectionSlug: doc.section_slug,
+        anchorId: doc.anchor_id,
+        selection: doc.selection ? JSON.parse(doc.selection) : null,
+        title: doc.title,
+        body: doc.body,
+        tags: JSON.parse(doc.tags),
+        createdAt: doc.created_at,
+        updatedAt: doc.updated_at,
       })),
     });
   } catch (error) {

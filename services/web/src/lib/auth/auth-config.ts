@@ -1,10 +1,15 @@
+/**
+ * NextAuth configuration for OpenClaw Web Service.
+ * DECISION_197: MongoDB → SQLite migration.
+ * User lookups now use SQLite repositories.
+ */
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { getAuthSecret } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/logger';
 import { verifyPassword } from '@/lib/auth/session';
-import { getUsersCollection } from '@/lib/db/collections';
+import { users } from '@/lib/db/repositories';
 
 type Role = 'admin' | 'user';
 
@@ -51,10 +56,12 @@ export const {
         }
 
         try {
-          const users = await getUsersCollection();
-          const user = await users.findOne({ email });
+          const user = users.findByEmail(email);
 
-          if (!user || !verifyPassword(password, user as Record<string, unknown>)) {
+          if (!user || !verifyPassword(password, {
+            password: user.password,
+            passwordHash: user.password_hash,
+          })) {
             await logSecurityEvent('auth.login.fail', {
               requestId,
               route: '/api/auth/login',
@@ -63,26 +70,23 @@ export const {
             return null;
           }
 
-          await users.updateOne(
-            { _id: user._id },
-            { $set: { lastLoginAt: new Date(), updatedAt: new Date() } },
-          );
+          users.updateLastLogin(user.id);
 
           await logSecurityEvent('auth.login.success', {
             requestId,
             route: '/api/auth/login',
-            userId: user._id.toHexString(),
+            userId: user.id,
             details: { role: user.role },
           });
 
           return {
-            id: user._id.toHexString(),
+            id: user.id,
             email: user.email,
             name: user.name,
             role: user.role,
           } satisfies AuthUser;
         } catch (error) {
-          await logSecurityEvent('mongo.connect.fail', {
+          await logSecurityEvent('db.error', {
             requestId,
             route: '/api/auth/login',
             details: {

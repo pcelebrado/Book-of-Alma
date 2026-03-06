@@ -79,6 +79,28 @@ const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}
 // Always run the built-from-source CLI entry directly to avoid PATH/global-install mismatches.
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
+const OPENCLAW_MEMORY_BACKEND = process.env.OPENCLAW_MEMORY_BACKEND?.trim() || "qmd";
+const OPENCLAW_MEMORY_QMD_COMMAND = process.env.OPENCLAW_MEMORY_QMD_COMMAND?.trim() || "qmd";
+const OPENCLAW_MEMORY_QMD_SEARCH_MODE = process.env.OPENCLAW_MEMORY_QMD_SEARCH_MODE?.trim() || "search";
+const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
+  process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
+
+function parseBoolEnv(value, fallback) {
+  if (value == null) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
+const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
+  process.env.OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC,
+  false,
+);
+const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
+  process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
+  true,
+);
 
 function clawArgs(args) {
   return [OPENCLAW_ENTRY, ...args];
@@ -900,6 +922,12 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
 
+      const memoryDefaults = await applyMemoryBackendDefaults();
+      extra += `\n[memory backend] ${memoryDefaults.reason}`;
+      if (memoryDefaults.output) {
+        extra += `\n${memoryDefaults.output}`;
+      }
+
       if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
         const providerId = payload.customProviderId.trim();
         const baseUrl = payload.customProviderBaseUrl.trim();
@@ -1044,9 +1072,24 @@ app.post("/internal/openclaw/setup/config/raw", requireInternalApiAuth, async (r
 app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, res) => {
   try {
     const v = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
+    const qmd = await runCmd(OPENCLAW_MEMORY_QMD_COMMAND, ["--version"], {
+      timeoutMs: 20_000,
+    });
     const help = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
     const tg = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
     const dc = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
+    const memoryBackend = await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "get", "memory.backend"]),
+    );
+    const memoryQmdCommand = await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "get", "memory.qmd.command"]),
+    );
+    const memoryQmdSearchMode = await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "get", "memory.qmd.searchMode"]),
+    );
 
     res.json({
       ok: true,
@@ -1067,6 +1110,14 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
       },
       openclaw: {
         version: v.output.trim(),
+        qmd: {
+          command: OPENCLAW_MEMORY_QMD_COMMAND,
+          binaryPresent: qmd.code === 0,
+          version: redactSecrets(qmd.output),
+          configuredBackend: redactSecrets(memoryBackend.output),
+          configuredCommand: redactSecrets(memoryQmdCommand.output),
+          configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
+        },
         channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
         channels: {
           telegram: { exit: tg.code, output: redactSecrets(tg.output) },
@@ -1506,6 +1557,102 @@ function runCmd(cmd, args, opts = {}) {
   });
 }
 
+async function applyMemoryBackendDefaults() {
+  if (!isConfigured()) {
+    return {
+      ok: false,
+      reason: "not_configured",
+      output: "[memory] skipped: config not present",
+    };
+  }
+
+  const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
+  if (backend !== "qmd") {
+    const setBackend = await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "memory.backend", backend]),
+    );
+    return {
+      ok: setBackend.code === 0,
+      reason: setBackend.code === 0 ? "configured" : "set_failed",
+      output: `[memory] backend=${backend} exit=${setBackend.code}\n${setBackend.output || ""}`,
+    };
+  }
+
+  const qmdVersion = await runCmd(OPENCLAW_MEMORY_QMD_COMMAND, ["--version"], {
+    timeoutMs: 20_000,
+  });
+  if (qmdVersion.code !== 0) {
+    return {
+      ok: false,
+      reason: "qmd_missing",
+      output: `[memory] qmd command unavailable (cmd=${OPENCLAW_MEMORY_QMD_COMMAND}) exit=${qmdVersion.code}\n${qmdVersion.output || ""}`,
+    };
+  }
+
+  const steps = [];
+  steps.push(
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "memory.backend", "qmd"])),
+  );
+  steps.push(
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND]),
+    ),
+  );
+  steps.push(
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "memory.qmd.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE]),
+    ),
+  );
+  steps.push(
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs([
+        "config",
+        "set",
+        "memory.qmd.update.interval",
+        OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL,
+      ]),
+    ),
+  );
+  steps.push(
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs([
+        "config",
+        "set",
+        "--json",
+        "memory.qmd.update.waitForBootSync",
+        JSON.stringify(OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC),
+      ]),
+    ),
+  );
+  steps.push(
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs([
+        "config",
+        "set",
+        "--json",
+        "memory.qmd.includeDefaultMemory",
+        JSON.stringify(OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY),
+      ]),
+    ),
+  );
+
+  const failed = steps.find((step) => step.code !== 0);
+  const output = steps
+    .map((step, index) => `[memory-step-${index + 1}] exit=${step.code}\n${step.output || ""}`)
+    .join("\n");
+  return {
+    ok: !failed,
+    reason: failed ? "set_failed" : "configured",
+    output,
+  };
+}
+
 app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
   try {
     const respondJson = (status, body) => {
@@ -1562,6 +1709,12 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       OPENCLAW_NODE,
       clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"]) ]),
     );
+
+    const memoryDefaults = await applyMemoryBackendDefaults();
+    extra += `\n[memory backend] ${memoryDefaults.reason}`;
+    if (memoryDefaults.output) {
+      extra += `\n${memoryDefaults.output}`;
+    }
 
     // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
     if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
@@ -1696,11 +1849,17 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
 app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
   const v = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
+  const qmd = await runCmd(OPENCLAW_MEMORY_QMD_COMMAND, ["--version"], {
+    timeoutMs: 20_000,
+  });
   const help = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
 
   // Channel config checks (redact secrets before returning to client)
   const tg = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
   const dc = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
+  const memoryBackend = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.backend"]));
+  const memoryQmdCommand = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.command"]));
+  const memoryQmdSearchMode = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.searchMode"]));
 
   const tgOut = redactSecrets(tg.output || "");
   const dcOut = redactSecrets(dc.output || "");
@@ -1734,6 +1893,14 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
       entry: OPENCLAW_ENTRY,
       node: OPENCLAW_NODE,
       version: v.output.trim(),
+      qmd: {
+        command: OPENCLAW_MEMORY_QMD_COMMAND,
+        binaryPresent: qmd.code === 0,
+        version: redactSecrets(qmd.output),
+        configuredBackend: redactSecrets(memoryBackend.output),
+        configuredCommand: redactSecrets(memoryQmdCommand.output),
+        configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
+      },
       channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
       channels: {
         telegram: {
@@ -2305,6 +2472,8 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
         OPENCLAW_NODE,
         clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
       );
+      const memoryDefaults = await applyMemoryBackendDefaults();
+      console.log(`[wrapper] memory backend: ${memoryDefaults.reason}`);
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);

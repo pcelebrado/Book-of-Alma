@@ -24,6 +24,8 @@
     "ops:web:deploys": "node tools/railway-ops.mjs deploys web",
     "ops:core:logs": "node tools/railway-ops.mjs logs core",
     "ops:web:logs": "node tools/railway-ops.mjs logs web",
+    "ops:core:snapshot": "node tools/railway-ops.mjs snapshot core",
+    "ops:web:snapshot": "node tools/railway-ops.mjs snapshot web",
     "ops:core:ssh": "node tools/railway-ops.mjs ssh core --",
     "ops:web:ssh": "node tools/railway-ops.mjs ssh web --"
   }

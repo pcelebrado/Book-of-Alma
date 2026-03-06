@@ -1,9 +1,12 @@
-import { ObjectId } from 'mongodb';
+/**
+ * PATCH /api/playbooks/:id — Update a playbook.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getPlaybooksCollection } from '@/lib/db/collections';
+import { playbooks } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,58 +23,41 @@ export async function PATCH(
   request: NextRequest,
   context: { params: { id: string } },
 ) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
-  if (!ObjectId.isValid(context.params.id)) {
+  const playbookId = context.params.id;
+  if (!playbookId) {
     return apiError('invalid_request', 'Invalid playbook id', 400);
   }
 
-  const playbookId = new ObjectId(context.params.id);
   const body = await parseJsonBody<UpdatePlaybookBody>(request);
   if (!body) {
     return apiError('invalid_request', 'Invalid JSON body', 400);
   }
 
   try {
-    const playbooks = await getPlaybooksCollection();
-    const existing = await playbooks.findOne({ _id: playbookId });
+    const existing = playbooks.findById(playbookId);
     if (!existing) {
       return apiError('not_found', 'Playbook not found', 404);
     }
 
-    const ownerMatch = existing.createdBy.toHexString() === userObjectId.toHexString();
+    const ownerMatch = existing.created_by === userId;
     if (!ownerMatch && !isAdmin(session)) {
       return apiError('forbidden', 'Not allowed to edit this playbook', 403);
     }
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (typeof body.title === 'string') {
-      updates.title = body.title;
-    }
-    if (Array.isArray(body.triggers)) {
-      updates.triggers = body.triggers;
-    }
-    if (Array.isArray(body.checklist)) {
-      updates.checklist = body.checklist;
-    }
-    if (typeof body.scenarioTree === 'string') {
-      updates.scenarioTree = body.scenarioTree;
-    }
-    if (Array.isArray(body.linkedSections)) {
-      updates.linkedSections = body.linkedSections;
-    }
-    if (Array.isArray(body.tags)) {
-      updates.tags = body.tags;
-    }
+    const updates: Record<string, unknown> = {};
+    if (typeof body.title === 'string') updates.title = body.title;
+    if (Array.isArray(body.triggers)) updates.triggers = body.triggers;
+    if (Array.isArray(body.checklist)) updates.checklist = body.checklist;
+    if (typeof body.scenarioTree === 'string') updates.scenarioTree = body.scenarioTree;
+    if (Array.isArray(body.linkedSections)) updates.linkedSections = body.linkedSections;
+    if (Array.isArray(body.tags)) updates.tags = body.tags;
 
-    const updated = await playbooks.findOneAndUpdate(
-      { _id: playbookId },
-      { $set: updates },
-      { returnDocument: 'after' },
-    );
+    const updated = playbooks.update(playbookId, updates);
 
     if (!updated) {
       return apiError('not_found', 'Playbook not found', 404);
@@ -79,9 +65,18 @@ export async function PATCH(
 
     return Response.json({
       playbook: {
-        ...updated,
-        _id: updated._id.toHexString(),
-        createdBy: updated.createdBy.toHexString(),
+        _id: updated.id,
+        status: updated.status,
+        title: updated.title,
+        triggers: JSON.parse(updated.triggers),
+        checklist: JSON.parse(updated.checklist),
+        scenarioTree: updated.scenario_tree,
+        linkedSections: JSON.parse(updated.linked_sections),
+        tags: JSON.parse(updated.tags),
+        createdBy: updated.created_by,
+        createdAt: updated.created_at,
+        updatedAt: updated.updated_at,
+        publishedAt: updated.published_at,
       },
     });
   } catch (error) {

@@ -1,9 +1,13 @@
+/**
+ * POST /api/auth/login — Authenticate user.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import { AuthError } from 'next-auth';
 import type { NextRequest } from 'next/server';
 
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
 import { signIn } from '@/lib/auth/auth-config';
-import { getUsersCollection } from '@/lib/db/collections';
+import { users } from '@/lib/db/repositories';
 import { logSecurityEvent, writeAuditLog } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -50,8 +54,7 @@ export async function POST(request: NextRequest) {
     return apiRateLimited(RATE_LIMIT_RULES.login.message, loginLimit.retryAfterSeconds);
   }
 
-  const users = await getUsersCollection();
-  const user = await users.findOne({ email });
+  const user = users.findByEmail(email);
 
   try {
     await signIn('credentials', {
@@ -90,11 +93,11 @@ export async function POST(request: NextRequest) {
 
   return Response.json({
     user: {
-      id: user._id.toHexString(),
+      id: user.id,
       name: user.name,
       email: user.email,
     },
     role: user.role,
-    prefs: user.prefs ?? null,
+    prefs: user.prefs ? JSON.parse(user.prefs) : null,
   });
 }

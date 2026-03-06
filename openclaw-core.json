@@ -23,18 +23,6 @@
     "value": "0",
     "description": "Run process as UID 0 to ensure write access to mounted Railway volume paths."
   },
-  "MONGO_BIND_IP": {
-    "value": "::,0.0.0.0",
-    "description": "MongoDB bind addresses for Railway private networking (IPv6 + IPv4)."
-  },
-  "MONGO_WT_CACHE_GB": {
-    "value": "0.25",
-    "description": "WiredTiger cache size in GB (0.25 recommended minimum for stable startup)."
-  },
-  "MONGODB_URI": {
-    "value": "mongodb://127.0.0.1:27017/openclaw",
-    "description": "Core service local MongoDB connection string used by OpenClaw runtime."
-  },
   "SFTPGO_ENABLED": {
     "value": "true",
     "description": "Enable embedded SFTPGo service for secure book/content upload."
@@ -72,8 +60,8 @@
     "description": "Fallback SFTP password used in portable mode (set explicitly for deterministic testing)."
   },
   "SFTPGO_PORTABLE_DIRECTORY": {
-    "value": "/data/book-source",
-    "description": "Directory exposed via SFTP portable mode for content upload and ingestion."
+    "value": "/data",
+    "description": "Directory exposed via SFTP portable mode; /data grants access to uploaded content, OpenClaw state, and workspace paths."
   },
   "INTERNAL_GATEWAY_HOST": {
     "value": "127.0.0.1",
@@ -91,6 +79,30 @@
     "value": "node",
     "description": "Node.js executable used to launch OpenClaw runtime."
   },
+  "OPENCLAW_MEMORY_BACKEND": {
+    "value": "qmd",
+    "description": "OpenClaw memory backend (`qmd` to enable QMD sidecar retrieval, `sqlite` for builtin manager)."
+  },
+  "OPENCLAW_MEMORY_QMD_COMMAND": {
+    "value": "qmd",
+    "description": "QMD executable path used when `OPENCLAW_MEMORY_BACKEND=qmd`."
+  },
+  "OPENCLAW_MEMORY_QMD_SEARCH_MODE": {
+    "value": "search",
+    "description": "QMD search mode used by OpenClaw memory (`search`, `vsearch`, or `query`)."
+  },
+  "OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL": {
+    "value": "5m",
+    "description": "QMD refresh cadence for memory ingestion updates."
+  },
+  "OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC": {
+    "value": "false",
+    "description": "If false, OpenClaw does not block startup waiting for QMD boot sync."
+  },
+  "OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY": {
+    "value": "true",
+    "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
+  },
   "BOOK_SOURCE_MODE": {
     "value": "external",
     "description": "Book ingestion mode (external volume/SFTP-based source by default)."
@@ -102,14 +114,6 @@
   "BOOK_IMPORT_MANIFEST": {
     "value": "/data/book-source/manifest.json",
     "description": "Path to manifest file describing book import inputs and structure."
-  },
-  "BOOK_CANONICAL_COLLECTION": {
-    "value": "book_sections",
-    "description": "MongoDB collection name for canonical imported book sections."
-  },
-  "BOOK_TOC_COLLECTION": {
-    "value": "book_toc",
-    "description": "MongoDB collection name for table-of-contents metadata."
   },
   "BOOK_IMPORT_ENABLED": {
     "value": "false",

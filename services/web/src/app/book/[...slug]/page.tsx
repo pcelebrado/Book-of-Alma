@@ -1,9 +1,13 @@
+/**
+ * Book section reader page (RSC).
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { HighlightToolbar } from '@/components/highlight-toolbar';
 import { SectionBlocks } from '@/components/section-blocks';
-import { getBookSectionsCollection } from '@/lib/db/collections';
+import { bookSections } from '@/lib/db/repositories';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 
@@ -94,37 +98,16 @@ function renderMarkdown(markdown: string): string {
   return output.join('');
 }
 
-async function getSection(slug: string): Promise<SectionPayload | null> {
+function getSection(slug: string): SectionPayload | null {
   try {
-    const sections = await getBookSectionsCollection();
-    const section =
-      (await sections.findOne({ slug, status: 'published' })) ??
-      (await sections.findOne({ slug }));
+    const section = bookSections.findBySlug(slug);
 
     if (!section) {
       return null;
     }
 
-    const orderedSections = await sections
-      .find(
-        { status: 'published' },
-        {
-          projection: {
-            slug: 1,
-            part: 1,
-            chapter: 1,
-            section: 1,
-          },
-          sort: {
-            'part.index': 1,
-            'chapter.index': 1,
-            'section.index': 1,
-          },
-        },
-      )
-      .toArray();
-
-    const slugs = orderedSections.map((entry) => entry.slug);
+    const orderedSlugs = bookSections.findPublishedSlugsOrdered();
+    const slugs = orderedSlugs.map((entry) => entry.slug);
     const sectionPosition = slugs.findIndex((entrySlug) => entrySlug === section.slug);
     const previousSlug = sectionPosition > 0 ? slugs[sectionPosition - 1] : undefined;
     const nextSlug =
@@ -135,20 +118,20 @@ async function getSection(slug: string): Promise<SectionPayload | null> {
     return {
       section: {
         slug: section.slug,
-        title: section.section.title,
-        part: section.part,
-        chapter: section.chapter,
+        title: section.section_title,
+        part: { slug: section.part_slug, title: section.part_title },
+        chapter: { slug: section.chapter_slug, title: section.chapter_title },
       },
-      frontmatter: section.frontmatter ?? {
+      frontmatter: section.frontmatter ? JSON.parse(section.frontmatter) : {
         summary: [],
         checklist: [],
         mistakes: [],
         drill: {},
       },
       body: {
-        content: section.bodyMarkdown,
+        content: section.body_markdown,
       },
-      headings: section.headings ?? [],
+      headings: section.headings ? JSON.parse(section.headings) : [],
       previousSlug,
       nextSlug,
     };
@@ -159,7 +142,7 @@ async function getSection(slug: string): Promise<SectionPayload | null> {
 
 export default async function ReaderPage({ params }: SectionPageProps) {
   const sectionSlug = params.slug?.join('/') ?? '';
-  const payload = await getSection(sectionSlug);
+  const payload = getSection(sectionSlug);
 
   if (!payload?.section) {
     return (

@@ -1,6 +1,9 @@
-import { ObjectId } from 'mongodb';
-
-import { getAuditLogCollection } from '@/lib/db/collections';
+/**
+ * Logging and audit trail for OpenClaw Web Service.
+ * DECISION_197: MongoDB → SQLite migration.
+ * Audit log now writes to SQLite via repositories.
+ */
+import { auditLog } from '@/lib/db/repositories';
 
 type SecurityEventName =
   | 'auth.login.success'
@@ -11,7 +14,7 @@ type SecurityEventName =
   | 'agent.skill.invoked'
   | 'agent.skill.rate_limited'
   | 'core.unavailable'
-  | 'mongo.connect.fail';
+  | 'db.error';
 
 interface LogEventInput {
   requestId?: string | null;
@@ -33,7 +36,7 @@ function nowIso(): string {
 
 export async function logSecurityEvent(event: SecurityEventName, input: LogEventInput = {}) {
   const payload = {
-    level: event.endsWith('.fail') ? 'warn' : 'info',
+    level: event.endsWith('.fail') || event.endsWith('.error') ? 'warn' : 'info',
     event,
     timestamp: nowIso(),
     requestId: input.requestId ?? null,
@@ -48,17 +51,13 @@ export async function logSecurityEvent(event: SecurityEventName, input: LogEvent
 
 export async function writeAuditLog(input: AuditLogInput) {
   try {
-    const auditLog = await getAuditLogCollection();
-    await auditLog.insertOne({
-      actorUserId: input.actorUserId && ObjectId.isValid(input.actorUserId)
-        ? new ObjectId(input.actorUserId)
-        : undefined,
+    auditLog.insert({
+      actorUserId: input.actorUserId,
       action: input.action,
       details: input.details,
-      createdAt: new Date(),
     });
   } catch (error) {
-    await logSecurityEvent('mongo.connect.fail', {
+    await logSecurityEvent('db.error', {
       route: 'audit_log',
       userId: input.actorUserId,
       details: {

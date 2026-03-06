@@ -1,9 +1,13 @@
-import { ObjectId } from 'mongodb';
+/**
+ * PATCH /api/notes/:id — Update a note.
+ * DELETE /api/notes/:id — Delete a note.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getNotesCollection } from '@/lib/db/collections';
+import { notes } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,24 +17,16 @@ interface UpdateNoteBody {
   title?: string;
 }
 
-function parseNoteId(id: string) {
-  if (!ObjectId.isValid(id)) {
-    return null;
-  }
-
-  return new ObjectId(id);
-}
-
 export async function PATCH(
   request: NextRequest,
   context: { params: { id: string } },
 ) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
-  const noteId = parseNoteId(context.params.id);
+  const noteId = context.params.id;
   if (!noteId) {
     return apiError('invalid_request', 'Invalid note id', 400);
   }
@@ -40,7 +36,7 @@ export async function PATCH(
     return apiError('invalid_request', 'Invalid JSON body', 400);
   }
 
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  const updates: Record<string, unknown> = {};
   if (typeof body.noteText === 'string') {
     updates.body = body.noteText;
   }
@@ -52,13 +48,7 @@ export async function PATCH(
   }
 
   try {
-    const notes = await getNotesCollection();
-
-    const result = await notes.findOneAndUpdate(
-      { _id: noteId, userId: userObjectId },
-      { $set: updates },
-      { returnDocument: 'after' },
-    );
+    const result = notes.update(noteId, userId, updates);
 
     if (!result) {
       return apiError('not_found', 'Note not found', 404);
@@ -66,9 +56,16 @@ export async function PATCH(
 
     return Response.json({
       note: {
-        ...result,
-        _id: result._id.toHexString(),
-        userId: result.userId.toHexString(),
+        _id: result.id,
+        userId: result.user_id,
+        sectionSlug: result.section_slug,
+        anchorId: result.anchor_id,
+        selection: result.selection ? JSON.parse(result.selection) : null,
+        title: result.title,
+        body: result.body,
+        tags: JSON.parse(result.tags),
+        createdAt: result.created_at,
+        updatedAt: result.updated_at,
       },
     });
   } catch (error) {
@@ -81,21 +78,20 @@ export async function DELETE(
   request: NextRequest,
   context: { params: { id: string } },
 ) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
-  const noteId = parseNoteId(context.params.id);
+  const noteId = context.params.id;
   if (!noteId) {
     return apiError('invalid_request', 'Invalid note id', 400);
   }
 
   try {
-    const notes = await getNotesCollection();
-    const result = await notes.deleteOne({ _id: noteId, userId: userObjectId });
+    const deleted = notes.delete(noteId, userId);
 
-    if (result.deletedCount === 0) {
+    if (!deleted) {
       return apiError('not_found', 'Note not found', 404);
     }
 

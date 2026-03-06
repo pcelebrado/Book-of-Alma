@@ -1,14 +1,18 @@
+/**
+ * GET /api/book/section?slug=... — Return a book section by slug.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
-import { getBookSectionsCollection } from '@/lib/db/collections';
+import { bookSections } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
@@ -18,11 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const sections = await getBookSectionsCollection();
-
-    const section =
-      (await sections.findOne({ slug, status: 'published' })) ??
-      (await sections.findOne({ slug }));
+    const section = bookSections.findBySlug(slug);
 
     if (!section) {
       return apiError('not_found', 'Section not found', 404);
@@ -31,14 +31,14 @@ export async function GET(request: NextRequest) {
     return Response.json({
       section: {
         slug: section.slug,
-        title: section.section.title,
-        part: section.part,
-        chapter: section.chapter,
+        title: section.section_title,
+        part: { index: section.part_index, slug: section.part_slug, title: section.part_title },
+        chapter: { index: section.chapter_index, slug: section.chapter_slug, title: section.chapter_title },
         order: {
-          sectionIndex: section.section.index,
+          sectionIndex: section.section_index,
         },
       },
-      frontmatter: section.frontmatter ?? {
+      frontmatter: section.frontmatter ? JSON.parse(section.frontmatter) : {
         summary: [],
         checklist: [],
         mistakes: [],
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
       },
       body: {
         format: 'markdown',
-        content: section.bodyMarkdown,
+        content: section.body_markdown,
       },
-      headings: section.headings ?? [],
+      headings: section.headings ? JSON.parse(section.headings) : [],
     });
   } catch (error) {
     console.error('[api/book/section] database_error', error);

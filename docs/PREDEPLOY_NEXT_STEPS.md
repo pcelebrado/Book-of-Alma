@@ -5,16 +5,16 @@ to deploy without committing secrets.
 
 ## Architecture (Free Plan)
 
-Two Railway services with a single 500MB persistent volume.
+Two Railway services with persistent volumes on both services.
 Railway auto-detects both from the npm workspace `package.json` at repo root.
 
 | Service | Package Dir | Builder | Public | Volume |
 |---------|------------|---------|--------|--------|
-| `openclaw-web` | `services/web` | Dockerfile | ✅ Yes | — |
+| `openclaw-web` | `services/web` | Dockerfile | ✅ Yes | `/data` (SQLite persistence) |
 | `openclaw-core` | `services/core` | Dockerfile | ❌ No | `/data` (500MB) |
 
-The `core` service runs OpenClaw, QMD, embedded MongoDB, and SFTPGo.
-All persistent data shares the single Railway volume at `/data`.
+The `core` service runs OpenClaw, QMD, and SFTPGo.
+The `web` service uses SQLite at `/data/web.db` for application data.
 
 ## Secrets wiring map (Railway Variables)
 
@@ -29,7 +29,7 @@ Set these values in Railway Variables (service-level), not in git.
 
 ### web service variables
 
-- `MONGODB_URI=mongodb://core.railway.internal:27017/openclaw`
+- `SQLITE_DB_PATH=/data/web.db`
 - `INTERNAL_CORE_BASE_URL=http://core.railway.internal:8080`
 - `INTERNAL_SERVICE_TOKEN` -> set from `OC_INTERNAL_SERVICE_TOKEN`
 - `AUTH_SECRET` -> set from `OC_AUTH_SECRET`
@@ -40,8 +40,6 @@ Set these values in Railway Variables (service-level), not in git.
   - `BOOK_SOURCE_MODE`
   - `BOOK_SOURCE_DIR`
   - `BOOK_IMPORT_MANIFEST`
-  - `BOOK_CANONICAL_COLLECTION`
-  - `BOOK_TOC_COLLECTION`
   - `BOOK_IMPORT_ENABLED`
   - `BOOK_IMPORT_DRY_RUN`
 
@@ -52,10 +50,6 @@ Set these values in Railway Variables (service-level), not in git.
 - `OPENCLAW_GATEWAY_TOKEN` -> set from `OC_GATEWAY_TOKEN` (recommended)
 - `OPENCLAW_STATE_DIR=/data/.openclaw`
 - `OPENCLAW_WORKSPACE_DIR=/data/workspace`
-- Embedded MongoDB (auto-configured, override only if needed):
-  - `MONGO_PORT=27017`
-  - `MONGO_BIND_IP=::,0.0.0.0`
-  - `MONGODB_URI=mongodb://127.0.0.1:27017/openclaw`
 - Optional:
   - `INTERNAL_GATEWAY_HOST`
   - `INTERNAL_GATEWAY_PORT`
@@ -66,8 +60,6 @@ Set these values in Railway Variables (service-level), not in git.
   - `BOOK_SOURCE_MODE`
   - `BOOK_SOURCE_DIR`
   - `BOOK_IMPORT_MANIFEST`
-  - `BOOK_CANONICAL_COLLECTION`
-  - `BOOK_TOC_COLLECTION`
   - `BOOK_IMPORT_ENABLED`
   - `BOOK_IMPORT_DRY_RUN`
 - Embedded SFTPGo (auto-configured, credentials MUST be set in Railway Variables):
@@ -91,9 +83,10 @@ Set these values in Railway Variables (service-level), not in git.
 ### Step 1 — Dashboard configuration
 
 1. **Core service → Volumes**: Add volume with mount path `/data` (500MB).
-2. **Core service → Networking**: Enable TCP Proxy on port `2022` (for external SFTP access).
-3. **Core service → Networking**: Ensure NO public domain is generated (internal only).
-4. **Web service → Networking**: Generate a public domain (or add your custom domain).
+2. **Web service → Volumes**: Add volume with mount path `/data` (for SQLite persistence).
+3. **Core service → Networking**: Enable TCP Proxy on port `2022` (for external SFTP access).
+4. **Core service → Networking**: Ensure NO public domain is generated (internal only).
+5. **Web service → Networking**: Generate a public domain (or add your custom domain).
 
 ### Step 2 — Set secrets in Railway Variables
 
@@ -103,8 +96,8 @@ Set these values in Railway Variables (service-level), not in git.
 
 ### Step 3 — Deploy and verify
 
-7. Deploy `core` first; it starts MongoDB automatically (standalone, no replica set).
-8. Deploy `web`; verify `/api/health` plus internal connectivity checks.
+7. Deploy `core` first.
+8. Deploy `web`; verify `/api/health` plus sqlite/core connectivity checks.
 9. Confirm cross-service auth (`INTERNAL_SERVICE_TOKEN`) and gateway token consistency.
 10. Set book ingest mode (`BOOK_SOURCE_MODE`) and verify chosen source path.
 11. Run post-deploy smoke: `web /`, `web /api/health`, `core /setup/healthz` (internal), book endpoints.
@@ -113,17 +106,16 @@ Set these values in Railway Variables (service-level), not in git.
 
 | Path | Purpose | Estimated Size |
 |------|---------|---------------|
-| `/data/db` | MongoDB data files | ~50-200MB |
-| `/data/log` | MongoDB + SFTPGo logs | ~5-10MB |
+| `/data/log` | SFTPGo logs | ~5-10MB |
 | `/data/.openclaw` | OpenClaw config, credentials, tokens | ~1MB |
 | `/data/workspace` | OpenClaw workspace (skills, plugins) | ~10-50MB |
 | `/data/book-source` | Staged book content for import | ~10-100MB |
 | `/data/npm`, `/data/pnpm` | Persistent tool installs | ~10-50MB |
 | `/data/sftpgo` | SFTPGo state, host keys, user DB | ~5-10MB |
-| **Total** | | **~100-420MB** |
+| **Total** | | **~50-220MB** |
 
 > Keep content imports small. For large books, import only the active sections.
-> MongoDB's WiredTiger cache is capped at 128MB RAM to leave room for Node.js + SFTPGo.
+> SQLite durability depends on the web service `/data` volume being attached.
 
 ## SFTPGo (embedded in core)
 

@@ -1,5 +1,6 @@
 # OpenClaw Core Service Dockerfile (MVP)
-# Consolidated: OpenClaw + MongoDB + QMD + SFTPGo — all in one container
+# Consolidated: OpenClaw + QMD + SFTPGo — all in one container
+# DECISION_197: MongoDB removed — web service uses embedded SQLite.
 # All persistent data stored on a single Railway volume at /data (500MB free plan)
 #
 # Railway Configuration Notes:
@@ -9,10 +10,9 @@
 # - TCP Proxy must be enabled in Railway dashboard for SFTP (port 2022)
 #
 # Volume layout (/data):
-#   /data/db              — MongoDB data files
-#   /data/log             — MongoDB logs
 #   /data/.openclaw       — OpenClaw state and config
 #   /data/workspace       — OpenClaw workspace
+#   /data/log             — Service logs
 #   /data/npm             — Persistent npm global installs
 #   /data/pnpm            — Persistent pnpm binaries
 #   /data/book-source     — Book content staging (optional)
@@ -67,7 +67,8 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:install && pnpm ui:build
 
 # =============================================================================
-# Stage 2: Runtime Image (Node.js + MongoDB + SFTPGo consolidated)
+# Stage 2: Runtime Image (Node.js + SFTPGo consolidated)
+# DECISION_197: MongoDB removed — web service uses embedded SQLite.
 # =============================================================================
 FROM node:22-bookworm
 
@@ -78,36 +79,25 @@ COPY --from=sftpgo-bin /usr/local/bin/sftpgo /usr/local/bin/sftpgo
 COPY --from=sftpgo-bin /srv/sftpgo /srv/sftpgo
 COPY --from=sftpgo-bin /var/lib/sftpgo /var/lib/sftpgo
 
-# Install MongoDB 7.0 community server (standalone, no replica set needed)
-# Uses the official MongoDB apt repository for Debian Bookworm
-# Only install mongod (server), mongosh (shell), and tools — skip mongos (sharding router)
-RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    gnupg \
-  && curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-    gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg \
-  && echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | \
-    tee /etc/apt/sources.list.d/mongodb-org-7.0.list \
-  && apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    mongodb-org-server \
-    mongodb-org-tools \
-    mongodb-mongosh \
-  && rm -rf /var/lib/apt/lists/*
-
-# Install other runtime dependencies
+# Install runtime dependencies
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     tini \
     python3 \
     python3-venv \
     bash \
+    sqlite3 \
   && rm -rf /var/lib/apt/lists/*
 
 # `openclaw update` expects pnpm. Provide it in the runtime image.
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
+
+# QMD runtime dependency for OpenClaw memory backend.
+# Install Bun only to fetch qmd and keep `qmd` available on PATH.
+RUN curl -fsSL https://bun.sh/install | bash \
+  && /root/.bun/bin/bun install -g @tobilu/qmd \
+  && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
+  && ln -sf /root/.bun/bin/qmd /usr/local/bin/qmd
 
 # Persist user-installed tool binaries on the Railway volume, but keep caches
 # ephemeral so cache churn does not consume persistent storage.

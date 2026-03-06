@@ -1,8 +1,12 @@
+/**
+ * POST /api/bookmarks/toggle — Toggle a bookmark.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getBookmarksCollection } from '@/lib/db/collections';
+import { bookmarks } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +16,8 @@ interface ToggleBookmarkBody {
 }
 
 export async function POST(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
@@ -23,22 +27,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const bookmarks = await getBookmarksCollection();
-    const filter = {
-      userId: userObjectId,
-      sectionSlug: body.sectionSlug,
-      anchorId: body.anchorId,
-    };
-
-    const existing = await bookmarks.findOne(filter);
+    const existing = bookmarks.findOne(userId, body.sectionSlug, body.anchorId);
     if (existing) {
-      await bookmarks.deleteOne({ _id: existing._id });
+      bookmarks.delete(existing.id);
       return Response.json({ bookmarked: false });
     }
 
-    await bookmarks.insertOne({
-      ...filter,
-      createdAt: new Date(),
+    bookmarks.insert({
+      userId,
+      sectionSlug: body.sectionSlug,
+      anchorId: body.anchorId,
     });
 
     return Response.json({ bookmarked: true });

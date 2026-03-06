@@ -1,9 +1,12 @@
-import { ObjectId } from 'mongodb';
+/**
+ * POST /api/highlights — Create a highlight.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getHighlightsCollection } from '@/lib/db/collections';
+import { highlights } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +20,8 @@ interface CreateHighlightBody {
 }
 
 export async function POST(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
@@ -28,30 +31,27 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const noteId = body.noteId && ObjectId.isValid(body.noteId)
-      ? new ObjectId(body.noteId)
-      : undefined;
-
-    const highlight = {
-      userId: userObjectId,
+    const highlight = highlights.insert({
+      userId,
       sectionSlug: body.sectionSlug,
       anchorId: body.anchorId,
       range: body.range,
       text: body.text,
-      color: body.color ?? 'yellow',
-      noteId,
-      createdAt: new Date(),
-    };
-
-    const highlights = await getHighlightsCollection();
-    const result = await highlights.insertOne(highlight);
+      color: body.color,
+      noteId: body.noteId,
+    });
 
     return Response.json({
       highlight: {
-        ...highlight,
-        _id: result.insertedId.toHexString(),
-        userId: userObjectId.toHexString(),
-        noteId: noteId?.toHexString(),
+        _id: highlight.id,
+        userId: highlight.user_id,
+        sectionSlug: highlight.section_slug,
+        anchorId: highlight.anchor_id,
+        range: { startOffset: highlight.range_start, endOffset: highlight.range_end },
+        text: highlight.text,
+        color: highlight.color,
+        noteId: highlight.note_id,
+        createdAt: highlight.created_at,
       },
     });
   } catch (error) {

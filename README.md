@@ -48,18 +48,19 @@ This Railway template deploys a complete **AI-powered learning platform** in min
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    [core] — Internal Only                         │   │
 │  │                                                                  │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │   │
-│  │  │   OpenClaw   │  │   MongoDB    │  │     QMD Search       │   │   │
-│  │  │  (AI Agent)  │  │  (embedded)  │  │  (Semantic Index)    │   │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────────────┘   │   │
+│  │  ┌──────────────┐  ┌──────────────────────┐                      │   │
+│  │  │   OpenClaw   │  │     QMD Search       │                      │   │
+│  │  │  (AI Agent)  │  │  (Semantic Index)    │                      │   │
+│  │  └──────────────┘  └──────────────────────┘                      │   │
 │  │  ┌──────────────┐                                                │   │
 │  │  │   SFTPGo     │  SFTP :2022 (TCP Proxy) + Admin :2080         │   │
 │  │  └──────────────┘                                                │   │
 │  │                                                                  │   │
-│  │  Single Railway volume: /data (500MB)                            │   │
-│  │  • /data/db — MongoDB   • /data/.openclaw — Config & state      │   │
-│  │  • /data/workspace      • /data/book-source — Content staging   │   │
-│  │  • /data/sftpgo — SFTPGo state and host keys                    │   │
+│  │  Core Railway volume: /data (500MB)                              │   │
+│  │  • /data/.openclaw      • /data/workspace                        │   │
+│  │  • /data/book-source    • /data/sftpgo                           │   │
+│  │  Web Railway volume: /data                                       │   │
+│  │  • /data/web.db (SQLite app datastore)                           │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -141,8 +142,9 @@ Railway will create a project with the repo attached. Configure
 | 6 | Core service → Variables | Set `SETUP_PASSWORD` to a strong password you choose |
 | 7 | Project canvas | **+ New Service** → GitHub Repo → same repo → Root Directory: `services/web` |
 | 8 | Web service → Settings | Set **Healthcheck Path** to `/api/health` |
-| 9 | Web service → Networking | **Generate domain** (public HTTP) |
-| 10 | Web service → Variables → **Raw Editor** | Paste contents of `services/web/.env.railway` |
+| 9 | Web service | Right-click → **Attach Volume** → Mount path: `/data` |
+| 10 | Web service → Networking | **Generate domain** (public HTTP) |
+| 11 | Web service → Variables → **Raw Editor** | Paste contents of `services/web/.env.railway` |
 
 > **Note:** The `.env.railway` files use Railway's `${{...}}` template
 > variable syntax. Secrets are auto-generated, service references resolve
@@ -152,13 +154,13 @@ Railway will create a project with the repo attached. Configure
 
 | What | How |
 |------|-----|
-| **MongoDB connection** | Web connects to core's embedded MongoDB via private networking |
+| **SQLite datastore** | Web stores app data in `/data/web.db` on its own volume |
 | **Service auth tokens** | Auto-generated via `${{secret(...)}}` and shared between web and core |
 | **Auth.js session secret** | Auto-generated (equivalent to `openssl rand -base64 32`) |
 | **Public URL wiring** | `AUTH_URL` and `NEXT_PUBLIC_APP_URL` use your Railway domain |
 | **SFTPGo admin password** | Auto-generated |
 | **Gateway token** | Auto-generated |
-| **Data volume** | Mounted at `/data` on the core service |
+| **Data volumes** | Mounted at `/data` on both core and web services |
 | **Book content defaults** | Preconfigured for external upload workflow |
 
 ### 3. After Deploy
@@ -258,12 +260,16 @@ npm run ops:web:status
 npm run ops:core:domain
 npm run ops:web:domain
 
+# Capture full service snapshots (JSON + logs + SSH probes)
+npm run ops:core:snapshot
+npm run ops:web:snapshot
+
 # SSH into each service
 npm run ops:core:ssh -- "openclaw status --all"
 npm run ops:web:ssh -- "ls -la /app"
 ```
 
-These helpers run Railway commands from the correct service directory so core/web context drift does not hide deployment issues.
+These helpers run Railway commands from the correct service directory so core/web context drift does not hide deployment issues. Snapshot artifacts are written to `logs/railway-snapshots/<timestamp>-<service>/`.
 
 ### Without Railway CLI
 
@@ -288,7 +294,7 @@ npm run build
 cd services/web
 docker build -t openclaw-web .
 
-# Core (from the core service directory — includes MongoDB + SFTPGo)
+# Core (from the core service directory — includes OpenClaw + QMD + SFTPGo)
 cd services/core
 docker build -t openclaw-core .
 ```
@@ -370,7 +376,7 @@ X-Request-Id: <uuid>
 ### Security Checklist
 
 - [ ] Only `web` is publicly exposed
-- [ ] MongoDB has no public port
+- [ ] Web SQLite file persists at `/data/web.db`
 - [ ] Core service has no public HTTP
 - [ ] Service-to-service auth implemented
 - [ ] Rate limiting enabled
@@ -388,6 +394,7 @@ X-Request-Id: <uuid>
 openclaw --version
 openclaw status
 openclaw doctor
+qmd --version
 
 # Route probes
 curl -i https://<your-domain>/healthz
@@ -404,6 +411,19 @@ curl -i https://<your-domain>/api/notes?limit=1
 ```
 Probe → Snapshot → Mutate → Verify → Record → Learn
 ```
+
+### QMD Memory Backend Defaults
+
+Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept docs):
+
+- `OPENCLAW_MEMORY_BACKEND=qmd`
+- `OPENCLAW_MEMORY_QMD_COMMAND=qmd`
+- `OPENCLAW_MEMORY_QMD_SEARCH_MODE=search`
+- `OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m`
+- `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
+- `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
+
+If QMD is unavailable at runtime, OpenClaw falls back to its builtin SQLite memory manager.
 
 See `docs/PREDEPLOY_NEXT_STEPS.md` for the full deployment checklist.
 

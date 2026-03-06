@@ -1,10 +1,14 @@
+/**
+ * GET /api/admin/status — Admin system status overview.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
 import { coreFetch, CoreClientError } from '@/lib/core-client';
-import { getAuditLogCollection } from '@/lib/db/collections';
-import { getMongoDb } from '@/lib/db/mongo';
+import { auditLog } from '@/lib/db/repositories';
+import { isDbHealthy } from '@/lib/db/sqlite';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,13 +22,7 @@ export async function GET(request: NextRequest) {
     return apiError('forbidden', 'Admin role required', 403);
   }
 
-  let mongo: 'connected' | 'unreachable' = 'connected';
-  try {
-    const db = await getMongoDb();
-    await db.command({ ping: 1 });
-  } catch {
-    mongo = 'unreachable';
-  }
+  const sqlite: 'connected' | 'unreachable' = isDbHealthy() ? 'connected' : 'unreachable';
 
   let core: 'ok' | 'unreachable' = 'ok';
   let coreComponents: Record<string, unknown> = {};
@@ -49,28 +47,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let lastReindex: { createdAt?: Date; details?: Record<string, unknown> } | null = null;
+  let lastReindex: { created_at?: string; details?: string } | null = null;
   try {
-    const auditLog = await getAuditLogCollection();
-    lastReindex = await auditLog.findOne(
-      { action: 'reindex' },
-      { sort: { createdAt: -1 } },
-    );
+    const row = auditLog.findLastByAction('reindex');
+    if (row) {
+      lastReindex = { created_at: row.created_at, details: row.details };
+    }
   } catch {
-    // Keep status endpoint available even when audit log storage is unavailable.
     lastReindex = null;
   }
 
   return Response.json({
-    mongo,
+    sqlite,
     core,
     components: coreComponents,
     lastReindexRun: {
-      at: lastReindex?.createdAt ?? null,
-      details: lastReindex?.details ?? null,
+      at: lastReindex?.created_at ?? null,
+      details: lastReindex?.details ? JSON.parse(lastReindex.details) : null,
     },
     lastCoreHealthCheck: new Date().toISOString(),
     lastCoreUnavailableAt,
-    lastMongoErrorAt: mongo === 'unreachable' ? new Date().toISOString() : null,
+    lastDbErrorAt: sqlite === 'unreachable' ? new Date().toISOString() : null,
   });
 }

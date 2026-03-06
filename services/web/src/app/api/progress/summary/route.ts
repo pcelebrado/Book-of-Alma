@@ -1,31 +1,30 @@
+/**
+ * GET /api/progress/summary — Reading progress summary.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
-import { getReadingProgressCollection } from '@/lib/db/collections';
+import { readingProgress } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
   try {
-    const progress = await getReadingProgressCollection();
-    const docs = await progress
-      .find({ userId: userObjectId })
-      .sort({ updatedAt: -1 })
-      .limit(10)
-      .toArray();
+    const docs = readingProgress.findByUser(userId, 10);
 
     const mapped = docs.map((doc) => ({
-      _id: doc._id.toHexString(),
-      sectionSlug: doc.sectionSlug,
+      _id: doc.id,
+      sectionSlug: doc.section_slug,
       percent: doc.percent,
-      lastAnchorId: doc.lastAnchorId ?? null,
-      updatedAt: doc.updatedAt,
+      lastAnchorId: doc.last_anchor_id ?? null,
+      updatedAt: doc.updated_at,
     }));
 
     return Response.json({

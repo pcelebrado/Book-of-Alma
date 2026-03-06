@@ -7,9 +7,9 @@
     "value": "::",
     "description": "Bind address for web server (IPv6-compatible for Railway networking)."
   },
-  "MONGODB_URI": {
-    "value": "mongodb://${{openclaw-core.RAILWAY_PRIVATE_DOMAIN}}:27017/openclaw",
-    "description": "MongoDB URI for web-side data access via core private network endpoint."
+  "SQLITE_DB_PATH": {
+    "value": "/data/web.db",
+    "description": "Persistent SQLite file path for web-side application data (requires /data volume mount)."
   },
   "INTERNAL_CORE_BASE_URL": {
     "value": "http://${{openclaw-core.RAILWAY_PRIVATE_DOMAIN}}:8080",
@@ -42,14 +42,6 @@
   "BOOK_IMPORT_MANIFEST": {
     "value": "/data/book-source/manifest.json",
     "description": "Manifest file path used by web-triggered import flows."
-  },
-  "BOOK_CANONICAL_COLLECTION": {
-    "value": "book_sections",
-    "description": "Collection name for canonical book section reads."
-  },
-  "BOOK_TOC_COLLECTION": {
-    "value": "book_toc",
-    "description": "Collection name for table-of-contents reads."
   },
   "BOOK_IMPORT_ENABLED": {
     "value": "false",

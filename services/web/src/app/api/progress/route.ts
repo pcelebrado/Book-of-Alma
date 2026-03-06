@@ -1,8 +1,12 @@
+/**
+ * POST /api/progress — Record reading progress.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getReadingProgressCollection } from '@/lib/db/collections';
+import { readingProgress } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +17,8 @@ interface ProgressBody {
 }
 
 export async function POST(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
@@ -24,31 +28,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const progress = await getReadingProgressCollection();
-    const now = new Date();
-    const result = await progress.findOneAndUpdate(
-      { userId: userObjectId, sectionSlug: body.sectionSlug },
-      {
-        $set: {
-          userId: userObjectId,
-          sectionSlug: body.sectionSlug,
-          percent: Math.max(0, Math.min(100, body.percent)),
-          lastAnchorId: body.lastAnchorId,
-          updatedAt: now,
-        },
-      },
-      { upsert: true, returnDocument: 'after' },
-    );
-
-    if (!result) {
-      return apiError('internal_error', 'Unable to store progress', 500);
-    }
+    const result = readingProgress.upsert({
+      userId,
+      sectionSlug: body.sectionSlug,
+      percent: Math.max(0, Math.min(100, body.percent)),
+      lastAnchorId: body.lastAnchorId,
+    });
 
     return Response.json({
       progress: {
-        ...result,
-        _id: result._id.toHexString(),
-        userId: result.userId.toHexString(),
+        _id: result.id,
+        userId: result.user_id,
+        sectionSlug: result.section_slug,
+        percent: result.percent,
+        lastAnchorId: result.last_anchor_id,
+        updatedAt: result.updated_at,
       },
     });
   } catch (error) {

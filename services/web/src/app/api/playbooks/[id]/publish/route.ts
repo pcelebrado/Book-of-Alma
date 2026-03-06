@@ -1,9 +1,12 @@
-import { ObjectId } from 'mongodb';
+/**
+ * POST /api/playbooks/:id/publish — Publish a playbook (admin only).
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError, apiRateLimited } from '@/lib/api/response';
-import { getPlaybooksCollection } from '@/lib/db/collections';
+import { playbooks } from '@/lib/db/repositories';
 import { logSecurityEvent, writeAuditLog } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -37,24 +40,16 @@ export async function POST(
     return apiRateLimited(RATE_LIMIT_RULES.admin.message, adminLimit.retryAfterSeconds);
   }
 
-  if (!ObjectId.isValid(context.params.id)) {
+  const playbookId = context.params.id;
+  if (!playbookId) {
     return apiError('invalid_request', 'Invalid playbook id', 400);
   }
 
-  const playbookId = new ObjectId(context.params.id);
-  const now = new Date();
-  const playbooks = await getPlaybooksCollection();
-  const updated = await playbooks.findOneAndUpdate(
-    { _id: playbookId },
-    {
-      $set: {
-        status: 'published',
-        updatedAt: now,
-        publishedAt: now,
-      },
-    },
-    { returnDocument: 'after' },
-  );
+  const ts = new Date().toISOString();
+  const updated = playbooks.update(playbookId, {
+    status: 'published',
+    publishedAt: ts,
+  });
 
   if (!updated) {
     return apiError('not_found', 'Playbook not found', 404);
@@ -82,9 +77,18 @@ export async function POST(
 
   return Response.json({
     playbook: {
-      ...updated,
-      _id: updated._id.toHexString(),
-      createdBy: updated.createdBy.toHexString(),
+      _id: updated.id,
+      status: updated.status,
+      title: updated.title,
+      triggers: JSON.parse(updated.triggers),
+      checklist: JSON.parse(updated.checklist),
+      scenarioTree: updated.scenario_tree,
+      linkedSections: JSON.parse(updated.linked_sections),
+      tags: JSON.parse(updated.tags),
+      createdBy: updated.created_by,
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at,
+      publishedAt: updated.published_at,
     },
   });
 }

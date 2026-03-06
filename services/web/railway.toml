@@ -5,6 +5,8 @@
 # Railpack auto-detects Next.js, installs deps, builds, and starts.
 # Environment variables are configured via Railway dashboard or
 # Raw Editor (see .env.railway for copy-paste values).
+# IMPORTANT: Attach a Railway volume to this service at /data so
+# SQLITE_DB_PATH=/data/web.db persists across deploys.
 # =============================================================================
 
 [build]

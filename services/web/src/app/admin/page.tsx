@@ -19,13 +19,13 @@ import { Textarea } from '@/components/ui/textarea';
 // ---------------------------------------------------------------------------
 
 interface AdminStatusPayload {
-  mongo?: string;
+  sqlite?: string;
   core?: string;
   components?: Record<string, string>;
   lastReindexRun?: { at?: string | null; details?: Record<string, unknown> | null };
   lastCoreHealthCheck?: string;
   lastCoreUnavailableAt?: string | null;
-  lastMongoErrorAt?: string | null;
+  lastDbErrorAt?: string | null;
 }
 
 interface OpenClawSettingsPayload {
@@ -640,9 +640,9 @@ export default function AdminPage() {
           </Badge>
         </div>
         <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-          <span className="font-medium">MongoDB</span>
-          <Badge variant={status?.mongo === 'connected' ? 'secondary' : 'destructive'}>
-            {status?.mongo ?? 'unknown'}
+          <span className="font-medium">SQLite</span>
+          <Badge variant={status?.sqlite === 'connected' ? 'secondary' : 'destructive'}>
+            {status?.sqlite ?? 'unknown'}
           </Badge>
         </div>
         <div className="flex items-center gap-2 rounded-md border px-3 py-2">

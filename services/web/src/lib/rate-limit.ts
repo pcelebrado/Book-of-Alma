@@ -1,6 +1,9 @@
-import type { Collection } from 'mongodb';
-
-import { getMongoDb } from '@/lib/db/mongo';
+/**
+ * Rate limiting for OpenClaw Web Service.
+ * DECISION_197: MongoDB → SQLite migration.
+ * Uses SQLite rate_limits table with ON CONFLICT upsert.
+ */
+import { rateLimits } from '@/lib/db/repositories';
 
 export interface RateLimitRule {
   keyPrefix: 'login:ip' | 'agent:user' | 'search:user' | 'admin:user';
@@ -9,34 +12,10 @@ export interface RateLimitRule {
   message: string;
 }
 
-interface RateLimitDocument {
-  key: string;
-  windowStart: number;
-  count: number;
-  createdAt: Date;
-}
-
 interface RateLimitResult {
   allowed: boolean;
   retryAfterSeconds: number;
   count: number;
-}
-
-let indexesReady = false;
-
-async function getRateLimitCollection(): Promise<Collection<RateLimitDocument>> {
-  const db = await getMongoDb();
-  return db.collection<RateLimitDocument>('rate_limits');
-}
-
-async function ensureIndexes(collection: Collection<RateLimitDocument>) {
-  if (indexesReady) {
-    return;
-  }
-
-  await collection.createIndex({ key: 1, windowStart: 1 }, { unique: true });
-  await collection.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 2 });
-  indexesReady = true;
 }
 
 function buildWindowStart(windowSeconds: number, at = Date.now()): number {
@@ -53,27 +32,10 @@ export async function enforceRateLimit(
   rule: RateLimitRule,
   keyValue: string,
 ): Promise<RateLimitResult> {
-  const collection = await getRateLimitCollection();
-  await ensureIndexes(collection);
-
   const windowStart = buildWindowStart(rule.windowSeconds);
   const key = `${rule.keyPrefix}:${keyValue}`;
 
-  await collection.updateOne(
-    { key, windowStart },
-    {
-      $inc: { count: 1 },
-      $setOnInsert: {
-        key,
-        windowStart,
-        createdAt: new Date(windowStart * 1000),
-      },
-    },
-    { upsert: true },
-  );
-
-  const doc = await collection.findOne({ key, windowStart }, { projection: { count: 1 } });
-  const count = doc?.count ?? 0;
+  const count = rateLimits.increment(key, windowStart);
   const retryAfterSeconds = buildRetryAfter(windowStart, rule.windowSeconds);
 
   return {

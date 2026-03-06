@@ -1,4 +1,8 @@
-import { ObjectId } from 'mongodb';
+/**
+ * Auth guard utilities for API routes.
+ * DECISION_197: MongoDB → SQLite migration.
+ * Replaced ObjectId with plain string IDs.
+ */
 import type { NextRequest } from 'next/server';
 
 import { getSessionUser } from '@/lib/auth/auth-config';
@@ -6,18 +10,18 @@ import type { SessionUser } from '@/lib/auth/session';
 
 export async function requireSession(
   _request: NextRequest,
-): Promise<{ session: SessionUser | null; userObjectId: ObjectId | null }> {
+): Promise<{ session: SessionUser | null; userId: string | null }> {
   const session = await getSessionUser();
-  if (!session || !ObjectId.isValid(session.id)) {
+  if (!session || !session.id) {
     return {
       session: null,
-      userObjectId: null,
+      userId: null,
     };
   }
 
   return {
     session,
-    userObjectId: new ObjectId(session.id),
+    userId: session.id,
   };
 }
 

@@ -1,6 +1,6 @@
 /**
  * Health endpoint for Railway probes and service monitoring.
- * Foundation infrastructure health probe.
+ * DECISION_197: MongoDB → SQLite migration.
  *
  * Returns service readiness without exposing secrets.
  */
@@ -15,19 +15,12 @@ export async function GET() {
     timestamp: new Date().toISOString(),
   };
 
-  // Check MongoDB connectivity (non-blocking, best-effort)
-  const mongoUri = process.env.MONGODB_URI;
-  if (!mongoUri) {
-    checks.mongo = 'not_configured';
-  } else {
-    try {
-      const { getMongoClient } = await import('@/lib/db/mongo');
-      const client = getMongoClient();
-      await client.db().command({ ping: 1 });
-      checks.mongo = 'connected';
-    } catch {
-      checks.mongo = 'unreachable';
-    }
+  // Check SQLite connectivity (non-blocking, best-effort)
+  try {
+    const { isDbHealthy } = await import('@/lib/db/sqlite');
+    checks.sqlite = isDbHealthy() ? 'connected' : 'unreachable';
+  } catch {
+    checks.sqlite = 'unreachable';
   }
 
   // Check internal core reachability (non-blocking)

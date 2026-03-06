@@ -1,37 +1,38 @@
+/**
+ * GET /api/playbooks — List playbooks for current user.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
-import type { Filter } from 'mongodb';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
-import { getPlaybooksCollection, type PlaybookDocument } from '@/lib/db/collections';
+import { playbooks } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
   try {
-    const playbooks = await getPlaybooksCollection();
-    const filter: Filter<PlaybookDocument> =
-      session.role === 'admin'
-        ? {}
-        : {
-            $or: [
-              { status: 'published' as const },
-              { status: 'draft' as const, createdBy: userObjectId },
-            ],
-          };
-
-    const docs = await playbooks.find(filter).sort({ updatedAt: -1 }).toArray();
+    const docs = playbooks.findAll(userId, session.role);
 
     return Response.json({
       playbooks: docs.map((doc) => ({
-        ...doc,
-        _id: doc._id.toHexString(),
-        createdBy: doc.createdBy.toHexString(),
+        _id: doc.id,
+        status: doc.status,
+        title: doc.title,
+        triggers: JSON.parse(doc.triggers),
+        checklist: JSON.parse(doc.checklist),
+        scenarioTree: doc.scenario_tree,
+        linkedSections: JSON.parse(doc.linked_sections),
+        tags: JSON.parse(doc.tags),
+        createdBy: doc.created_by,
+        createdAt: doc.created_at,
+        updatedAt: doc.updated_at,
+        publishedAt: doc.published_at,
       })),
     });
   } catch (error) {

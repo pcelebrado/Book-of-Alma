@@ -1,12 +1,14 @@
+/**
+ * POST /api/auth/register — Create initial admin account.
+ * GET  /api/auth/register — Check onboarding state.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import { createHash } from 'node:crypto';
 
 import type { NextRequest } from 'next/server';
 
-import type { Collection } from 'mongodb';
-
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
-import { getUsersCollection } from '@/lib/db/collections';
-import type { UserDocument } from '@/lib/db/collections';
+import { users } from '@/lib/db/repositories';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -37,8 +39,7 @@ function toPasswordHash(password: string): string {
 
 export async function GET() {
   try {
-    const users = await getUsersCollection();
-    const userCount = await users.countDocuments();
+    const userCount = users.count();
     return Response.json({
       onboardingOpen: userCount === 0,
       userCount,
@@ -78,12 +79,10 @@ export async function POST(request: NextRequest) {
     return apiRateLimited(RATE_LIMIT_RULES.login.message, registerLimit.retryAfterSeconds);
   }
 
-  let users: Collection<UserDocument>;
   let userCount: number;
 
   try {
-    users = await getUsersCollection();
-    userCount = await users.countDocuments();
+    userCount = users.count();
   } catch {
     return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
   }
@@ -92,26 +91,22 @@ export async function POST(request: NextRequest) {
     return apiError('onboarding_closed', 'Initial admin has already been created', 403);
   }
 
-  const existing = await users.findOne({ email });
+  const existing = users.findByEmail(email);
   if (existing) {
     return apiError('email_taken', 'An account with that email already exists', 409);
   }
 
-  const now = new Date();
-
-  const result = await users.insertOne({
+  const insertedId = users.insert({
     name,
     email,
     role: 'admin',
     passwordHash: toPasswordHash(password),
-    createdAt: now,
-    updatedAt: now,
-  } as never);
+  });
 
   await logSecurityEvent('auth.login.success', {
     requestId,
     route: '/api/auth/register',
-    userId: result.insertedId.toHexString(),
+    userId: insertedId,
     ip,
     details: {
       role: 'admin',
@@ -122,7 +117,7 @@ export async function POST(request: NextRequest) {
   return Response.json({
     ok: true,
     user: {
-      id: result.insertedId.toHexString(),
+      id: insertedId,
       name,
       email,
     },

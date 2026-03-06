@@ -1,8 +1,12 @@
+/**
+ * POST /api/playbooks/draft — Create a draft playbook.
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { getPlaybooksCollection } from '@/lib/db/collections';
+import { playbooks } from '@/lib/db/repositories';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +20,8 @@ interface DraftBody {
 }
 
 export async function POST(request: NextRequest) {
-  const { session, userObjectId } = await requireSession(request);
-  if (!session || !userObjectId) {
+  const { session, userId } = await requireSession(request);
+  if (!session || !userId) {
     return apiError('unauthorized', 'Not authenticated', 401);
   }
 
@@ -27,28 +31,29 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const now = new Date();
-    const playbook = {
-      status: 'draft' as const,
+    const playbook = playbooks.insert({
       title: body.title,
-      triggers: body.triggers ?? [],
-      checklist: body.checklist ?? [],
-      scenarioTree: body.scenarioTree ?? '',
-      linkedSections: body.linkedSections ?? [],
-      tags: body.tags ?? [],
-      createdBy: userObjectId,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const playbooks = await getPlaybooksCollection();
-    const result = await playbooks.insertOne(playbook);
+      triggers: body.triggers,
+      checklist: body.checklist,
+      scenarioTree: body.scenarioTree,
+      linkedSections: body.linkedSections,
+      tags: body.tags,
+      createdBy: userId,
+    });
 
     return Response.json({
       playbook: {
-        ...playbook,
-        _id: result.insertedId.toHexString(),
-        createdBy: userObjectId.toHexString(),
+        _id: playbook.id,
+        status: playbook.status,
+        title: playbook.title,
+        triggers: JSON.parse(playbook.triggers),
+        checklist: JSON.parse(playbook.checklist),
+        scenarioTree: playbook.scenario_tree,
+        linkedSections: JSON.parse(playbook.linked_sections),
+        tags: JSON.parse(playbook.tags),
+        createdBy: playbook.created_by,
+        createdAt: playbook.created_at,
+        updatedAt: playbook.updated_at,
       },
     });
   } catch (error) {

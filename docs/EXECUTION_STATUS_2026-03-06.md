@@ -18,15 +18,28 @@ OpenClaw + Book template stabilization pass.
 - SFTP resilience landed in core entrypoint:
   - full `sftpgo serve` attempt
   - automatic fallback to `sftpgo portable` for upload continuity
+  - portable scope default widened to `/data` for full-volume upload visibility
 - Web service wiring hardening landed:
   - core wake + retry path in `services/web/src/lib/core-client.ts`
-  - Mongo connect retry + wake probe in `services/web/src/lib/db/mongo.ts`
-  - health endpoint now checks core reachability (not only config presence)
+  - SQLite data layer migration (`better-sqlite3`, repositories, schema init)
+  - health endpoint now checks core reachability and sqlite state
+- Railway observability snapshot tooling landed:
+  - `npm run ops:core:snapshot`
+  - `npm run ops:web:snapshot`
+  - artifacts saved under `logs/railway-snapshots/<timestamp>-<service>/`
+- QMD memory backend wiring landed in core runtime/template:
+  - Docker runtime installs `qmd` binary
+  - setup/bootstrap now applies `memory.backend=qmd` and `memory.qmd.*` defaults
+  - debug endpoints now expose QMD binary + config state
+- Latest snapshot evidence artifacts:
+  - `logs/railway-snapshots/2026-03-06T19-36-46-274Z-core/`
+  - `logs/railway-snapshots/2026-03-06T19-36-16-450Z-web/`
+  - core probe currently shows `openclaw health` failure with gateway close `1006`
 
 ## Key commits (recent)
 
 - `dcf27c3` feat(ops): add explicit railway service tooling and sftp fallback
-- `8abe743` fix(web): harden core and mongo cold-start wiring
+- `8abe743` fix(web): harden core cold-start wiring
 - `9e66ddf` fix(web): use valid security event name for wake probe
 - `9241783` fix(web): guard core response initialization path
 - `bee2d77` fix(deploy): revert port env overrides breaking healthchecks
@@ -65,13 +78,15 @@ npm run ops:web:ssh -- "ls -la /app"
 4. Verify book path end-to-end:
    - `/login` -> authenticated session -> `/book`
 5. Validate SFTP upload path against TCP proxy endpoint and reindex flow.
+6. Verify web SQLite volume durability (`/data/web.db`) across redeploy.
+7. Execute final Railway deploy + snapshots + runtime audit for DECISION_197 closure.
 
 ## File references touched this pass
 
 - `services/core/src/server.js`
 - `services/core/scripts/entrypoint.sh`
 - `services/web/src/lib/core-client.ts`
-- `services/web/src/lib/db/mongo.ts`
+- `services/web/src/lib/db/sqlite.ts`
 - `services/web/src/lib/env.ts`
 - `services/web/src/app/api/health/route.ts`
 - `tools/railway-ops.mjs`

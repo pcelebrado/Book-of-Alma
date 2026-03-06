@@ -3,60 +3,12 @@ set -eu
 
 # =============================================================================
 # OpenClaw Core Entrypoint (MVP — Consolidated)
-# Starts MongoDB, SFTPGo, then the Node.js wrapper.
+# Starts SFTPGo, then the Node.js wrapper.
 # All data persists on the single Railway volume at /data.
+# DECISION_197: MongoDB removed — web service uses embedded SQLite.
 # =============================================================================
 
-# ---------------------------------------------------------------------------
-# MongoDB
-# ---------------------------------------------------------------------------
-MONGO_DATA_DIR="${MONGO_DATA_DIR:-/data/db}"
-MONGO_LOG_DIR="${MONGO_LOG_DIR:-/data/log}"
-MONGO_PORT="${MONGO_PORT:-27017}"
-# Default: ::,0.0.0.0 — required for Railway private networking (IPv6+IPv4).
-# See: https://docs.railway.com/networking/private-networking/library-configuration
-MONGO_BIND_IP="${MONGO_BIND_IP:-::,0.0.0.0}"
-MONGO_WT_CACHE_GB="${MONGO_WT_CACHE_GB:-0.25}"
-
-mkdir -p "$MONGO_DATA_DIR" "$MONGO_LOG_DIR"
-chown -R "$(id -u)":"$(id -g)" "$MONGO_DATA_DIR" "$MONGO_LOG_DIR" 2>/dev/null || true
-
 echo "[entrypoint] Runtime UID:GID $(id -u):$(id -g)"
-
-echo "[entrypoint] Starting MongoDB on ${MONGO_BIND_IP}:${MONGO_PORT} (data: ${MONGO_DATA_DIR})"
-
-# Railway docs baseline: mongod --ipv6 --bind_ip ::,0.0.0.0 --setParameter diagnosticDataCollectionEnabled=false
-# Use background process (instead of --fork) for better container log visibility.
-mongod \
-  --dbpath "$MONGO_DATA_DIR" \
-  --port "$MONGO_PORT" \
-  --bind_ip "$MONGO_BIND_IP" \
-  --ipv6 \
-  --wiredTigerCacheSizeGB "$MONGO_WT_CACHE_GB" \
-  --setParameter diagnosticDataCollectionEnabled=false \
-  --noauth \
-  > "$MONGO_LOG_DIR/mongod.log" 2>&1 &
-
-MONGOD_PID=$!
-echo "[entrypoint] MongoDB launched (PID: ${MONGOD_PID}, WT cache: ${MONGO_WT_CACHE_GB}GB)"
-
-# Wait for MongoDB to be ready
-MONGO_WAIT_RETRIES=30
-for i in $(seq 1 $MONGO_WAIT_RETRIES); do
-  if mongosh --host 127.0.0.1 --port "$MONGO_PORT" --eval "db.adminCommand('ping')" --quiet >/dev/null 2>&1; then
-    echo "[entrypoint] MongoDB ready (attempt $i)"
-    break
-  fi
-  if [ "$i" -eq "$MONGO_WAIT_RETRIES" ]; then
-    echo "[entrypoint] ERROR: MongoDB did not start in time"
-    tail -30 "$MONGO_LOG_DIR/mongod.log"
-    exit 1
-  fi
-  sleep 1
-done
-
-export MONGODB_URI="${MONGODB_URI:-mongodb://127.0.0.1:${MONGO_PORT}/openclaw}"
-echo "[entrypoint] MONGODB_URI=${MONGODB_URI}"
 
 # ---------------------------------------------------------------------------
 # SFTPGo
@@ -115,7 +67,7 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
 
     PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-book-uploader}"
     PORTABLE_PASS="${SFTPGO_PORTABLE_PASSWORD:-${SFTPGO_DEFAULT_ADMIN_PASSWORD:-change-me-now}}"
-    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-/data/book-source}"
+    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-/data}"
     mkdir -p "$PORTABLE_DIR"
 
     sftpgo portable \

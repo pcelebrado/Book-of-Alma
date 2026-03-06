@@ -1,9 +1,12 @@
-import { ObjectId } from 'mongodb';
+/**
+ * POST /api/playbooks/:id/archive — Archive a playbook (admin only).
+ * DECISION_197: MongoDB → SQLite migration.
+ */
 import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError, apiRateLimited } from '@/lib/api/response';
-import { getPlaybooksCollection } from '@/lib/db/collections';
+import { playbooks } from '@/lib/db/repositories';
 import { logSecurityEvent, writeAuditLog } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -37,22 +40,14 @@ export async function POST(
     return apiRateLimited(RATE_LIMIT_RULES.admin.message, adminLimit.retryAfterSeconds);
   }
 
-  if (!ObjectId.isValid(context.params.id)) {
+  const playbookId = context.params.id;
+  if (!playbookId) {
     return apiError('invalid_request', 'Invalid playbook id', 400);
   }
 
-  const playbookId = new ObjectId(context.params.id);
-  const playbooks = await getPlaybooksCollection();
-  const updated = await playbooks.findOneAndUpdate(
-    { _id: playbookId },
-    {
-      $set: {
-        status: 'archived',
-        updatedAt: new Date(),
-      },
-    },
-    { returnDocument: 'after' },
-  );
+  const updated = playbooks.update(playbookId, {
+    status: 'archived',
+  });
 
   if (!updated) {
     return apiError('not_found', 'Playbook not found', 404);
