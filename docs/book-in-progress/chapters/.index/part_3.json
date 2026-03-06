@@ -1,0 +1,302 @@
+{
+  "part": {
+    "part_number": 3,
+    "title": "Macro and Geopolitical Engine",
+    "description": "Macro forces shaping volatility regimes. Alma-teachings first, external references only for unresolved gaps.",
+    "synthesis_ready": true,
+    "source_policy": {
+      "primary": "alma-teachings corpus",
+      "secondary": "web references only when internal corpus is sparse"
+    },
+    "draft_quality_targets": {
+      "chapter_word_count_min": 2600,
+      "section_word_count_min": 450,
+      "evidence_citations_min": 8,
+      "notes": "Use sourced macro case anchors and flow-mechanics examples to maintain book-grade depth."
+    }
+  },
+  "structure": {
+    "Part_III_Macro_and_Geopolitical_Engine": {
+      "chapters": [
+        {
+          "chapter_number": 8,
+          "title": "Geopolitics and Volatility Regimes",
+          "synthesis_ready": true,
+          "opening_hook": "Volatility becomes a regime only when a macro story gives fear a memory.",
+          "chapter_outcome": "The reader will understand how geopolitical narratives anchor volatility persistence and how fragmentation reshapes liquidity and pricing.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-above-the-line-china-vs-us-intraday-post-25-april.md",
+            "alma-teachings/substack/unknown-date-recession-stagflation-risk-intraday-post-1-may.md",
+            "alma-teachings/substack/unknown-date-vol-selling-geo-risk-premium-intraday-post-13-june.md",
+            "alma-teachings/substack/unknown-date-nfp-stagflation-deflation-intraday-post-04-april.md",
+            "alma-teachings/substack/unknown-date-cpi-credit-spreads-stagflation-qt-intraday-post-13-may.md",
+            "alma-teachings/substack/unknown-date-the-problems-momentum-fed-stagflation-intraday-post-11-july.md",
+            "alma-teachings/substack/unknown-date-bonds-currency-market-sentiment-education-and-study-on-crise.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md"
+          ],
+          "sections": [
+            {
+              "section_number": 8.1,
+              "section": "Volatility requires narrative",
+              "mission": "Explain how macro narratives anchor volatility regimes and provide psychological legitimacy to price repricing.",
+              "tags": ["volatility regime", "macro narrative", "geopolitics", "risk perception", "structural repricing"],
+              "content": {
+                "narrative": "A volatility spike can be mechanical, but a volatility regime needs narrative continuity. Alma's geopolitical framing shows why: once participants can explain risk in a coherent storyline, they keep repricing that risk beyond the first shock. Without narrative, fear mean-reverts; with narrative, fear compounds into positioning. The story does not have to be objectively complete. It only has to be behaviorally sticky.",
+                "key_insight": "Narrative coherence is a persistence engine for volatility.",
+                "trading_implication": "When vol rises with a coherent macro story, extend horizon assumptions and avoid quick mean-reversion reflexes."
+              }
+            },
+            {
+              "section_number": 8.2,
+              "section": "Fragmentation and supply chain inflation",
+              "mission": "Describe how geopolitical fragmentation reshapes global supply chains and embeds structural inflation risk.",
+              "tags": ["fragmentation", "supply chain", "inflation risk", "geopolitics", "friend-shoring"],
+              "content": {
+                "narrative": "Fragmentation does not only change trade routes, it changes cost structures, lead times, and pricing confidence. Alma's stagflation notes repeatedly connect geopolitical stress to persistent inflation pressure through supply constraints and policy responses. Markets can rally on short-term liquidity while embedding medium-term cost instability. That duality is why regime calls fail when they focus on one horizon only.",
+                "key_insight": "Geopolitical fragmentation embeds inflation asymmetry into otherwise risk-on tapes.",
+                "trading_implication": "Treat supply-chain and tariff signals as regime modifiers, not as one-day headline noise."
+              }
+            },
+            {
+              "section_number": 8.3,
+              "section": "De-dollarization mechanics",
+              "mission": "Analyze how currency realignment and reserve shifts impact capital flows and volatility structure.",
+              "tags": ["de-dollarization", "currency regime", "capital flows", "FX volatility", "global reserves"],
+              "content": {
+                "narrative": "Reserve composition and trade-settlement shifts can alter funding behavior before they appear in broad narratives. In Alma's macro lens, de-dollarization is less about abrupt replacement and more about gradual marginal shifts that rewire demand for duration, collateral, and cross-currency hedging. These shifts can increase volatility in rates and FX while equities lag in recognition. The market reprices plumbing first, story second.",
+                "key_insight": "Currency regime drift affects funding and volatility channels long before consensus narratives catch up.",
+                "trading_implication": "Monitor rates/FX stress signals as early warnings for equity-regime instability."
+              }
+            },
+            {
+              "section_number": 8.4,
+              "section": "Regime transition dynamics",
+              "mission": "Identify how macro regime shifts alter liquidity, volatility cycles, and valuation frameworks.",
+              "tags": ["regime shift", "macro cycle", "liquidity transition", "structural change"],
+              "content": {
+                "narrative": "Regime transitions are rarely clean. They pass through overlap periods where old playbooks partially work and then abruptly fail. Alma's regime language emphasizes this ambiguity: traders must carry conditional maps rather than single-path conviction. During transition, valuation anchors move, liquidity quality changes, and volatility elasticity becomes unstable. The winning posture is adaptive, not declarative.",
+                "key_insight": "Transition regimes punish static frameworks more than outright wrong forecasts.",
+                "trading_implication": "Use staged scenario trees with explicit invalidation, and rebalance risk when transition evidence accumulates."
+              }
+            }
+          ],
+          "transition_vector": "Macro narrative persistence sets the stage for financing behavior; the next chapter maps how liquidity engineering extends bubbles and delays recognition."
+        },
+        {
+          "chapter_number": 9,
+          "title": "Financing the Bubble",
+          "synthesis_ready": true,
+          "opening_hook": "Bubbles rarely survive on belief alone; they survive on financing pathways that keep belief funded.",
+          "chapter_outcome": "The reader will understand how capex, credit, and synthetic liquidity mechanisms sustain overvaluation and defer repricing.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-quick-education-on-reflexivity-hidden-qe-plan-intraday-post-.md",
+            "alma-teachings/substack/unknown-date-cpi-credit-spreads-stagflation-qt-intraday-post-13-may.md",
+            "alma-teachings/substack/unknown-date-the-problems-momentum-fed-stagflation-intraday-post-11-july.md",
+            "alma-teachings/substack/unknown-date-fomc-day-bessent-put-hidden-qe-intraday-post-18-june.md",
+            "alma-teachings/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+            "alma-teachings/substack/2025-01-29-articles-predictions-education.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-disbalance-investigating-the-story-that-the-m.md"
+          ],
+          "sections": [
+            {
+              "section_number": 9.1,
+              "section": "AI capex structure",
+              "mission": "Explain how capital expenditure cycles in AI and technology sectors drive valuation expansion and systemic leverage.",
+              "tags": ["AI bubble", "capex cycle", "tech valuation", "leverage", "growth narrative"],
+              "content": {
+                "narrative": "AI capex narratives can justify valuation expansion, but they also concentrate dependency on financing conditions. Alma's macro notes imply a key asymmetry: upside narrative compounds quickly, while cash-flow realization lags. That gap is where leverage and expectation risk accumulate. When financing is easy, the gap is ignored. When financing tightens, the same gap becomes a repricing trigger.",
+                "key_insight": "Capex optimism can pull valuation forward faster than fundamentals can validate it.",
+                "trading_implication": "Treat narrative-led capex surges as two-phase trades: expansion first, validation risk second."
+              }
+            },
+            {
+              "section_number": 9.2,
+              "section": "Credit deregulation",
+              "mission": "Show how loosening financial constraints expands liquidity and artificially extends cycle longevity.",
+              "tags": ["credit cycle", "deregulation", "liquidity expansion", "bank lending", "systemic leverage"],
+              "content": {
+                "narrative": "Credit conditions are cycle accelerators. Looser constraints can convert fragile balance sheets into temporarily stable trends by extending refinancing windows and lowering visible stress. Alma's framework warns that this can create false macro confidence: better liquidity optics without true deleveraging. The cycle survives longer, then reprices harder when limits return.",
+                "key_insight": "Deregulatory liquidity can postpone, not eliminate, balance-sheet fragility.",
+                "trading_implication": "Price credit-easing rallies with explicit time decay assumptions; do not extrapolate them as permanent regime change."
+              }
+            },
+            {
+              "section_number": 9.3,
+              "section": "Synthetic QE",
+              "mission": "Define synthetic liquidity mechanisms that replicate QE effects without formal monetary expansion.",
+              "tags": ["synthetic QE", "liquidity injection", "financial engineering", "stimulus mechanics"],
+              "content": {
+                "narrative": "Alma's hidden-QE lens highlights how markets can receive functional liquidity support without headline QE. Balance-sheet channels, collateral dynamics, and policy backstops can mimic easing behavior while preserving restrictive rhetoric. This divergence between narrative policy and effective liquidity is a source of repeated pricing confusion. Traders who watch only official labels often miss the real transmission channel.",
+                "key_insight": "Effective liquidity can expand even when formal policy language remains restrictive.",
+                "trading_implication": "Track functional liquidity indicators in parallel with central-bank messaging before making regime assumptions."
+              }
+            },
+            {
+              "section_number": 9.4,
+              "section": "Artificial cash-flow inflation",
+              "mission": "Explain how accounting, buybacks, and credit cycles distort perceived corporate strength.",
+              "tags": ["buybacks", "earnings distortion", "financial engineering", "valuation inflation"],
+              "content": {
+                "narrative": "Corporate strength can appear robust while being partly engineered through buybacks, financing terms, and accounting optics. Alma's warnings about market underpricing risk fit this pattern: surface resilience can coexist with deeper fragility if cash-flow quality deteriorates. In these environments, valuation metrics look stable until financing conditions tighten. Then the quality gap reprices quickly.",
+                "key_insight": "Not all earnings support has equal durability; financing quality matters.",
+                "trading_implication": "Separate earnings level from earnings quality when sizing longer-horizon conviction."
+              }
+            }
+          ],
+          "transition_vector": "Once financing scaffolding is understood, the remaining question is tail geometry: how suppressed risk reappears through the left tail."
+        },
+        {
+          "chapter_number": 10,
+          "title": "The Hidden Left Tail",
+          "synthesis_ready": true,
+          "opening_hook": "The left tail is rarely invisible; it is usually ignored until it becomes undeniable.",
+          "chapter_outcome": "The reader will identify latent tail-risk buildup through rates, credit, intermarket divergence, and volatility-distribution shifts.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md",
+            "alma-teachings/substack/unknown-date-gold-rally-hedging-curve-steepening-risk-intraday-post-02-oc.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-disbalance-investigating-the-story-that-the-m.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-has-just-opened-weekly-post-22-26-sept.md",
+            "alma-teachings/substack/2025-01-29-window-of-risk-pt-2-flows-update.md",
+            "alma-teachings/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md",
+            "alma-teachings/substack/unknown-date-vix-downside-vomma-risk-remember-intraday-post-03-july.md"
+          ],
+          "sections": [
+            {
+              "section_number": 10.1,
+              "section": "Term premium mechanics",
+              "mission": "Explain how rising term premium alters discount rates and embeds systemic fragility.",
+              "tags": ["term premium", "yield curve", "rates volatility", "discount rate", "macro risk"],
+              "content": {
+                "narrative": "When term premium rises, discount-rate assumptions change even without immediate policy-rate shifts. Alma's bond-market stress notes treat this as a core warning: equity narratives can stay bullish while funding stress accumulates in the long end. This creates fragility where valuation and financing assumptions drift apart. The repricing rarely waits for consensus.",
+                "key_insight": "Term-premium stress can front-run broader risk-asset repricing.",
+                "trading_implication": "Use rates-vol and long-end stress as early warning overlays on equity risk."
+              }
+            },
+            {
+              "section_number": 10.2,
+              "section": "Credit saturation",
+              "mission": "Identify how excessive leverage compresses upside while amplifying downside convexity.",
+              "tags": ["credit cycle", "leverage saturation", "systemic fragility", "convex risk"],
+              "content": {
+                "narrative": "Leverage extends trends until it does not. Saturated credit regimes are characterized by diminishing upside efficiency and increasing downside asymmetry. Alma's risk-window framing captures this: rallies persist, but their quality degrades as financing sensitivity rises. When pressure arrives, deleveraging accelerates faster than prior gains were built.",
+                "key_insight": "Leverage saturation turns moderate shocks into convex downside events.",
+                "trading_implication": "As leverage sensitivity rises, shift from return-maximization to drawdown minimization."
+              }
+            },
+            {
+              "section_number": 10.3,
+              "section": "Gold vs Copper divergence",
+              "mission": "Use intermarket signals to illustrate growth versus safety divergence and macro tension.",
+              "tags": ["gold", "copper", "intermarket analysis", "stagflation", "growth divergence"],
+              "content": {
+                "narrative": "Intermarket divergence is often the first visible fracture in consensus macro narratives. When gold strength and industrial weakness diverge persistently, markets may be pricing policy uncertainty and growth fragility simultaneously. Alma's use of metals and rates context points to this tension as a regime clue, not a standalone trade signal. Divergence matters because it shows disagreement across macro channels.",
+                "key_insight": "Persistent intermarket divergence is a regime-stress indicator.",
+                "trading_implication": "Use divergence as a confidence reducer on one-sided macro bets."
+              }
+            },
+            {
+              "section_number": 10.4,
+              "section": "Inflation vs Growth regime",
+              "mission": "Differentiate between inflation-dominant and growth-dominant volatility structures.",
+              "tags": ["inflation regime", "growth regime", "macro transition", "risk repricing"],
+              "content": {
+                "narrative": "Inflation and growth shocks do not produce identical volatility signatures. In inflation-dominant stress, discount-rate and policy credibility channels dominate. In growth-dominant stress, earnings durability and credit channels dominate. Alma's stagflation commentary sits in the overlap where both pressures coexist, creating unstable cross-asset behavior. That overlap is where static models fail fastest.",
+                "key_insight": "Regime identification must separate inflation shock mechanics from growth shock mechanics.",
+                "trading_implication": "Map risk by shock-type first, then choose hedges aligned with that shock path."
+              }
+            },
+            {
+              "section_number": 10.5,
+              "section": "Kurtosis expansion risk",
+              "mission": "Explain how suppressed volatility regimes eventually reprice through tail expansion.",
+              "tags": ["kurtosis", "tail risk", "volatility expansion", "distribution shift"],
+              "content": {
+                "narrative": "Suppressed volatility can make distributions look benign while left-tail probability is merely deferred. Alma's window-of-risk language captures the transition: markets stay orderly longer than expected, then disorder arrives faster than expected. Tail repricing is often nonlinear because positioning and liquidity reconfigure at once. What looked improbable becomes suddenly obvious.",
+                "key_insight": "Tail expansion is often the delayed payment for prolonged suppression.",
+                "trading_implication": "Carry explicit tail protection when suppression regimes extend beyond their usual half-life."
+              }
+            }
+          ],
+          "transition_vector": "Part IV converts macro tail theory into crisis architecture: breakpoints, nonlinear cascades, and managed stability limits."
+        }
+      ]
+    }
+  },
+  "navigation_index": {
+    "part_slug": "part-iii-macro-and-geopolitical-engine",
+    "chapter_slugs": [
+      "ch-8-geopolitics-and-volatility-regimes",
+      "ch-9-financing-the-bubble",
+      "ch-10-the-hidden-left-tail"
+    ],
+    "quick_topics": [
+      "geopolitics",
+      "stagflation",
+      "term-premium",
+      "hidden-qe",
+      "tail-risk"
+    ],
+    "reference_expansion_pool": [
+      "alma-teachings/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md",
+      "alma-teachings/substack/unknown-date-nfp-stagflation-deflation-intraday-post-04-april.md",
+      "alma-teachings/substack/unknown-date-fomc-day-bessent-put-hidden-qe-intraday-post-18-june.md",
+      "alma-teachings/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+      "alma-teachings/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md"
+    ]
+  },
+  "context_expansion_pack": {
+    "chapter_8": {
+      "macro_fragments": [
+        "alma-teachings/substack/unknown-date-above-the-line-china-vs-us-intraday-post-25-april.md",
+        "alma-teachings/substack/unknown-date-recession-stagflation-risk-intraday-post-1-may.md",
+        "alma-teachings/substack/unknown-date-cpi-credit-spreads-stagflation-qt-intraday-post-13-may.md",
+        "alma-teachings/substack/unknown-date-the-problems-momentum-fed-stagflation-intraday-post-11-july.md",
+        "alma-teachings/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md"
+      ],
+      "narrative_pressure_prompts": [
+        "Where did narrative persistence outlive first-order flow?",
+        "What changed in pricing behavior before media consensus shifted?",
+        "Which macro terms became sticky enough to sustain volatility trend?"
+      ]
+    },
+    "chapter_9": {
+      "financing_fragments": [
+        "alma-teachings/substack/unknown-date-quick-education-on-reflexivity-hidden-qe-plan-intraday-post-.md",
+        "alma-teachings/substack/unknown-date-fomc-day-bessent-put-hidden-qe-intraday-post-18-june.md",
+        "alma-teachings/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+        "alma-teachings/substack/2025-01-29-articles-predictions-education.md",
+        "alma-teachings/substack/unknown-date-cpi-credit-spreads-stagflation-qt-intraday-post-13-may.md"
+      ],
+      "analysis_prompts": [
+        "Separate liquidity optics from balance-sheet durability.",
+        "Name one mechanism that extends cycle life without fixing fragility.",
+        "Map narrative expansion vs financing constraint timing."
+      ]
+    },
+    "chapter_10": {
+      "tail_risk_fragments": [
+        "alma-teachings/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md",
+        "alma-teachings/substack/unknown-date-gold-rally-hedging-curve-steepening-risk-intraday-post-02-oc.md",
+        "alma-teachings/substack/unknown-date-window-of-risk-disbalance-investigating-the-story-that-the-m.md",
+        "alma-teachings/substack/unknown-date-window-of-risk-has-just-opened-weekly-post-22-26-sept.md",
+        "alma-teachings/substack/2025-01-29-window-of-risk-pt-2-flows-update.md"
+      ],
+      "stress_test_prompts": [
+        "Which indicator moved first: rates, spreads, metals, or equities?",
+        "How did suppression regime hide or delay tail repricing?",
+        "Where did positioning make downside non-linear?"
+      ]
+    },
+    "cross_chapter_density_rules": {
+      "minimum_case_anchors_per_chapter": 3,
+      "minimum_distinct_sources_per_chapter": 8,
+      "require_mechanics_plus_narrative_pairing": true
+    }
+  },
+  "synthesis_metadata": {
+    "last_updated": "2026-03-02T22:18:33Z",
+    "updated_by": "Pyxis (Strategist)",
+    "status": "Synthesis-Ready",
+    "next_action": "Expand Parts IV-V with same teaching-first schema and navigation hooks"
+  }
+}

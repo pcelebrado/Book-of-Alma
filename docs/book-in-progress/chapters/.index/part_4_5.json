@@ -1,0 +1,441 @@
+{
+  "parts": [
+    {
+      "part_number": 4,
+      "title": "Crisis Architecture",
+      "description": "Systemic instability and asymmetry. Alma-teachings first with web only as gap-fill.",
+      "synthesis_ready": true,
+      "source_policy": {
+        "primary": "alma-teachings corpus",
+        "secondary": "web references only when internal corpus is sparse"
+      },
+      "draft_quality_targets": {
+        "chapter_word_count_min": 2600,
+        "section_word_count_min": 450,
+        "evidence_citations_min": 8,
+        "notes": "Expand each crisis chapter with concrete sequence examples, trigger maps, and risk-response mechanics."
+      },
+      "chapters": [
+        {
+          "chapter_number": 11,
+          "title": "The Crisis Blueprint",
+          "synthesis_ready": true,
+          "opening_hook": "Crises are not random explosions; they are architecture completing itself.",
+          "chapter_outcome": "The reader will map bubble evolution into conditional breakpoints and scenario trees for asymmetric risk control.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-window-of-risk-disbalance-investigating-the-story-that-the-m.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-has-just-opened-weekly-post-22-26-sept.md",
+            "alma-teachings/substack/unknown-date-accumulating-risk-intraday-post-16-oct.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md",
+            "alma-teachings/substack/2025-01-29-window-of-risk-pt-2-flows-update.md",
+            "alma-teachings/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md"
+          ],
+          "sections": [
+            {
+              "section_number": 11.1,
+              "section": "Bubble buildup timeline",
+              "mission": "Map the structural stages of bubble formation from liquidity expansion to reflexive instability.",
+              "tags": ["bubble cycle", "liquidity expansion", "reflexivity", "systemic build-up", "cycle timing"],
+              "content": {
+                "narrative": "Bubble progression usually follows a repeatable sequence: liquidity easing, narrative acceleration, leverage normalization, then fragility disguised as strength. Alma's market-window framing tracks these transitions as behavior shifts rather than headline milestones. By the time consensus acknowledges instability, most of the architecture is already in place.",
+                "key_insight": "Bubbles are temporal structures, not isolated valuation errors.",
+                "trading_implication": "Assign each market phase to a cycle stage and update risk posture as stages advance."
+              }
+            },
+            {
+              "section_number": 11.2,
+              "section": "Conditional breakpoints",
+              "mission": "Identify structural thresholds that, once breached, accelerate regime transition.",
+              "tags": ["breakpoints", "trigger levels", "regime acceleration", "structural thresholds"],
+              "content": {
+                "narrative": "Breakpoints are less about exact price and more about state transfer. A level matters when its breach changes funding behavior, dealer response, or narrative confidence simultaneously. Alma's method treats breakpoints as conditional triggers tied to mechanics, not magical numbers on a chart.",
+                "key_insight": "A breakpoint is defined by what behavior changes after it breaks.",
+                "trading_implication": "Predefine which state transitions must confirm a breakpoint before escalating exposure."
+              }
+            },
+            {
+              "section_number": 11.3,
+              "section": "If-then logic chains",
+              "mission": "Formalize probabilistic scenario construction through conditional macro and volatility pathways.",
+              "tags": ["conditional logic", "scenario modeling", "probability tree", "macro triggers"],
+              "content": {
+                "narrative": "Crisis navigation is conditional reasoning, not deterministic prediction. Alma's approach builds logic chains where each branch has a trigger, confirmation path, and invalidation rule. This preserves flexibility under uncertainty and prevents ego-driven overcommitment to one narrative.",
+                "key_insight": "Conditional trees convert uncertainty into executable decisions.",
+                "trading_implication": "Write scenario chains before stress events; in-event improvisation is usually expensive."
+              }
+            },
+            {
+              "section_number": 11.4,
+              "section": "Asymmetric risk stacking",
+              "mission": "Explain how layered risks compound convexity and produce nonlinear downside outcomes.",
+              "tags": ["asymmetry", "convex risk", "risk stacking", "nonlinearity", "tail amplification"],
+              "content": {
+                "narrative": "Risk layers rarely arrive one by one. Funding strain, policy uncertainty, and positioning fragility can stack into convex downside where each new shock multiplies the prior one. Alma's warning is straightforward: if layers are aligning, linear expectations are wrong.",
+                "key_insight": "Stacked risks create nonlinear outcomes that invalidate linear sizing assumptions.",
+                "trading_implication": "When risk layers align, reduce gross exposure and prioritize convex hedges."
+              }
+            }
+          ],
+          "transition_vector": "From crisis architecture, we move to managed stability mechanisms that delay dislocation while concentrating latent downside pressure."
+        },
+        {
+          "chapter_number": 12,
+          "title": "Managed Stability",
+          "synthesis_ready": true,
+          "opening_hook": "What looks stable can be engineered, and engineered stability has an expiration date.",
+          "chapter_outcome": "The reader will understand how suppression regimes function and why controlled calm can convert into accelerated downside when thresholds break.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-vol-selling-intraday-post-03-june.md",
+            "alma-teachings/substack/unknown-date-vix-downside-vomma-risk-remember-intraday-post-03-july.md",
+            "alma-teachings/substack/unknown-date-opex-gaps-downside-risk-bulls-intraday-post-20-nov.md",
+            "alma-teachings/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md",
+            "alma-teachings/substack/unknown-date-expectations-in-short-institutional-support-intraday-post-24.md",
+            "alma-teachings/substack/unknown-date-inflation-expectations-perspectives-intraday-post-12-08.md",
+            "alma-teachings/substack/unknown-date-ppi-and-cpi-expectations-intraday-post-10-sept.md"
+          ],
+          "sections": [
+            {
+              "section_number": 12.1,
+              "section": "Volatility suppression",
+              "mission": "Describe how institutional intervention dampens realized volatility while embedding latent instability.",
+              "tags": ["vol suppression", "institutional intervention", "realized volatility", "latent risk"],
+              "content": {
+                "narrative": "Suppression regimes smooth realized paths, compress dispersion, and reward short-horizon confidence. But the same process can underprice contingency risk and encourage fragile positioning. Alma's repeated cautions on underpriced reality fit this dynamic exactly.",
+                "key_insight": "Suppression lowers visible risk while often increasing hidden risk.",
+                "trading_implication": "Treat prolonged calm as a risk-budget warning, not a green light for leverage expansion."
+              }
+            },
+            {
+              "section_number": 12.2,
+              "section": "CTA asymmetry",
+              "mission": "Analyze how systematic strategies add limited upside but amplify downside selling pressure.",
+              "tags": ["CTA models", "systematic selling", "trend following", "downside convexity"],
+              "content": {
+                "narrative": "Systematic strategies can support trends in calm conditions, yet their de-risk logic can become reflexively pro-cyclical in stress. Alma's flow-first lens highlights this asymmetry: upside support is often incremental, downside de-risking can be abrupt.",
+                "key_insight": "Systematic flow asymmetry is mild in calm and sharp in stress.",
+                "trading_implication": "Model systematic de-risk triggers as potential accelerants during breakdown scenarios."
+              }
+            },
+            {
+              "section_number": 12.3,
+              "section": "Vol-control fund exposure",
+              "mission": "Explain how volatility-targeting funds increase leverage in calm regimes and accelerate de-risking in stress.",
+              "tags": ["vol control", "leverage expansion", "forced deleveraging", "realized volatility trigger"],
+              "content": {
+                "narrative": "Vol-control frameworks mechanically scale exposure with realized volatility. That creates a paradox: the quieter the regime, the larger the exposure base for eventual de-risking. Alma's risk-window framing repeatedly points to this delayed reflex.",
+                "key_insight": "Calm-regime leverage builds the fuel for stress-regime deleveraging.",
+                "trading_implication": "Track realized-vol thresholds that can force strategy-level de-risking cascades."
+              }
+            },
+            {
+              "section_number": 12.4,
+              "section": "Exponential downside de-risking",
+              "mission": "Illustrate how feedback loops convert small declines into rapid structural liquidation events.",
+              "tags": ["liquidation cascade", "feedback loop", "systemic selloff", "convex downside"],
+              "content": {
+                "narrative": "De-risking loops are feedback systems: lower price raises hedging demand, hedging demand lowers price, and liquidity thins at the worst moment. Alma's caution against narrative-only interpretation is crucial here, because these cascades can begin mechanically before headlines catch up.",
+                "key_insight": "Downside cascades are often flow-driven first and narrative-driven second.",
+                "trading_implication": "In early cascade conditions, prioritize execution quality and capital preservation over precision entries."
+              }
+            }
+          ],
+          "transition_vector": "Part V shifts from system mechanics to operator mechanics: the trader mind, probability discipline, and bias control under pressure."
+        }
+      ],
+      "navigation_index": {
+        "part_slug": "part-iv-crisis-architecture",
+        "chapter_slugs": [
+          "ch-11-the-crisis-blueprint",
+          "ch-12-managed-stability"
+        ],
+        "reference_expansion_pool": [
+          "alma-teachings/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md",
+          "alma-teachings/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md",
+          "alma-teachings/substack/unknown-date-expectations-in-short-institutional-support-intraday-post-24.md"
+        ]
+      }
+    },
+    {
+      "part_number": 5,
+      "title": "The Trader Mind",
+      "description": "Psychology and probabilistic discipline.",
+      "synthesis_ready": true,
+      "source_policy": {
+        "primary": "alma-teachings corpus",
+        "secondary": "web references only when internal corpus is sparse"
+      },
+      "draft_quality_targets": {
+        "chapter_word_count_min": 2400,
+        "section_word_count_min": 400,
+        "evidence_citations_min": 6,
+        "notes": "Keep psychology chapters practical with explicit decision loops and risk controls, not abstract motivational prose."
+      },
+      "chapters": [
+        {
+          "chapter_number": 13,
+          "title": "The Wall Street Casino",
+          "synthesis_ready": true,
+          "opening_hook": "Most traders lose not because they are unintelligent, but because they confuse excitement with expectancy.",
+          "chapter_outcome": "The reader will distinguish entertainment trading from expectancy trading and adopt risk-first thinking.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-the-concept-of-risk-var-beta-sharpe-sortino-etc.md",
+            "alma-teachings/substack/unknown-date-my-basic-trading-principles-pt-1-strategies-basic-risk-manag.md",
+            "alma-teachings/substack/unknown-date-my-trading-principles-pt-2-the-wall-street-casino-and-my-sto.md",
+            "alma-teachings/substack/unknown-date-game-of-probabilities.md"
+          ],
+          "sections": [
+            {
+              "section_number": 13.1,
+              "section": "Mathematical pitfalls",
+              "mission": "Expose common statistical misunderstandings that lead to negative expectancy trading.",
+              "tags": ["statistics", "expectancy", "probability error", "retail traps"],
+              "content": {
+                "narrative": "Common trading math errors are simple: confusing hit-rate with edge, ignoring tail losses, and treating recent outcomes as probability proof. Alma's educational posts frame risk metrics as decision tools, not decoration.",
+                "key_insight": "Expectancy is distribution-aware, not win-rate-aware.",
+                "trading_implication": "Judge systems by expectancy under stress scenarios, not by isolated streaks."
+              }
+            },
+            {
+              "section_number": 13.2,
+              "section": "Retail illusion",
+              "mission": "Show how structural asymmetry disadvantages uninformed participants.",
+              "tags": ["retail trading", "information asymmetry", "structural disadvantage"],
+              "content": {
+                "narrative": "The retail illusion is believing everyone faces the same information and execution constraints. In reality, timing, inventory access, and hedging sophistication are unevenly distributed. Alma's principle is not defeatism; it is realism: edge begins when illusions end.",
+                "key_insight": "Structural asymmetry is a market condition, not a personal failure.",
+                "trading_implication": "Build systems around your true constraints instead of imitating institutional workflows."
+              }
+            },
+            {
+              "section_number": 13.3,
+              "section": "Hit-rate vs expectancy",
+              "mission": "Differentiate between win percentage and long-term profitability through risk-reward asymmetry.",
+              "tags": ["expectancy", "risk-reward", "probability", "trade structure"],
+              "content": {
+                "narrative": "A high hit-rate strategy can still lose money if losers are structurally larger than winners. Alma's risk language emphasizes payoff geometry: the shape of outcomes matters more than the count of green days.",
+                "key_insight": "Profitability depends on payoff asymmetry, not just frequency of wins.",
+                "trading_implication": "Design for positive expectancy first; optimize hit-rate second."
+              }
+            },
+            {
+              "section_number": 13.4,
+              "section": "Risk asymmetry",
+              "mission": "Instill understanding of convex payoff structures and survival-based trading.",
+              "tags": ["risk asymmetry", "convex payoff", "capital preservation", "downside protection"],
+              "content": {
+                "narrative": "Asymmetry is survival architecture. A trader with bounded downside and scalable upside stays in the game long enough to let edge compound. Alma's basic principles repeatedly return to this: preserving optionality is more important than maximizing any one trade.",
+                "key_insight": "Survival is the prerequisite for compounding.",
+                "trading_implication": "Structure every trade with predefined downside and explicit path to positive convexity where possible."
+              }
+            }
+          ],
+          "transition_vector": "From risk math we move to cognition: replacing prediction addiction with conditional probability thinking."
+        },
+        {
+          "chapter_number": 14,
+          "title": "Probability Over Prediction",
+          "synthesis_ready": true,
+          "opening_hook": "Prediction seeks certainty; probability seeks durability.",
+          "chapter_outcome": "The reader will apply scenario-based thinking, risk-weighted sizing, and capital-preservation discipline.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-near-term-outlook-free-education-about-principles-risk-windo.md",
+            "alma-teachings/substack/unknown-date-window-of-risk-disbalance-investigating-the-story-that-the-m.md",
+            "alma-teachings/substack/unknown-date-game-of-probabilities.md",
+            "alma-teachings/substack/2025-01-29-window-of-risk-pt-2-flows-update.md"
+          ],
+          "sections": [
+            {
+              "section_number": 14.1,
+              "section": "Conditional thinking",
+              "mission": "Teach scenario-based reasoning over deterministic forecasting.",
+              "tags": ["conditional probability", "scenario analysis", "non-determinism"],
+              "content": {
+                "narrative": "Conditional thinking accepts uncertainty without surrendering action. Alma's if-then discipline translates uncertainty into executable branches with clear invalidation. This keeps ego out and process in.",
+                "key_insight": "Conditional logic replaces brittle certainty with adaptive execution.",
+                "trading_implication": "Enter with a branch map, not a prophecy."
+              }
+            },
+            {
+              "section_number": 14.2,
+              "section": "Scenario stacking",
+              "mission": "Demonstrate how multiple conditional paths can coexist within a probabilistic framework.",
+              "tags": ["multi-scenario modeling", "risk layering", "probability weighting"],
+              "content": {
+                "narrative": "Markets often carry multiple plausible futures at once. Scenario stacking allows exposure to reflect that plurality instead of forcing single-path bets. Alma's regime work repeatedly benefits from this layered framing.",
+                "key_insight": "Multiple scenarios can be traded simultaneously through weighted exposure.",
+                "trading_implication": "Allocate risk by scenario probability and impact, then rebalance as evidence updates."
+              }
+            },
+            {
+              "section_number": 14.3,
+              "section": "Position sizing discipline",
+              "mission": "Explain how capital allocation determines survival more than directional accuracy.",
+              "tags": ["position sizing", "capital management", "risk control"],
+              "content": {
+                "narrative": "Sizing is the most practical expression of humility. You can be directionally right and still lose if size ignores volatility and path risk. Alma's practical guidance consistently ties conviction to position architecture, not to narrative confidence.",
+                "key_insight": "Sizing quality often matters more than entry quality.",
+                "trading_implication": "Tie size to regime volatility and invalidation distance, not to emotional conviction."
+              }
+            },
+            {
+              "section_number": 14.4,
+              "section": "Capital preservation",
+              "mission": "Reinforce that longevity in markets depends on protecting downside exposure.",
+              "tags": ["capital preservation", "drawdown control", "risk management"],
+              "content": {
+                "narrative": "Capital preservation is not defensive pessimism, it is strategic endurance. Drawdown control preserves psychological clarity and future opportunity. Alma's risk-first posture makes this non-negotiable.",
+                "key_insight": "The ability to continue is a core trading edge.",
+                "trading_implication": "Define maximum daily and regime drawdown limits before market open and honor them mechanically."
+              }
+            }
+          ],
+          "transition_vector": "The final chapter turns probability into identity-level discipline: no side loyalty, only framework loyalty."
+        },
+        {
+          "chapter_number": 15,
+          "title": "Do Not Marry a Side",
+          "synthesis_ready": true,
+          "opening_hook": "Bias can feel like conviction until the market charges interest on it.",
+          "chapter_outcome": "The reader will internalize adaptive discipline, reduce ego-driven error, and prioritize volatility-state over opinion-state.",
+          "source_basis": [
+            "alma-teachings/substack/unknown-date-my-basic-trading-principles-pt-1-strategies-basic-risk-manag.md",
+            "alma-teachings/substack/unknown-date-near-term-outlook-free-education-about-principles-risk-windo.md",
+            "alma-teachings/substack/unknown-date-my-trading-principles-pt-2-the-wall-street-casino-and-my-sto.md",
+            "alma-teachings/substack/unknown-date-game-of-probabilities.md"
+          ],
+          "sections": [
+            {
+              "section_number": 15.1,
+              "section": "Ego in trading",
+              "mission": "Identify psychological attachment as a primary source of structural trading error.",
+              "tags": ["ego", "bias", "psychology", "cognitive distortion"],
+              "content": {
+                "narrative": "Ego turns analysis into identity defense. Once that happens, new evidence is treated as threat instead of information. Alma's discipline is to keep self-worth separate from trade outcome.",
+                "key_insight": "Ego cost compounds faster than slippage cost.",
+                "trading_implication": "Use written invalidation to force objective exits when thesis fails."
+              }
+            },
+            {
+              "section_number": 15.2,
+              "section": "Framework switching",
+              "mission": "Encourage adaptive thinking when volatility regimes shift.",
+              "tags": ["adaptability", "regime shift", "mental flexibility"],
+              "content": {
+                "narrative": "Frameworks are tools, not tribes. Regime shifts require switching from trend logic to reversion logic, from expansion logic to preservation logic. Alma's process makes switching explicit to avoid silent drift.",
+                "key_insight": "Adaptive switching is evidence-driven, not mood-driven.",
+                "trading_implication": "Define regime-switch criteria in advance and trigger strategy changes mechanically."
+              }
+            },
+            {
+              "section_number": 15.3,
+              "section": "Be like water",
+              "mission": "Promote fluid probabilistic thinking aligned with structural flow changes.",
+              "tags": ["fluidity", "discipline", "adaptive trading"],
+              "content": {
+                "narrative": "Fluidity means staying principled without staying rigid. You keep risk rules fixed while allowing directional and tactical expression to evolve with state. That is the practical meaning of adaptive consistency in Alma's teaching style.",
+                "key_insight": "Flexibility is strongest when anchored by stable risk principles.",
+                "trading_implication": "Keep risk constants fixed and let directional bias remain conditional."
+              }
+            },
+            {
+              "section_number": 15.4,
+              "section": "Volatility first, opinion second",
+              "mission": "Conclude with the principle that structural volatility analysis must override personal bias.",
+              "tags": ["volatility primacy", "structure over opinion", "risk discipline"],
+              "content": {
+                "narrative": "The final discipline is ordering: volatility state first, personal opinion second. This single priority prevents many preventable errors because it forces the trader to respect market mechanics before narrative preference. Alma's whole framework closes here by design.",
+                "key_insight": "Correct ordering of inputs is itself an edge.",
+                "trading_implication": "Before every trade, confirm volatility-state alignment; if absent, reduce size or pass."
+              }
+            }
+          ],
+          "transition_vector": "Book closure transitions to implementation playbooks and recurring decision loops for live market operation."
+        }
+      ],
+      "navigation_index": {
+        "part_slug": "part-v-the-trader-mind",
+        "chapter_slugs": [
+          "ch-13-the-wall-street-casino",
+          "ch-14-probability-over-prediction",
+          "ch-15-do-not-marry-a-side"
+        ],
+        "reference_expansion_pool": [
+          "alma-teachings/substack/unknown-date-game-of-probabilities.md",
+          "alma-teachings/substack/unknown-date-the-concept-of-risk-var-beta-sharpe-sortino-etc.md",
+          "alma-teachings/substack/unknown-date-my-trading-principles-pt-2-the-wall-street-casino-and-my-sto.md"
+        ]
+      }
+    }
+  ],
+  "quick_navigation": {
+    "primary_topics": [
+      "crisis-breakpoints",
+      "managed-stability",
+      "risk-asymmetry",
+      "probabilistic-discipline",
+      "bias-control"
+    ],
+    "openclaw_hint": "Use chapter_slugs and section_number as deterministic retrieval keys before semantic expansion."
+  },
+  "context_expansion_pack": {
+    "chapter_11": {
+      "crisis_sequence_fragments": [
+        "alma-teachings/substack/unknown-date-window-of-risk-disbalance-investigating-the-story-that-the-m.md",
+        "alma-teachings/substack/unknown-date-window-of-risk-has-just-opened-weekly-post-22-26-sept.md",
+        "alma-teachings/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md",
+        "alma-teachings/substack/unknown-date-accumulating-risk-intraday-post-16-oct.md",
+        "alma-teachings/substack/2025-01-29-window-of-risk-pt-2-flows-update.md"
+      ],
+      "execution_prompts": [
+        "Show where architecture looked stable before breakpoints activated.",
+        "Map one full if-then chain from first stress sign to downside acceleration.",
+        "Name what evidence invalidates each branch to prevent thesis lock-in."
+      ]
+    },
+    "chapter_12": {
+      "managed_stability_fragments": [
+        "alma-teachings/substack/unknown-date-vol-selling-intraday-post-03-june.md",
+        "alma-teachings/substack/unknown-date-vix-downside-vomma-risk-remember-intraday-post-03-july.md",
+        "alma-teachings/substack/unknown-date-opex-gaps-downside-risk-bulls-intraday-post-20-nov.md",
+        "alma-teachings/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md",
+        "alma-teachings/substack/unknown-date-expectations-in-short-institutional-support-intraday-post-24.md"
+      ],
+      "de-risking_prompts": [
+        "Contrast calm-regime leverage build vs stress-regime unwind speed.",
+        "Explain one pathway from suppression to cascade without headline shock.",
+        "Include execution-quality implications during liquidity thinning."
+      ]
+    },
+    "chapter_13_to_15": {
+      "mindset_fragments": [
+        "alma-teachings/substack/unknown-date-the-concept-of-risk-var-beta-sharpe-sortino-etc.md",
+        "alma-teachings/substack/unknown-date-my-basic-trading-principles-pt-1-strategies-basic-risk-manag.md",
+        "alma-teachings/substack/unknown-date-my-trading-principles-pt-2-the-wall-street-casino-and-my-sto.md",
+        "alma-teachings/substack/unknown-date-game-of-probabilities.md",
+        "alma-teachings/substack/unknown-date-near-term-outlook-free-education-about-principles-risk-windo.md"
+      ],
+      "discipline_prompts": [
+        "Translate each mindset claim into one concrete pre-trade behavior.",
+        "Differentiate confidence from expectancy with one numerical example.",
+        "Force explicit invalidation behavior for bias-control sections."
+      ]
+    },
+    "global_reference_nodes": [
+      "alma-teachings/bible/_manifest/manifest.json",
+      "alma-teachings/bible/mappings/book-sections.json",
+      "alma-teachings/bible/corpus/substack/docs.json",
+      "alma-teachings/bible/index.json"
+    ],
+    "cross_part_density_rules": {
+      "minimum_case_anchors_per_chapter": 3,
+      "minimum_distinct_sources_per_chapter": 8,
+      "minimum_operator_rules_per_chapter": 3,
+      "avoid_generic_motivation_language": true
+    }
+  },
+  "synthesis_metadata": {
+    "last_updated": "2026-03-02T22:18:33Z",
+    "updated_by": "Pyxis (Strategist)",
+    "status": "Synthesis-Ready"
+  }
+}

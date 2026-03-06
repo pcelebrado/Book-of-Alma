@@ -1,0 +1,1348 @@
+{
+  "book_title": "Nate Alma Options Trading (Working Title)",
+  "target_word_count": 80000,
+  "current_word_count": 73501,
+  "chapters": [
+    {
+      "chapter_id": "CH01",
+      "title": "Why Fundamentals Mislead",
+      "status": "revision",
+      "current_revision": 5,
+      "word_count": 5860,
+      "reviews": [
+        {
+          "review_id": "CH01_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "FAIL",
+          "severity": "HIGH",
+          "blockers_count": 4,
+          "findings_count": 8
+        },
+        {
+          "review_id": "CH01_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH01_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 3
+        },
+        {
+          "review_id": "CH01_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 2,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH01_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH01_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 3
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Missing explicit risk disclosure",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Uses Alma-style principles without Bible trace",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Oversimplified / potentially incorrect vanna-gamma causality",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Specific 2025 event/level claims lack sourcing",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+2500-4000 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-my-basic-trading-principles-pt-1-strategies-basic-risk-manag.md",
+            "bible/corpus/substack/2025-01-29-april-s-performance-review.md",
+            "bible/corpus/substack/2025-01-29-theory-of-reflexivity-by-george-soros.md",
+            "bible/corpus/substack/unknown-date-weekly-post-10-14-march.md"
+          ]
+        },
+        {
+          "issue": "Unsourced '48-hour rule' heuristic must be cited or reframed as author synthesis",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Regime triggers (VIX term structure inversion/dispersion) need Bible anchors or softer language",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing Bible citations for two direct Alma quotes from April performance review",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-april-s-performance-review.md"
+          ]
+        },
+        {
+          "issue": "Alma-attributed bond-market and narrative-tracking behavior needs citation or reframing",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md",
+            "bible/corpus/substack/2025-01-29-april-s-performance-review.md"
+          ]
+        },
+        {
+          "issue": "Correlation/dispersion interpretation reversed in regime-shift indicators",
+          "status": "open",
+          "bible_refs": []
+        },
+        {
+          "issue": "Overconfident dealer-flow statements need explicit conditionality",
+          "status": "open",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-my-basic-trading-principles-pt-1-strategies-basic-risk-manag.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH02",
+      "title": "The Volatility Framework",
+      "status": "revision",
+      "current_revision": 6,
+      "word_count": 8208,
+      "reviews": [
+        {
+          "review_id": "CH02_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 2,
+          "findings_count": 6
+        },
+        {
+          "review_id": "CH02_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH02_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 4
+        },
+        {
+          "review_id": "CH02_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 1,
+          "findings_count": 1
+        },
+        {
+          "review_id": "CH02_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 1
+        },
+        {
+          "review_id": "CH02_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH02_CRITIQUE_20260306_04",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 1,
+          "findings_count": 2
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Missing Bible citation for 'real velocity' volatility definition",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-what-is-volatility.md"
+          ]
+        },
+        {
+          "issue": "Vol-control/CTA mechanics presented without caveats/constraints",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-what-is-volatility.md",
+            "bible/corpus/substack/2025-01-29-educational-thread-chat.md",
+            "bible/corpus/substack/unknown-date-vol-higher-lows-weekly-post-23-27-june.md"
+          ]
+        },
+        {
+          "issue": "Alma attribution discipline: 'method' and aphorisms need citations or reframing",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Vol-control/CTA multiplier section needs Bible anchor or explicit non-Alma labeling",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Evidence drift: educational-thread chat corpus capture is header-only; citations must be removed/replaced",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-educational-thread-chat.md",
+            "bible/corpus/substack/unknown-date-a-guide-to-reading-my-daily-posts.md",
+            "bible/corpus/substack/unknown-date-fed-distribution-revision-of-weekly-post-intraday-post-25-ju.md"
+          ]
+        },
+        {
+          "issue": "Short-gamma hedging direction error in high-vol case study (must be procyclical: sell as spot falls)",
+          "status": "open",
+          "bible_refs": []
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH03",
+      "title": "Liquidity Is Everything",
+      "status": "passed",
+      "current_revision": 5,
+      "word_count": 7101,
+      "reviews": [
+        {
+          "review_id": "CH03_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 3,
+          "findings_count": 8
+        },
+        {
+          "review_id": "CH03_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH03_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 3
+        },
+        {
+          "review_id": "CH03_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 3
+        },
+        {
+          "review_id": "CH03_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "March 2025 spot-decay narrative and 'insiders' claims need Bible citation + epistemic labeling",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md",
+            "bible/corpus/substack/2025-01-29-intraday-post-28-feb.md",
+            "bible/corpus/substack/unknown-date-weekly-post-17-21-march.md"
+          ]
+        },
+        {
+          "issue": "May 2025 swap-spread numbers and bond-market causality need Bible citation",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md"
+          ]
+        },
+        {
+          "issue": "June 2025 'admin won't let this market crash' claim not traceable to Bible corpus",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing explicit risk disclosure despite prescriptive hedging/sizing content",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md",
+            "bible/corpus/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md"
+          ]
+        },
+        {
+          "issue": "Hedging table needs explicit constraints and non-advice framing",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Wrong Bible citation for 'synthetic dealer short vomma' quote; must cite correct corpus file",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md",
+            "bible/corpus/substack/2025-01-29-window-of-risk-pt-2-flows-update.md"
+          ]
+        },
+        {
+          "issue": "Alma attribution discipline: remove unsourced Alma-phrasing claims (e.g., 'Suppression is not resolution')",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH04",
+      "title": "Gamma: The Market's Gravity",
+      "status": "passed",
+      "current_revision": 4,
+      "word_count": 5044,
+      "reviews": [
+        {
+          "review_id": "CH04_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "FAIL",
+          "severity": "CRITICAL",
+          "blockers_count": 3,
+          "findings_count": 9
+        },
+        {
+          "review_id": "CH04_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH04_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 5
+        },
+        {
+          "review_id": "CH04_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 3
+        },
+        {
+          "review_id": "CH04_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Black-Scholes gamma formula is incorrect (will miseducate readers)",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Specific Feb/March 2025 gamma flip/pinning claims need Bible citations",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-intraday-post-28-feb.md",
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md"
+          ]
+        },
+        {
+          "issue": "Needs clear distinction: option gamma vs dealer net gamma positioning",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-intraday-post-28-feb.md",
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md",
+            "bible/corpus/substack/unknown-date-liquidity-structure-let-s-put-speed-profile-into-context.md",
+            "bible/corpus/substack/unknown-date-weekly-post-24-28-march.md"
+          ]
+        },
+        {
+          "issue": "Alma attribution discipline: 'intraday framing' bullet playbooks need citations or reframing",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-liquidity-structure-let-s-put-speed-profile-into-context.md"
+          ]
+        },
+        {
+          "issue": "March 2025 OpEx positioning/pinning explanation is uncited (long vanna/short charm/long color; near-zero negative speed)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-weekly-post-24-28-march.md"
+          ]
+        },
+        {
+          "issue": "Case study 4.9 invents trade-construction claims not supported by Bible corpus source (truncated March 26 post)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-intraday-post-26-march-vol-comparsion-long-gamma-trade.md"
+          ]
+        },
+        {
+          "issue": "Incorrect/overstated mapping of 'long vanna' to spot/vol correlation introduced in CH04",
+          "status": "resolved",
+          "bible_refs": []
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH05",
+      "title": "Vanna and Speed Profiles",
+      "status": "passed",
+      "current_revision": 4,
+      "word_count": 5305,
+      "reviews": [
+        {
+          "review_id": "CH05_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 3,
+          "findings_count": 7
+        },
+        {
+          "review_id": "CH05_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH05_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 4,
+          "findings_count": 4
+        },
+        {
+          "review_id": "CH05_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "FAIL",
+          "severity": "CRITICAL",
+          "blockers_count": 1,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH05_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "JPM collar case-study quotes/claims need Bible citation",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-bottom-jpm-collar-opex-systematics-intraday-post-14-march.md",
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md"
+          ]
+        },
+        {
+          "issue": "Vanna sign/flow mapping needs explicit conditioning (dealer positioning, vol direction) and/or Bible citation",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Aug 29 2025 vomma/vvol numeric example needs Bible citation",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-vomma-supply-short-vanna-risk-intraday-post-29-aug.md"
+          ]
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-opex-flows-supportive-or-suppressive-vanna-charm-intraday-po.md",
+            "bible/corpus/substack/unknown-date-the-risk-of-vanna-regime-shift-trades-tariffs-deadline-intra.md",
+            "bible/corpus/substack/unknown-date-vomma-supply-short-vanna-risk-intraday-post-29-aug.md"
+          ]
+        },
+        {
+          "issue": "JPM collar case-study citation is not verifiable in local corpus (March 14 file is header-only); must replace or reframe",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-theta-decay-when-will-vol-come-back-intraday-post-30-june-wi.md",
+            "bible/corpus/substack/unknown-date-weekly-post-24-28-march.md"
+          ]
+        },
+        {
+          "issue": "Alma attribution discipline: multiple 'Alma warns/frames' claims need adjacent citations or reframing",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-liquidity-structure-let-s-put-speed-profile-into-context.md",
+            "bible/corpus/substack/unknown-date-opex-flows-supportive-or-suppressive-vanna-charm-intraday-po.md"
+          ]
+        },
+        {
+          "issue": "Missing sign conventions/conditioning for vanna and speed flow mapping (risk of miseducation)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-opex-flows-supportive-or-suppressive-vanna-charm-intraday-po.md"
+          ]
+        },
+        {
+          "issue": "Vanna sign convention and 2x2 hedge-flow table contradict Alma's Sept 18 OpEx flows explanation (reader-harm risk)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-opex-flows-supportive-or-suppressive-vanna-charm-intraday-po.md"
+          ]
+        }
+      ]
+    }
+    ,
+      {
+        "chapter_id": "CH06",
+        "title": "Charm, Color and Dealer Hedging",
+        "status": "passed",
+        "current_revision": 5,
+        "word_count": 4905,
+        "reviews": [
+        {
+          "review_id": "CH06_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 3,
+          "findings_count": 7
+        },
+        {
+          "review_id": "CH06_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH06_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH06_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 4
+        },
+          {
+            "review_id": "CH06_CRITIQUE_20260306_02",
+            "date": "2026-03-06",
+            "verdict": "FAIL",
+            "severity": "HIGH",
+            "blockers_count": 2,
+            "findings_count": 3
+          },
+          {
+            "review_id": "CH06_CRITIQUE_20260306_03",
+            "date": "2026-03-06",
+            "verdict": "PARTIAL",
+            "severity": "MEDIUM",
+            "blockers_count": 1,
+            "findings_count": 1
+          },
+          {
+            "review_id": "CH06_CRITIQUE_20260306_04",
+            "date": "2026-03-06",
+            "verdict": "PASS",
+            "severity": "LOW",
+            "blockers_count": 0,
+            "findings_count": 0
+          }
+        ],
+        "blockers": [
+        {
+          "issue": "Mixes theta, charm, and color without precise definitions",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "June 30, 2025 and June 16, 2025 claims need Bible citations",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-theta-decay-when-will-vol-come-back-intraday-post-30-june-wi.md",
+            "bible/corpus/substack/unknown-date-important-trading-advice-intraday-post-16-june.md"
+          ]
+        },
+        {
+          "issue": "Shadow-Greek / chain-weighting claim needs Bible citation (Sept 2025 OpEx flows)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-opex-flows-pt-2-intraday-post-19-sept.md"
+          ]
+        },
+        {
+          "issue": "Missing explicit risk disclosure despite options tactics mentioned",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-important-trading-advice-intraday-post-16-june.md",
+            "bible/corpus/substack/unknown-date-opex-flows-pt-2-intraday-post-19-sept.md",
+            "bible/corpus/substack/2025-01-29-intraday-post-28-feb.md"
+          ]
+        },
+        {
+          "issue": "Evidence drift: June 30 'theta decay' post cited for claims not present in local corpus capture; must remove or source",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-theta-decay-when-will-vol-come-back-intraday-post-30-june-wi.md"
+          ]
+        },
+        {
+          "issue": "Color (dGamma/dTime) is defined but not taught/operationalized; needs Bible-anchored example",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-intraday-post-28-feb.md"
+          ]
+        },
+        {
+          "issue": "Alma attribution discipline failure: unsourced 'Alma's framework/process/warning' claims throughout CH06",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-important-trading-advice-intraday-post-16-june.md",
+            "bible/corpus/substack/unknown-date-opex-flows-pt-2-intraday-post-19-sept.md"
+          ]
+        },
+        {
+          "issue": "Interpretive hedging-flow narratives exceed evidence in truncated Bible captures; must be constrained or labeled author synthesis",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-opex-week-fomc-risk-of-reversion-weekly-post-15-19-sept.md",
+            "bible/corpus/substack/unknown-date-september-monthly-weekly-post-02-05-sept.md",
+            "bible/corpus/substack/2025-01-29-appendix-for-today-s-intraday-post.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH07",
+      "title": "The Intraday Playbook",
+      "status": "passed",
+      "current_revision": 6,
+      "word_count": 5669,
+      "reviews": [
+        {
+          "review_id": "CH07_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 2,
+          "findings_count": 6
+        },
+        {
+          "review_id": "CH07_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 1
+        },
+        {
+          "review_id": "CH07_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH07_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 1
+        },
+        {
+          "review_id": "CH07_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 1,
+          "findings_count": 1
+        },
+        {
+          "review_id": "CH07_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Multiple dated examples and direct Alma advice need Bible citations",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-post-cpi-spx-to-yields-beta-flip-intraday-post-12-june.md",
+            "bible/corpus/substack/unknown-date-intraday-post-26-march-vol-comparsion-long-gamma-trade.md",
+            "bible/corpus/substack/unknown-date-vomma-supply-short-vanna-risk-intraday-post-29-aug.md",
+            "bible/corpus/substack/unknown-date-important-trading-advice-intraday-post-16-june.md"
+          ]
+        },
+        {
+          "issue": "Needs one explicit 'not a crystal ball' + sizing/risk budget reminder near Trading Implications",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing explicit risk disclosure despite intraday tactics/playbook",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-important-trading-advice-intraday-post-16-june.md",
+            "bible/corpus/substack/unknown-date-post-cpi-spx-to-yields-beta-flip-intraday-post-12-june.md",
+            "bible/corpus/substack/unknown-date-vomma-supply-short-vanna-risk-intraday-post-29-aug.md",
+            "bible/corpus/substack/unknown-date-intraday-post-26-march-vol-comparsion-long-gamma-trade.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH08",
+      "title": "Geopolitics and Volatility Regimes",
+      "status": "passed",
+      "current_revision": 4,
+      "word_count": 4911,
+      "reviews": [
+        {
+          "review_id": "CH08_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 9
+        },
+        {
+          "review_id": "CH08_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH08_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH08_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Multiple quoted Alma claims require Bible citations (April 2025 geo weekly post)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-bonds-currency-market-sentiment-education-and-study-on-crise.md"
+          ]
+        },
+        {
+          "issue": "Macro statistics (ISM prices paid etc.) require sourcing (May 6, 2025 post)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md"
+          ]
+        },
+        {
+          "issue": "De-dollarization/term-premium/correlation/BIS references need explicit sources or must be softened",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing explicit risk disclosure despite trading implications",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-bonds-currency-market-sentiment-education-and-study-on-crise.md",
+            "bible/corpus/substack/unknown-date-ahead-of-fomc-pt-2-heading-into-a-liquidity-crisis-intraday-.md",
+            "bible/corpus/substack/unknown-date-cpi-credit-spreads-stagflation-qt-intraday-post-13-may.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH09",
+      "title": "Financing the Bubble",
+      "status": "passed",
+      "current_revision": 5,
+      "word_count": 6857,
+      "reviews": [
+        {
+          "review_id": "CH09_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 8
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 4,
+          "findings_count": 4
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 5,
+          "findings_count": 5
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 5,
+          "findings_count": 5
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260306_04",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH09_CRITIQUE_20260306_05",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "AI bubble quotes/claims need Bible citation (Challenges of 2026 / performance review)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-challenges-of-2026.md",
+            "bible/corpus/substack/2025-01-29-warsh-gold-sentiment-weekly-post-02-06-feb.md"
+          ]
+        },
+        {
+          "issue": "Hidden QE / Bessent put / QT cap numbers require Bible citations",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+            "bible/corpus/substack/unknown-date-fomc-day-bessent-put-hidden-qe-intraday-post-18-june.md"
+          ]
+        },
+        {
+          "issue": "Several macro-mechanism claims are asserted without evidence; needs qualifiers or sources",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Citations are present but do not resolve to explicit Bible corpus paths; must convert to bible/corpus/substack/* references",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-challenges-of-2026.md",
+            "bible/corpus/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+            "bible/corpus/substack/unknown-date-fomc-day-bessent-put-hidden-qe-intraday-post-18-june.md"
+          ]
+        },
+        {
+          "issue": "Missing explicit risk disclosure despite trading implications",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "AI bubble quote attribution uses unsupported Bible file capture; must cite correct file or reframe",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-articles-predictions-education.md",
+            "bible/corpus/substack/2025-01-29-january-opex-week-quant-breakdown-weekly-post-12-16-jan-free.md",
+            "bible/corpus/substack/unknown-date-the-challenges-of-2026.md"
+          ]
+        },
+        {
+          "issue": "Unsourced Alma quotes (credit toolset; earnings durability) must be cited or rewritten as author synthesis",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-central-banks-tariffs-market-weekly-post-07-11-april.md"
+          ]
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+3000-4500 words)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-fomc-day-bessent-put-hidden-qe-intraday-post-18-june.md",
+            "bible/corpus/substack/unknown-date-the-bessent-put-spy-yields-correlation-hidden-qe.md",
+            "bible/corpus/substack/unknown-date-central-banks-tariffs-market-weekly-post-07-11-april.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH10",
+      "title": "The Hidden Left Tail",
+      "status": "passed",
+      "current_revision": 3,
+      "word_count": 5063,
+      "reviews": [
+        {
+          "review_id": "CH10_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 9
+        },
+        {
+          "review_id": "CH10_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH10_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH10_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Multiple numeric/quoted macro claims need Bible citations (term premium, swap spreads, synthetic short vomma quote)",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md",
+            "bible/corpus/substack/unknown-date-window-of-risk-updated-intraday-post-30-oct.md",
+            "bible/corpus/substack/unknown-date-cpi-credit-spreads-stagflation-qt-intraday-post-13-may.md"
+          ]
+        },
+        {
+          "issue": "Tail-hedge guidance needs sizing/carry guardrails (avoid perpetual bleed advice)",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing operational proxy list for term premium / credit saturation / kurtosis expansion signals",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Bible traceability failure: untraceable Alma quote must be removed/replaced",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-the-risk-is-in-the-bond-market-intraday-post-23-may.md"
+          ]
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+1500-3000 words)",
+          "status": "resolved",
+          "bible_refs": []
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH14",
+      "title": "Probability Over Prediction",
+      "status": "passed",
+      "current_revision": 2,
+      "word_count": 3270,
+      "reviews": [
+        {
+          "review_id": "CH14_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "FAIL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 10
+        },
+        {
+          "review_id": "CH14_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH14_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 3,
+          "findings_count": 3
+        },
+        {
+          "review_id": "CH14_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Incorrect expectancy claim (60% win rate at 1:1 is not zero before costs; math needs correction)",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Multiple assertions attributed to Alma without Bible sourcing (conditional trees, scenario stacking, WoR usage)",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Position sizing formula is oversimplified; must add assumptions and options-specific caveats",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing explicit risk disclosure",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Alma attribution discipline failure: remove/cite all 'Alma framework' process claims",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+2000-3500 words)",
+          "status": "resolved",
+          "bible_refs": []
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH15",
+      "title": "Do Not Marry a Side",
+      "status": "passed",
+      "current_revision": 4,
+      "word_count": 5140,
+      "reviews": [
+        {
+          "review_id": "CH15_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 2,
+          "findings_count": 7
+        },
+        {
+          "review_id": "CH15_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH15_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH15_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 1,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH15_CRITIQUE_20260306_03",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "HIGH",
+          "blockers_count": 2,
+          "findings_count": 3
+        },
+        {
+          "review_id": "CH15_CRITIQUE_20260306_04",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Repeatedly attributes psychological doctrines to Alma without Bible trace; must source or reframe as author synthesis",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Needs tighter linkage to volatility/microstructure (currently generic trading-psychology in places)",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Missing explicit risk disclosure",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+2000-3500 words)",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Bible traceability: Alma-attributed claims/quotes must be cited or reframed as author synthesis",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/unknown-date-opex-flows-supportive-or-suppressive-vanna-charm-intraday-po.md",
+            "bible/corpus/substack/unknown-date-my-basic-trading-principles-pt-1-strategies-basic-risk-manag.md"
+          ]
+        },
+        {
+          "issue": "Hypothetical composite vignettes still include specific historical dates; must remove dates or cite specific episodes",
+          "status": "resolved",
+          "bible_refs": [
+            "bible/corpus/substack/2025-01-29-intraday-post-28-feb.md",
+            "bible/corpus/substack/unknown-date-weekly-post-24-28-march.md",
+            "bible/corpus/substack/unknown-date-opex-flows-supportive-or-suppressive-vanna-charm-intraday-po.md"
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "chapter_id": "CH16",
+      "title": "The Trader Mind",
+      "status": "passed",
+      "current_revision": 3,
+      "word_count": 5063,
+      "reviews": [
+        {
+          "review_id": "CH16_CRITIQUE_20260305",
+          "date": "2026-03-05",
+          "verdict": "FAIL",
+          "severity": "CRITICAL",
+          "blockers_count": 4,
+          "findings_count": 10
+        },
+        {
+          "review_id": "CH16_CRITIQUE_20260305_02",
+          "date": "2026-03-05",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 2
+        },
+        {
+          "review_id": "CH16_CRITIQUE_20260305_03",
+          "date": "2026-03-05",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        },
+        {
+          "review_id": "CH16_CRITIQUE_20260306_01",
+          "date": "2026-03-06",
+          "verdict": "PARTIAL",
+          "severity": "MEDIUM",
+          "blockers_count": 1,
+          "findings_count": 1
+        },
+        {
+          "review_id": "CH16_CRITIQUE_20260306_02",
+          "date": "2026-03-06",
+          "verdict": "PASS",
+          "severity": "LOW",
+          "blockers_count": 0,
+          "findings_count": 0
+        }
+      ],
+      "blockers": [
+        {
+          "issue": "Not in chapter form; reads like internal synthesis memo (date/purpose metadata) and breaks book voice",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Large list of principles contains unsourced Alma aphorisms; must cite Bible or reframe",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Daily playbook includes prescriptive advice without explicit risk disclosure and sizing constraints",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Contains internal structural claims (Parts I-V summaries) that may contradict earlier chapters unless verified",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Contains residual unsourced Alma attributions (e.g., 'Alma's framework emphasizes...' without Bible reference) that contradicts its own sourcing rule",
+          "status": "resolved",
+          "bible_refs": []
+        },
+        {
+          "issue": "Chapter expansion required to meet 80k manuscript target (+2500-4000 words)",
+          "status": "resolved",
+          "bible_refs": []
+        }
+      ]
+    }
+  ],
+  "bible_coverage": {
+    "topics_covered": [
+      "fundamentals vs structure",
+      "voting vs weighing machine",
+      "bond market risk",
+      "volatility narrative",
+      "gamma definitions"
+    ],
+    "topics_pending": [
+      "vanna definitions",
+      "regime classification"
+    ]
+  },
+  "last_updated": "2026-03-06T12:00:00Z"
+}
