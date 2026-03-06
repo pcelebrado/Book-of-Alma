@@ -2183,6 +2183,24 @@ function gatewayProxyHeaders(req) {
   return { authorization: `Bearer ${OPENCLAW_GATEWAY_TOKEN}` };
 }
 
+function maybeBootstrapControlUiToken(req, res) {
+  if (!OPENCLAW_GATEWAY_TOKEN) return false;
+  if (req.method !== "GET") return false;
+  if (req.path.startsWith("/setup")) return false;
+  if (req.path === "/healthz" || req.path === "/setup/healthz") return false;
+  if (/\.[a-zA-Z0-9]+$/.test(req.path)) return false;
+
+  try {
+    const current = new URL(req.originalUrl || req.url || "/", "http://local");
+    if (current.searchParams.get("token")) return false;
+    current.searchParams.set("token", OPENCLAW_GATEWAY_TOKEN);
+    res.redirect(302, current.pathname + current.search);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function attachGatewayAuthHeaderWs(proxyReq, req) {
   if (!OPENCLAW_GATEWAY_TOKEN) return;
   const existing = req?.headers?.authorization || "";
@@ -2221,6 +2239,8 @@ app.use(requireDashboardAuth, async (req, res) => {
       return res.status(503).type("text/plain").send(hint);
     }
   }
+
+  if (maybeBootstrapControlUiToken(req, res)) return;
 
   attachGatewayAuthHeader(req);
   return proxy.web(req, res, {
