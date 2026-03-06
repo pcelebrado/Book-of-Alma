@@ -137,6 +137,10 @@ function isConfigured() {
 
 let gatewayProc = null;
 let gatewayStarting = null;
+let gatewayDesired = false;
+let gatewayRestartTimer = null;
+let gatewayRestartAttempts = 0;
+let lastGatewayOutput = "";
 
 // Debug breadcrumbs for common Railway failures (502 / "Application failed to respond").
 let lastGatewayError = null;
@@ -146,6 +150,41 @@ let lastDoctorAt = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function appendGatewayOutput(stream, chunk) {
+  const text = String(chunk || "");
+  if (!text) return;
+  const stamped = `[${new Date().toISOString()}][${stream}] ${text}`;
+  lastGatewayOutput += stamped;
+  if (lastGatewayOutput.length > 80_000) {
+    lastGatewayOutput = lastGatewayOutput.slice(-80_000);
+  }
+}
+
+function clearGatewayRestartTimer() {
+  if (!gatewayRestartTimer) return;
+  clearTimeout(gatewayRestartTimer);
+  gatewayRestartTimer = null;
+}
+
+function scheduleGatewayRestart(reason) {
+  if (!gatewayDesired || gatewayRestartTimer || !isConfigured()) return;
+
+  const delayMs = Math.min(15_000, 1_000 * 2 ** Math.min(gatewayRestartAttempts, 4));
+  gatewayRestartAttempts += 1;
+
+  lastGatewayError = `[gateway] scheduling restart in ${delayMs}ms after ${reason}`;
+  gatewayRestartTimer = setTimeout(async () => {
+    gatewayRestartTimer = null;
+    try {
+      await ensureGatewayRunning();
+    } catch (err) {
+      lastGatewayError = `[gateway] auto-restart failed: ${String(err)}`;
+      scheduleGatewayRestart("failed restart");
+    }
+  }, delayMs);
+  gatewayRestartTimer.unref?.();
 }
 
 async function waitForGatewayReady(opts = {}) {
@@ -176,6 +215,8 @@ async function startGateway() {
   if (gatewayProc) return;
   if (!isConfigured()) throw new Error("Gateway cannot start: not configured");
 
+  clearGatewayRestartTimer();
+
   fs.mkdirSync(STATE_DIR, { recursive: true });
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
@@ -193,12 +234,31 @@ async function startGateway() {
   ];
 
   gatewayProc = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
-    stdio: "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
+      NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=1024",
       OPENCLAW_STATE_DIR: STATE_DIR,
       OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
     },
+  });
+
+  gatewayProc.stdout?.on("data", (chunk) => {
+    appendGatewayOutput("stdout", chunk);
+    try {
+      process.stdout.write(chunk);
+    } catch {
+      // ignore
+    }
+  });
+
+  gatewayProc.stderr?.on("data", (chunk) => {
+    appendGatewayOutput("stderr", chunk);
+    try {
+      process.stderr.write(chunk);
+    } catch {
+      // ignore
+    }
   });
 
   gatewayProc.on("error", (err) => {
@@ -206,6 +266,7 @@ async function startGateway() {
     console.error(msg);
     lastGatewayError = msg;
     gatewayProc = null;
+    scheduleGatewayRestart("spawn error");
   });
 
   gatewayProc.on("exit", (code, signal) => {
@@ -213,7 +274,27 @@ async function startGateway() {
     console.error(msg);
     lastGatewayExit = { code, signal, at: new Date().toISOString() };
     gatewayProc = null;
+    if (code === 0 || signal === "SIGTERM") {
+      gatewayRestartAttempts = 0;
+      return;
+    }
+    runDoctorBestEffort().catch(() => {});
+    scheduleGatewayRestart(`exit code=${code} signal=${signal}`);
   });
+}
+
+async function stopGateway({ disableDesired = true } = {}) {
+  if (disableDesired) gatewayDesired = false;
+  clearGatewayRestartTimer();
+
+  if (!gatewayProc) return;
+  try {
+    gatewayProc.kill("SIGTERM");
+  } catch {
+    // ignore
+  }
+  await sleep(750);
+  gatewayProc = null;
 }
 
 async function runDoctorBestEffort() {
@@ -232,7 +313,11 @@ async function runDoctorBestEffort() {
 }
 
 async function ensureGatewayRunning() {
-  if (!isConfigured()) return { ok: false, reason: "not configured" };
+  if (!isConfigured()) {
+    gatewayDesired = false;
+    return { ok: false, reason: "not configured" };
+  }
+  gatewayDesired = true;
   if (gatewayProc) return { ok: true };
   if (!gatewayStarting) {
     gatewayStarting = (async () => {
@@ -243,6 +328,7 @@ async function ensureGatewayRunning() {
         if (!ready) {
           throw new Error("Gateway did not become ready in time");
         }
+        gatewayRestartAttempts = 0;
       } catch (err) {
         const msg = `[gateway] start failure: ${String(err)}`;
         lastGatewayError = msg;
@@ -259,16 +345,7 @@ async function ensureGatewayRunning() {
 }
 
 async function restartGateway() {
-  if (gatewayProc) {
-    try {
-      gatewayProc.kill("SIGTERM");
-    } catch {
-      // ignore
-    }
-    // Give it a moment to exit and release the port.
-    await sleep(750);
-    gatewayProc = null;
-  }
+  await stopGateway({ disableDesired: false });
   return ensureGatewayRunning();
 }
 
@@ -676,11 +753,7 @@ app.post("/internal/openclaw/console/run", requireInternalApiAuth, async (req, r
       return res.json({ ok: true, output: "Gateway restarted (wrapper-managed).\n" });
     }
     if (cmd === "gateway.stop") {
-      if (gatewayProc) {
-        try { gatewayProc.kill("SIGTERM"); } catch {}
-        await sleep(750);
-        gatewayProc = null;
-      }
+      await stopGateway();
       return res.json({ ok: true, output: "Gateway stopped (wrapper-managed).\n" });
     }
     if (cmd === "gateway.start") {
@@ -918,11 +991,7 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
 app.post("/internal/openclaw/setup/reset", requireInternalApiAuth, async (_req, res) => {
   try {
     try {
-      if (gatewayProc) {
-        try { gatewayProc.kill("SIGTERM"); } catch {}
-        await sleep(750);
-        gatewayProc = null;
-      }
+      await stopGateway();
     } catch { /* ignore */ }
 
     const candidates = typeof resolveConfigCandidates === "function" ? resolveConfigCandidates() : [configPath()];
@@ -992,6 +1061,9 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
         gatewayRunning: Boolean(gatewayProc),
         lastGatewayError,
         lastGatewayExit,
+        gatewayDesired,
+        gatewayRestartAttempts,
+        lastGatewayOutput,
       },
       openclaw: {
         version: v.output.trim(),
@@ -1654,6 +1726,9 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
       gatewayTokenPersisted: fs.existsSync(path.join(STATE_DIR, "gateway.token")),
       lastGatewayError,
       lastGatewayExit,
+      gatewayDesired,
+      gatewayRestartAttempts,
+      lastGatewayOutput,
       lastDoctorAt,
       lastDoctorOutput,
       railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || null,
@@ -1745,11 +1820,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       return res.json({ ok: true, output: "Gateway restarted (wrapper-managed).\n" });
     }
     if (cmd === "gateway.stop") {
-      if (gatewayProc) {
-        try { gatewayProc.kill("SIGTERM"); } catch {}
-        await sleep(750);
-        gatewayProc = null;
-      }
+      await stopGateway();
       return res.json({ ok: true, output: "Gateway stopped (wrapper-managed).\n" });
     }
     if (cmd === "gateway.start") {
@@ -1901,11 +1972,7 @@ app.post("/setup/api/reset", requireSetupAuth, async (_req, res) => {
   try {
     // Stop gateway to avoid running gateway + onboard concurrently on small Railway instances.
     try {
-      if (gatewayProc) {
-        try { gatewayProc.kill("SIGTERM"); } catch {}
-        await sleep(750);
-        gatewayProc = null;
-      }
+      await stopGateway();
     } catch {
       // ignore
     }
@@ -2019,11 +2086,7 @@ app.post("/setup/import", requireSetupAuth, async (req, res) => {
     }
 
     // Stop gateway before restore so we don't overwrite live files.
-    if (gatewayProc) {
-      try { gatewayProc.kill("SIGTERM"); } catch {}
-      await sleep(750);
-      gatewayProc = null;
-    }
+    await stopGateway();
 
     const buf = await readBodyBuffer(req, 250 * 1024 * 1024); // 250MB max
     if (!buf.length) return res.status(400).type("text/plain").send("Empty body\n");
@@ -2129,6 +2192,7 @@ app.use(requireDashboardAuth, async (req, res) => {
         "Gateway not ready.",
         String(err),
         lastGatewayError ? `\n${lastGatewayError}` : "",
+        lastGatewayOutput ? "\nRecent gateway output (tail):\n" + lastGatewayOutput : "",
         "\nTroubleshooting:",
         "- Visit /setup and check the Debug Console",
         "- Visit /setup/api/debug for config + gateway diagnostics",
@@ -2238,11 +2302,7 @@ server.on("upgrade", async (req, socket, head) => {
 
 process.on("SIGTERM", () => {
   // Best-effort shutdown
-  try {
-    if (gatewayProc) gatewayProc.kill("SIGTERM");
-  } catch {
-    // ignore
-  }
+  stopGateway().catch(() => {});
 
   // Stop accepting new connections; allow in-flight requests to complete briefly.
   try {
