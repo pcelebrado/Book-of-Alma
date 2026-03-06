@@ -22,10 +22,11 @@ async function wakeCoreFromPublicEdge(requestId: string, route: string) {
       signal: wakeAbort.signal,
     });
 
-    await logSecurityEvent('core.wake_probe.sent', {
+    await logSecurityEvent('core.unavailable', {
       requestId,
       route,
       details: {
+        reason: 'wake_probe_sent',
         publicUrl,
       },
     });
