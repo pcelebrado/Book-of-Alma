@@ -1,16 +1,13 @@
 /**
  * NextAuth configuration for OpenClaw Web Service.
- * DECISION_197: MongoDB → SQLite migration.
- * User lookups now use SQLite repositories.
+ * DECISION_197 follow-up: auth verification is core-backed.
  */
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { getAuthSecret } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/logger';
-import { verifyPassword } from '@/lib/auth/session';
 import { CoreClientError, coreFetch } from '@/lib/core-client';
-import { users } from '@/lib/db/repositories';
 
 type Role = 'admin' | 'user';
 
@@ -57,45 +54,22 @@ export const {
         }
 
         try {
-          let user: AuthUser | null = null;
-          try {
-            const verified = await coreFetch<{
-              ok: boolean;
-              user?: AuthUser;
-            }, {
-              email: string;
-              password: string;
-            }>('/internal/web/auth/verify', {
-              method: 'POST',
-              body: {
-                email,
-                password,
-              },
-              rid: requestId ?? undefined,
-            });
-            user = verified.user ?? null;
-          } catch (error) {
-            if (error instanceof CoreClientError && error.statusCode === 401) {
-              user = null;
-            } else {
-              const local = users.findByEmail(email);
-              if (
-                local &&
-                verifyPassword(password, {
-                  password: local.password,
-                  passwordHash: local.password_hash,
-                })
-              ) {
-                users.updateLastLogin(local.id);
-                user = {
-                  id: local.id,
-                  email: local.email,
-                  name: local.name,
-                  role: local.role,
-                };
-              }
-            }
-          }
+          const verified = await coreFetch<{
+            ok: boolean;
+            user?: AuthUser;
+          }, {
+            email: string;
+            password: string;
+          }>('/internal/web/auth/verify', {
+            method: 'POST',
+            body: {
+              email,
+              password,
+            },
+            rid: requestId ?? undefined,
+          });
+
+          const user = verified.user ?? null;
 
           if (!user) {
             await logSecurityEvent('auth.login.fail', {

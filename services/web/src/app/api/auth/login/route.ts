@@ -1,6 +1,6 @@
 /**
  * POST /api/auth/login — Authenticate user.
- * DECISION_197: MongoDB → SQLite migration.
+ * DECISION_197 follow-up: login verification is core-backed.
  */
 import { AuthError } from 'next-auth';
 import type { NextRequest } from 'next/server';
@@ -8,7 +8,6 @@ import type { NextRequest } from 'next/server';
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
 import { signIn } from '@/lib/auth/auth-config';
 import { CoreClientError, coreFetch } from '@/lib/core-client';
-import { users } from '@/lib/db/repositories';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -105,17 +104,7 @@ export async function POST(request: NextRequest) {
       return apiError('invalid_credentials', 'Invalid email or password', 401);
     }
 
-    const local = users.findByEmail(email);
-    if (local) {
-      verifiedUser = {
-        id: local.id,
-        name: local.name,
-        email: local.email,
-        role: local.role,
-      };
-    } else {
-      return apiError('core_auth_unavailable', 'Unable to verify account with core service', 503);
-    }
+    return apiError('core_auth_unavailable', 'Unable to verify account with core service', 503);
   }
 
   if (!verifiedUser) {
