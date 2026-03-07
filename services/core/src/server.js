@@ -116,6 +116,8 @@ const WORKSPACE_QMD_SQLITE_LINK = path.join(WORKSPACE_DIR, "qmd-index.sqlite");
 const WORKSPACE_SQLITE_SOURCES_DOC = path.join(WORKSPACE_DIR, "SQLITE_SOURCES.md");
 const WEB_AUTH_STORE_PATH = path.join(STATE_DIR, "web-auth-users.json");
 const WEB_NOTES_STORE_PATH = path.join(STATE_DIR, "web-notes.json");
+const WEB_HIGHLIGHTS_STORE_PATH = path.join(STATE_DIR, "web-highlights.json");
+const WEB_BOOKMARKS_STORE_PATH = path.join(STATE_DIR, "web-bookmarks.json");
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -242,6 +244,65 @@ function writeWebNotes(notes) {
   const tempPath = `${WEB_NOTES_STORE_PATH}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
   fs.renameSync(tempPath, WEB_NOTES_STORE_PATH);
+}
+
+function readWebHighlights() {
+  try {
+    const raw = fs.readFileSync(WEB_HIGHLIGHTS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.highlights)) return [];
+    return parsed.highlights.filter((highlight) => highlight && typeof highlight === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebHighlights(highlights) {
+  fs.mkdirSync(path.dirname(WEB_HIGHLIGHTS_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    highlights,
+  };
+  const tempPath = `${WEB_HIGHLIGHTS_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_HIGHLIGHTS_STORE_PATH);
+}
+
+function normalizeHighlightRecord(highlight) {
+  return {
+    id: highlight.id,
+    user_id: highlight.user_id,
+    section_slug: highlight.section_slug,
+    anchor_id: highlight.anchor_id ?? null,
+    range_start: highlight.range_start,
+    range_end: highlight.range_end,
+    text: highlight.text,
+    color: highlight.color ?? "yellow",
+    note_id: highlight.note_id ?? null,
+    created_at: highlight.created_at,
+  };
+}
+
+function readWebBookmarks() {
+  try {
+    const raw = fs.readFileSync(WEB_BOOKMARKS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.bookmarks)) return [];
+    return parsed.bookmarks.filter((bookmark) => bookmark && typeof bookmark === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebBookmarks(bookmarks) {
+  fs.mkdirSync(path.dirname(WEB_BOOKMARKS_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    bookmarks,
+  };
+  const tempPath = `${WEB_BOOKMARKS_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_BOOKMARKS_STORE_PATH);
 }
 
 function normalizeNoteRecord(note) {
@@ -1017,6 +1078,97 @@ app.delete("/internal/web/notes/:id", requireInternalApiAuth, async (req, res) =
 
   writeWebNotes(next);
   return res.json({ ok: true });
+});
+
+app.post("/internal/web/highlights", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const body = req.body || {};
+  const sectionSlug = typeof body.sectionSlug === "string" ? body.sectionSlug.trim() : "";
+  const text = typeof body.text === "string" ? body.text : "";
+  const anchorId = typeof body.anchorId === "string" ? body.anchorId : null;
+  const color = typeof body.color === "string" ? body.color : "yellow";
+  const noteId = typeof body.noteId === "string" ? body.noteId : null;
+  const range = body.range && typeof body.range === "object" ? body.range : null;
+  const startOffset = Number.parseInt(String(range?.startOffset ?? ""), 10);
+  const endOffset = Number.parseInt(String(range?.endOffset ?? ""), 10);
+
+  if (!sectionSlug || !text || !Number.isFinite(startOffset) || !Number.isFinite(endOffset)) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "sectionSlug, text, and range are required",
+      },
+    });
+  }
+
+  const created = {
+    id: crypto.randomUUID(),
+    user_id: context.userId,
+    section_slug: sectionSlug,
+    anchor_id: anchorId,
+    range_start: startOffset,
+    range_end: endOffset,
+    text,
+    color,
+    note_id: noteId,
+    created_at: new Date().toISOString(),
+  };
+
+  const highlights = readWebHighlights();
+  highlights.push(created);
+  writeWebHighlights(highlights);
+
+  return res.json({
+    ok: true,
+    highlight: normalizeHighlightRecord(created),
+  });
+});
+
+app.post("/internal/web/bookmarks/toggle", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const body = req.body || {};
+  const sectionSlug = typeof body.sectionSlug === "string" ? body.sectionSlug.trim() : "";
+  const anchorId = typeof body.anchorId === "string" ? body.anchorId : null;
+
+  if (!sectionSlug) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "sectionSlug is required",
+      },
+    });
+  }
+
+  const bookmarks = readWebBookmarks();
+  const existingIndex = bookmarks.findIndex(
+    (bookmark) =>
+      bookmark.user_id === context.userId &&
+      bookmark.section_slug === sectionSlug &&
+      (bookmark.anchor_id ?? null) === (anchorId ?? null),
+  );
+
+  if (existingIndex >= 0) {
+    bookmarks.splice(existingIndex, 1);
+    writeWebBookmarks(bookmarks);
+    return res.json({ ok: true, bookmarked: false });
+  }
+
+  bookmarks.push({
+    id: crypto.randomUUID(),
+    user_id: context.userId,
+    section_slug: sectionSlug,
+    anchor_id: anchorId,
+    created_at: new Date().toISOString(),
+  });
+  writeWebBookmarks(bookmarks);
+
+  return res.json({ ok: true, bookmarked: true });
 });
 
 app.post("/internal/agent/run", requireInternalApiAuth, async (req, res) => {

@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { bookmarks } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,21 +27,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const existing = bookmarks.findOne(userId, body.sectionSlug, body.anchorId);
-    if (existing) {
-      bookmarks.delete(existing.id);
-      return Response.json({ bookmarked: false });
-    }
+    const result = await coreFetch<{ bookmarked: boolean }, ToggleBookmarkBody>(
+      '/internal/web/bookmarks/toggle',
+      {
+        method: 'POST',
+        uid: userId,
+        role: session.role,
+        body,
+      },
+    );
 
-    bookmarks.insert({
-      userId,
-      sectionSlug: body.sectionSlug,
-      anchorId: body.anchorId,
-    });
-
-    return Response.json({ bookmarked: true });
+    return Response.json({ bookmarked: result.bookmarked });
   } catch (error) {
-    console.error('[api/bookmarks/toggle][POST] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'sectionSlug is required', 400);
+    }
     return apiError('database_error', 'Unable to toggle bookmark', 503);
   }
 }
