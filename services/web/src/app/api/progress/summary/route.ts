@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
-import { readingProgress } from '@/lib/db/repositories';
+import { coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +17,27 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const docs = readingProgress.findByUser(userId, 10);
+    const result = await coreFetch<{
+      continue: {
+        id: string;
+        section_slug: string;
+        percent: number;
+        last_anchor_id: string | null;
+        updated_at: string;
+      } | null;
+      recent: Array<{
+        id: string;
+        section_slug: string;
+        percent: number;
+        last_anchor_id: string | null;
+        updated_at: string;
+      }>;
+    }>('/internal/web/progress/summary', {
+      uid: userId,
+      role: session.role,
+    });
 
-    const mapped = docs.map((doc) => ({
+    const mapped = result.recent.map((doc) => ({
       _id: doc.id,
       sectionSlug: doc.section_slug,
       percent: doc.percent,
@@ -28,7 +46,15 @@ export async function GET(request: NextRequest) {
     }));
 
     return Response.json({
-      continue: mapped[0] ?? null,
+      continue: result.continue
+        ? {
+            _id: result.continue.id,
+            sectionSlug: result.continue.section_slug,
+            percent: result.continue.percent,
+            lastAnchorId: result.continue.last_anchor_id ?? null,
+            updatedAt: result.continue.updated_at,
+          }
+        : null,
       recent: mapped,
     });
   } catch (error) {

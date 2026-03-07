@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { readingProgress } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,25 +28,36 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = readingProgress.upsert({
-      userId,
-      sectionSlug: body.sectionSlug,
-      percent: Math.max(0, Math.min(100, body.percent)),
-      lastAnchorId: body.lastAnchorId,
+    const result = await coreFetch<{ progress: {
+      id: string;
+      user_id: string;
+      section_slug: string;
+      percent: number;
+      last_anchor_id: string | null;
+      updated_at: string;
+    } }, ProgressBody>('/internal/web/progress', {
+      method: 'POST',
+      uid: userId,
+      role: session.role,
+      body,
     });
+
+    const progress = result.progress;
 
     return Response.json({
       progress: {
-        _id: result.id,
-        userId: result.user_id,
-        sectionSlug: result.section_slug,
-        percent: result.percent,
-        lastAnchorId: result.last_anchor_id,
-        updatedAt: result.updated_at,
+        _id: progress.id,
+        userId: progress.user_id,
+        sectionSlug: progress.section_slug,
+        percent: progress.percent,
+        lastAnchorId: progress.last_anchor_id,
+        updatedAt: progress.updated_at,
       },
     });
   } catch (error) {
-    console.error('[api/progress][POST] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'sectionSlug and percent are required', 400);
+    }
     return apiError('database_error', 'Unable to store progress', 503);
   }
 }

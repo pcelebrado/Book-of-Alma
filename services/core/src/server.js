@@ -118,6 +118,7 @@ const WEB_AUTH_STORE_PATH = path.join(STATE_DIR, "web-auth-users.json");
 const WEB_NOTES_STORE_PATH = path.join(STATE_DIR, "web-notes.json");
 const WEB_HIGHLIGHTS_STORE_PATH = path.join(STATE_DIR, "web-highlights.json");
 const WEB_BOOKMARKS_STORE_PATH = path.join(STATE_DIR, "web-bookmarks.json");
+const WEB_PROGRESS_STORE_PATH = path.join(STATE_DIR, "web-progress.json");
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -303,6 +304,39 @@ function writeWebBookmarks(bookmarks) {
   const tempPath = `${WEB_BOOKMARKS_STORE_PATH}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
   fs.renameSync(tempPath, WEB_BOOKMARKS_STORE_PATH);
+}
+
+function readWebProgress() {
+  try {
+    const raw = fs.readFileSync(WEB_PROGRESS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.progress)) return [];
+    return parsed.progress.filter((item) => item && typeof item === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebProgress(progress) {
+  fs.mkdirSync(path.dirname(WEB_PROGRESS_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    progress,
+  };
+  const tempPath = `${WEB_PROGRESS_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_PROGRESS_STORE_PATH);
+}
+
+function normalizeProgressRecord(item) {
+  return {
+    id: item.id,
+    user_id: item.user_id,
+    section_slug: item.section_slug,
+    percent: item.percent,
+    last_anchor_id: item.last_anchor_id ?? null,
+    updated_at: item.updated_at,
+  };
 }
 
 function normalizeNoteRecord(note) {
@@ -1169,6 +1203,81 @@ app.post("/internal/web/bookmarks/toggle", requireInternalApiAuth, async (req, r
   writeWebBookmarks(bookmarks);
 
   return res.json({ ok: true, bookmarked: true });
+});
+
+app.post("/internal/web/progress", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const body = req.body || {};
+  const sectionSlug = typeof body.sectionSlug === "string" ? body.sectionSlug.trim() : "";
+  const percentRaw = Number(body.percent);
+  const percent = Number.isFinite(percentRaw)
+    ? Math.max(0, Math.min(100, percentRaw))
+    : Number.NaN;
+  const lastAnchorId = typeof body.lastAnchorId === "string" ? body.lastAnchorId : null;
+
+  if (!sectionSlug || !Number.isFinite(percent)) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "sectionSlug and percent are required",
+      },
+    });
+  }
+
+  const items = readWebProgress();
+  const idx = items.findIndex(
+    (item) => item.user_id === context.userId && item.section_slug === sectionSlug,
+  );
+  const ts = new Date().toISOString();
+  let record;
+
+  if (idx >= 0) {
+    const next = {
+      ...items[idx],
+      percent,
+      last_anchor_id: lastAnchorId,
+      updated_at: ts,
+    };
+    items[idx] = next;
+    record = next;
+  } else {
+    const created = {
+      id: crypto.randomUUID(),
+      user_id: context.userId,
+      section_slug: sectionSlug,
+      percent,
+      last_anchor_id: lastAnchorId,
+      updated_at: ts,
+    };
+    items.push(created);
+    record = created;
+  }
+
+  writeWebProgress(items);
+  return res.json({
+    ok: true,
+    progress: normalizeProgressRecord(record),
+  });
+});
+
+app.get("/internal/web/progress/summary", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const rows = readWebProgress()
+    .filter((item) => item.user_id === context.userId)
+    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))
+    .slice(0, 10)
+    .map(normalizeProgressRecord);
+
+  return res.json({
+    ok: true,
+    continue: rows[0] ?? null,
+    recent: rows,
+  });
 });
 
 app.post("/internal/agent/run", requireInternalApiAuth, async (req, res) => {
