@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError, apiRateLimited } from '@/lib/api/response';
-import { playbooks } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 import { logSecurityEvent, writeAuditLog } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -45,14 +45,41 @@ export async function POST(
     return apiError('invalid_request', 'Invalid playbook id', 400);
   }
 
-  const ts = new Date().toISOString();
-  const updated = playbooks.update(playbookId, {
-    status: 'published',
-    publishedAt: ts,
-  });
-
-  if (!updated) {
-    return apiError('not_found', 'Playbook not found', 404);
+  let updated: {
+    id: string;
+    status: string;
+    title: string;
+    triggers: string;
+    checklist: string;
+    scenario_tree: string;
+    linked_sections: string;
+    tags: string;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+    published_at: string | null;
+  };
+  try {
+    const result = await coreFetch<{ playbook: typeof updated }>(
+      `/internal/web/playbooks/${encodeURIComponent(playbookId)}/publish`,
+      {
+        method: 'POST',
+        uid: session.id,
+        role: 'admin',
+      },
+    );
+    updated = result.playbook;
+  } catch (error) {
+    if (error instanceof CoreClientError && error.statusCode === 404) {
+      return apiError('not_found', 'Playbook not found', 404);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 403) {
+      return apiError('forbidden', 'Admin role required', 403);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'Invalid playbook id', 400);
+    }
+    return apiError('database_error', 'Unable to publish playbook', 503);
   }
 
   await writeAuditLog({

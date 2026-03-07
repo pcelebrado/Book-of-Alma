@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { playbooks } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,29 +39,26 @@ export async function PATCH(
   }
 
   try {
-    const existing = playbooks.findById(playbookId);
-    if (!existing) {
-      return apiError('not_found', 'Playbook not found', 404);
-    }
-
-    const ownerMatch = existing.created_by === userId;
-    if (!ownerMatch && !isAdmin(session)) {
-      return apiError('forbidden', 'Not allowed to edit this playbook', 403);
-    }
-
-    const updates: Record<string, unknown> = {};
-    if (typeof body.title === 'string') updates.title = body.title;
-    if (Array.isArray(body.triggers)) updates.triggers = body.triggers;
-    if (Array.isArray(body.checklist)) updates.checklist = body.checklist;
-    if (typeof body.scenarioTree === 'string') updates.scenarioTree = body.scenarioTree;
-    if (Array.isArray(body.linkedSections)) updates.linkedSections = body.linkedSections;
-    if (Array.isArray(body.tags)) updates.tags = body.tags;
-
-    const updated = playbooks.update(playbookId, updates);
-
-    if (!updated) {
-      return apiError('not_found', 'Playbook not found', 404);
-    }
+    const updatedResult = await coreFetch<{ playbook: {
+      id: string;
+      status: string;
+      title: string;
+      triggers: string;
+      checklist: string;
+      scenario_tree: string;
+      linked_sections: string;
+      tags: string;
+      created_by: string;
+      created_at: string;
+      updated_at: string;
+      published_at: string | null;
+    } }, UpdatePlaybookBody>(`/internal/web/playbooks/${encodeURIComponent(playbookId)}`, {
+      method: 'PATCH',
+      uid: userId,
+      role: isAdmin(session) ? 'admin' : 'user',
+      body,
+    });
+    const updated = updatedResult.playbook;
 
     return Response.json({
       playbook: {
@@ -80,7 +77,15 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error('[api/playbooks/:id][PATCH] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 404) {
+      return apiError('not_found', 'Playbook not found', 404);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 403) {
+      return apiError('forbidden', 'Not allowed to edit this playbook', 403);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'Invalid playbook id', 400);
+    }
     return apiError('database_error', 'Unable to update playbook', 503);
   }
 }

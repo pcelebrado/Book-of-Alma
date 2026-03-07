@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { playbooks } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,15 +31,26 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const playbook = playbooks.insert({
-      title: body.title,
-      triggers: body.triggers,
-      checklist: body.checklist,
-      scenarioTree: body.scenarioTree,
-      linkedSections: body.linkedSections,
-      tags: body.tags,
-      createdBy: userId,
+    const result = await coreFetch<{ playbook: {
+      id: string;
+      status: string;
+      title: string;
+      triggers: string;
+      checklist: string;
+      scenario_tree: string;
+      linked_sections: string;
+      tags: string;
+      created_by: string;
+      created_at: string;
+      updated_at: string;
+      published_at: string | null;
+    } }, DraftBody>('/internal/web/playbooks/draft', {
+      method: 'POST',
+      uid: userId,
+      role: session.role,
+      body,
     });
+    const playbook = result.playbook;
 
     return Response.json({
       playbook: {
@@ -57,7 +68,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[api/playbooks/draft][POST] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'title is required', 400);
+    }
     return apiError('database_error', 'Unable to create draft playbook', 503);
   }
 }

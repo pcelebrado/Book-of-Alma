@@ -119,6 +119,7 @@ const WEB_NOTES_STORE_PATH = path.join(STATE_DIR, "web-notes.json");
 const WEB_HIGHLIGHTS_STORE_PATH = path.join(STATE_DIR, "web-highlights.json");
 const WEB_BOOKMARKS_STORE_PATH = path.join(STATE_DIR, "web-bookmarks.json");
 const WEB_PROGRESS_STORE_PATH = path.join(STATE_DIR, "web-progress.json");
+const WEB_PLAYBOOKS_STORE_PATH = path.join(STATE_DIR, "web-playbooks.json");
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -336,6 +337,45 @@ function normalizeProgressRecord(item) {
     percent: item.percent,
     last_anchor_id: item.last_anchor_id ?? null,
     updated_at: item.updated_at,
+  };
+}
+
+function readWebPlaybooks() {
+  try {
+    const raw = fs.readFileSync(WEB_PLAYBOOKS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.playbooks)) return [];
+    return parsed.playbooks.filter((item) => item && typeof item === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebPlaybooks(playbooks) {
+  fs.mkdirSync(path.dirname(WEB_PLAYBOOKS_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    playbooks,
+  };
+  const tempPath = `${WEB_PLAYBOOKS_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_PLAYBOOKS_STORE_PATH);
+}
+
+function normalizePlaybookRecord(item) {
+  return {
+    id: item.id,
+    status: item.status,
+    title: item.title,
+    triggers: item.triggers ?? "[]",
+    checklist: item.checklist ?? "[]",
+    scenario_tree: item.scenario_tree ?? "",
+    linked_sections: item.linked_sections ?? "[]",
+    tags: item.tags ?? "[]",
+    created_by: item.created_by,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    published_at: item.published_at ?? null,
   };
 }
 
@@ -1277,6 +1317,235 @@ app.get("/internal/web/progress/summary", requireInternalApiAuth, async (req, re
     ok: true,
     continue: rows[0] ?? null,
     recent: rows,
+  });
+});
+
+app.get("/internal/web/playbooks", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const rows = readWebPlaybooks()
+    .filter((item) => {
+      if (context.role === "admin") return true;
+      return item.status === "published" || (item.status === "draft" && item.created_by === context.userId);
+    })
+    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))
+    .map(normalizePlaybookRecord);
+
+  return res.json({
+    ok: true,
+    playbooks: rows,
+  });
+});
+
+app.post("/internal/web/playbooks/draft", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const body = req.body || {};
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  if (!title) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "title is required",
+      },
+    });
+  }
+
+  const ts = new Date().toISOString();
+  const row = {
+    id: crypto.randomUUID(),
+    status: "draft",
+    title,
+    triggers: JSON.stringify(Array.isArray(body.triggers) ? body.triggers.map((v) => String(v)) : []),
+    checklist: JSON.stringify(Array.isArray(body.checklist) ? body.checklist.map((v) => String(v)) : []),
+    scenario_tree: typeof body.scenarioTree === "string" ? body.scenarioTree : "",
+    linked_sections: JSON.stringify(
+      Array.isArray(body.linkedSections) ? body.linkedSections.map((v) => String(v)) : [],
+    ),
+    tags: JSON.stringify(Array.isArray(body.tags) ? body.tags.map((v) => String(v)) : []),
+    created_by: context.userId,
+    created_at: ts,
+    updated_at: ts,
+    published_at: null,
+  };
+
+  const rows = readWebPlaybooks();
+  rows.push(row);
+  writeWebPlaybooks(rows);
+
+  return res.json({
+    ok: true,
+    playbook: normalizePlaybookRecord(row),
+  });
+});
+
+app.patch("/internal/web/playbooks/:id", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const playbookId = String(req.params.id || "").trim();
+  if (!playbookId) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "Invalid playbook id",
+      },
+    });
+  }
+
+  const rows = readWebPlaybooks();
+  const idx = rows.findIndex((item) => item.id === playbookId);
+  if (idx < 0) {
+    return res.status(404).json({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "Playbook not found",
+      },
+    });
+  }
+
+  const current = rows[idx];
+  const ownerMatch = current.created_by === context.userId;
+  if (!ownerMatch && context.role !== "admin") {
+    return res.status(403).json({
+      ok: false,
+      error: {
+        code: "forbidden",
+        message: "Not allowed to edit this playbook",
+      },
+    });
+  }
+
+  const body = req.body || {};
+  const updated = {
+    ...current,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (typeof body.title === "string") updated.title = body.title;
+  if (Array.isArray(body.triggers)) updated.triggers = JSON.stringify(body.triggers.map((v) => String(v)));
+  if (Array.isArray(body.checklist)) updated.checklist = JSON.stringify(body.checklist.map((v) => String(v)));
+  if (typeof body.scenarioTree === "string") updated.scenario_tree = body.scenarioTree;
+  if (Array.isArray(body.linkedSections)) {
+    updated.linked_sections = JSON.stringify(body.linkedSections.map((v) => String(v)));
+  }
+  if (Array.isArray(body.tags)) updated.tags = JSON.stringify(body.tags.map((v) => String(v)));
+
+  rows[idx] = updated;
+  writeWebPlaybooks(rows);
+
+  return res.json({
+    ok: true,
+    playbook: normalizePlaybookRecord(updated),
+  });
+});
+
+app.post("/internal/web/playbooks/:id/publish", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  if (context.role !== "admin") {
+    return res.status(403).json({
+      ok: false,
+      error: {
+        code: "forbidden",
+        message: "Admin role required",
+      },
+    });
+  }
+
+  const playbookId = String(req.params.id || "").trim();
+  if (!playbookId) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "Invalid playbook id",
+      },
+    });
+  }
+
+  const rows = readWebPlaybooks();
+  const idx = rows.findIndex((item) => item.id === playbookId);
+  if (idx < 0) {
+    return res.status(404).json({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "Playbook not found",
+      },
+    });
+  }
+
+  const ts = new Date().toISOString();
+  const updated = {
+    ...rows[idx],
+    status: "published",
+    published_at: ts,
+    updated_at: ts,
+  };
+  rows[idx] = updated;
+  writeWebPlaybooks(rows);
+
+  return res.json({
+    ok: true,
+    playbook: normalizePlaybookRecord(updated),
+  });
+});
+
+app.post("/internal/web/playbooks/:id/archive", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  if (context.role !== "admin") {
+    return res.status(403).json({
+      ok: false,
+      error: {
+        code: "forbidden",
+        message: "Admin role required",
+      },
+    });
+  }
+
+  const playbookId = String(req.params.id || "").trim();
+  if (!playbookId) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "Invalid playbook id",
+      },
+    });
+  }
+
+  const rows = readWebPlaybooks();
+  const idx = rows.findIndex((item) => item.id === playbookId);
+  if (idx < 0) {
+    return res.status(404).json({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "Playbook not found",
+      },
+    });
+  }
+
+  const updated = {
+    ...rows[idx],
+    status: "archived",
+    updated_at: new Date().toISOString(),
+  };
+  rows[idx] = updated;
+  writeWebPlaybooks(rows);
+
+  return res.json({
+    ok: true,
+    playbook: normalizePlaybookRecord(updated),
   });
 });
 

@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError, apiRateLimited } from '@/lib/api/response';
-import { playbooks } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 import { logSecurityEvent, writeAuditLog } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -45,12 +45,26 @@ export async function POST(
     return apiError('invalid_request', 'Invalid playbook id', 400);
   }
 
-  const updated = playbooks.update(playbookId, {
-    status: 'archived',
-  });
-
-  if (!updated) {
-    return apiError('not_found', 'Playbook not found', 404);
+  try {
+    await coreFetch<{ playbook: {
+      id: string;
+      status: string;
+    } }>(`/internal/web/playbooks/${encodeURIComponent(playbookId)}/archive`, {
+      method: 'POST',
+      uid: session.id,
+      role: 'admin',
+    });
+  } catch (error) {
+    if (error instanceof CoreClientError && error.statusCode === 404) {
+      return apiError('not_found', 'Playbook not found', 404);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 403) {
+      return apiError('forbidden', 'Admin role required', 403);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'Invalid playbook id', 400);
+    }
+    return apiError('database_error', 'Unable to archive playbook', 503);
   }
 
   await writeAuditLog({

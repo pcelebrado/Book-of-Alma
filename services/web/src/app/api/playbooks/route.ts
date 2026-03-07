@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
-import { playbooks } from '@/lib/db/repositories';
+import { coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const docs = playbooks.findAll(userId, session.role);
+    const result = await coreFetch<{ playbooks: Array<{
+      id: string;
+      status: string;
+      title: string;
+      triggers: string;
+      checklist: string;
+      scenario_tree: string;
+      linked_sections: string;
+      tags: string;
+      created_by: string;
+      created_at: string;
+      updated_at: string;
+      published_at: string | null;
+    }> }>('/internal/web/playbooks', {
+      uid: userId,
+      role: session.role,
+    });
+    const docs = result.playbooks;
 
     return Response.json({
       playbooks: docs.map((doc) => ({
