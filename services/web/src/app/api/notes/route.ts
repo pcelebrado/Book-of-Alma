@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { notes } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,15 +32,39 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const note = notes.insert({
-      userId,
-      sectionSlug: body.sectionSlug,
-      anchorId: body.anchorId,
-      selection: body.selection,
-      title: body.title,
-      body: body.noteText,
-      tags: body.tags,
+    const created = await coreFetch<{ note: {
+      id: string;
+      user_id: string;
+      section_slug: string;
+      anchor_id: string | null;
+      selection: string | null;
+      title: string | null;
+      body: string;
+      tags: string;
+      created_at: string;
+      updated_at: string;
+    } }, {
+      sectionSlug: string;
+      anchorId?: string;
+      selection?: { text: string; startOffset: number; endOffset: number };
+      noteText: string;
+      title?: string;
+      tags?: string[];
+    }>('/internal/web/notes', {
+      method: 'POST',
+      uid: userId,
+      role: session.role,
+      body: {
+        sectionSlug: body.sectionSlug,
+        anchorId: body.anchorId,
+        selection: body.selection,
+        title: body.title,
+        noteText: body.noteText,
+        tags: body.tags,
+      },
     });
+
+    const note = created.note;
 
     return Response.json({
       note: {
@@ -57,7 +81,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[api/notes][POST] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'sectionSlug and noteText are required', 400);
+    }
     return apiError('database_error', 'Unable to create note', 503);
   }
 }
@@ -70,7 +96,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const sectionSlug = request.nextUrl.searchParams.get('sectionSlug') ?? undefined;
-    const docs = notes.findByUser(userId, sectionSlug);
+    const path = sectionSlug
+      ? `/internal/web/notes?sectionSlug=${encodeURIComponent(sectionSlug)}`
+      : '/internal/web/notes';
+    const result = await coreFetch<{ notes: Array<{
+      id: string;
+      user_id: string;
+      section_slug: string;
+      anchor_id: string | null;
+      selection: string | null;
+      title: string | null;
+      body: string;
+      tags: string;
+      created_at: string;
+      updated_at: string;
+    }> }>(path, {
+      uid: userId,
+      role: session.role,
+    });
+    const docs = result.notes;
 
     return Response.json({
       notes: docs.map((doc) => ({

@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError, parseJsonBody } from '@/lib/api/response';
-import { notes } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,28 +48,47 @@ export async function PATCH(
   }
 
   try {
-    const result = notes.update(noteId, userId, updates);
+    const result = await coreFetch<{ note: {
+      id: string;
+      user_id: string;
+      section_slug: string;
+      anchor_id: string | null;
+      selection: string | null;
+      title: string | null;
+      body: string;
+      tags: string;
+      created_at: string;
+      updated_at: string;
+    } }, UpdateNoteBody>(`/internal/web/notes/${encodeURIComponent(noteId)}`, {
+      method: 'PATCH',
+      uid: userId,
+      role: session.role,
+      body,
+    });
 
-    if (!result) {
-      return apiError('not_found', 'Note not found', 404);
-    }
+    const note = result.note;
 
     return Response.json({
       note: {
-        _id: result.id,
-        userId: result.user_id,
-        sectionSlug: result.section_slug,
-        anchorId: result.anchor_id,
-        selection: result.selection ? JSON.parse(result.selection) : null,
-        title: result.title,
-        body: result.body,
-        tags: JSON.parse(result.tags),
-        createdAt: result.created_at,
-        updatedAt: result.updated_at,
+        _id: note.id,
+        userId: note.user_id,
+        sectionSlug: note.section_slug,
+        anchorId: note.anchor_id,
+        selection: note.selection ? JSON.parse(note.selection) : null,
+        title: note.title,
+        body: note.body,
+        tags: JSON.parse(note.tags),
+        createdAt: note.created_at,
+        updatedAt: note.updated_at,
       },
     });
   } catch (error) {
-    console.error('[api/notes/:id][PATCH] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 404) {
+      return apiError('not_found', 'Note not found', 404);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'Invalid note id', 400);
+    }
     return apiError('database_error', 'Unable to update note', 503);
   }
 }
@@ -89,15 +108,20 @@ export async function DELETE(
   }
 
   try {
-    const deleted = notes.delete(noteId, userId);
-
-    if (!deleted) {
-      return apiError('not_found', 'Note not found', 404);
-    }
+    await coreFetch<{ ok: boolean }>(`/internal/web/notes/${encodeURIComponent(noteId)}`, {
+      method: 'DELETE',
+      uid: userId,
+      role: session.role,
+    });
 
     return Response.json({ ok: true });
   } catch (error) {
-    console.error('[api/notes/:id][DELETE] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 404) {
+      return apiError('not_found', 'Note not found', 404);
+    }
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'Invalid note id', 400);
+    }
     return apiError('database_error', 'Unable to delete note', 503);
   }
 }

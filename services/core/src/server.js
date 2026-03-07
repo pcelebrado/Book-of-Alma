@@ -115,6 +115,7 @@ const QMD_INDEX_SQLITE_PATH = path.join(
 const WORKSPACE_QMD_SQLITE_LINK = path.join(WORKSPACE_DIR, "qmd-index.sqlite");
 const WORKSPACE_SQLITE_SOURCES_DOC = path.join(WORKSPACE_DIR, "SQLITE_SOURCES.md");
 const WEB_AUTH_STORE_PATH = path.join(STATE_DIR, "web-auth-users.json");
+const WEB_NOTES_STORE_PATH = path.join(STATE_DIR, "web-notes.json");
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -219,6 +220,63 @@ function verifyWebAuthCredentials({ email, password }) {
       role: fresh.role === "admin" ? "admin" : "user",
     },
   };
+}
+
+function readWebNotes() {
+  try {
+    const raw = fs.readFileSync(WEB_NOTES_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.notes)) return [];
+    return parsed.notes.filter((note) => note && typeof note === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebNotes(notes) {
+  fs.mkdirSync(path.dirname(WEB_NOTES_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    notes,
+  };
+  const tempPath = `${WEB_NOTES_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_NOTES_STORE_PATH);
+}
+
+function normalizeNoteRecord(note) {
+  return {
+    id: note.id,
+    user_id: note.user_id,
+    section_slug: note.section_slug,
+    anchor_id: note.anchor_id ?? null,
+    selection: note.selection ?? null,
+    title: note.title ?? null,
+    body: note.body,
+    tags: note.tags ?? "[]",
+    created_at: note.created_at,
+    updated_at: note.updated_at,
+  };
+}
+
+function getInternalUserContext(req, res) {
+  const userIdHeader = req.headers["x-user-id"];
+  const roleHeader = req.headers["x-user-role"];
+  const userId = typeof userIdHeader === "string" ? userIdHeader.trim() : "";
+  const role = roleHeader === "admin" ? "admin" : "user";
+
+  if (!userId) {
+    res.status(400).json({
+      ok: false,
+      error: {
+        code: "missing_user_context",
+        message: "x-user-id header is required",
+      },
+    });
+    return null;
+  }
+
+  return { userId, role };
 }
 
 function syncWorkspaceSqliteScaffold() {
@@ -808,6 +866,157 @@ app.post("/internal/web/auth/verify", requireInternalApiAuth, async (req, res) =
     ok: true,
     user: result.user,
   });
+});
+
+app.get("/internal/web/notes", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const sectionSlug =
+    typeof req.query.sectionSlug === "string" ? req.query.sectionSlug.trim() : "";
+  const rows = readWebNotes()
+    .filter((note) => note.user_id === context.userId)
+    .filter((note) => (!sectionSlug ? true : note.section_slug === sectionSlug))
+    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))
+    .map(normalizeNoteRecord);
+
+  return res.json({
+    ok: true,
+    notes: rows,
+  });
+});
+
+app.post("/internal/web/notes", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const body = req.body || {};
+  const sectionSlug = typeof body.sectionSlug === "string" ? body.sectionSlug.trim() : "";
+  const noteText = typeof body.noteText === "string" ? body.noteText : "";
+  const anchorId = typeof body.anchorId === "string" ? body.anchorId : null;
+  const title = typeof body.title === "string" ? body.title : null;
+  const selection = body.selection && typeof body.selection === "object" ? body.selection : null;
+  const tags = Array.isArray(body.tags)
+    ? body.tags.map((tag) => String(tag)).filter(Boolean)
+    : [];
+
+  if (!sectionSlug || !noteText) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "sectionSlug and noteText are required",
+      },
+    });
+  }
+
+  const ts = new Date().toISOString();
+  const next = {
+    id: crypto.randomUUID(),
+    user_id: context.userId,
+    section_slug: sectionSlug,
+    anchor_id: anchorId,
+    selection: selection ? JSON.stringify(selection) : null,
+    title,
+    body: noteText,
+    tags: JSON.stringify(tags),
+    created_at: ts,
+    updated_at: ts,
+  };
+
+  const notes = readWebNotes();
+  notes.push(next);
+  writeWebNotes(notes);
+
+  return res.json({
+    ok: true,
+    note: normalizeNoteRecord(next),
+  });
+});
+
+app.patch("/internal/web/notes/:id", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const noteId = String(req.params.id || "").trim();
+  if (!noteId) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "Invalid note id",
+      },
+    });
+  }
+
+  const body = req.body || {};
+  const notes = readWebNotes();
+  const index = notes.findIndex(
+    (note) => note.id === noteId && note.user_id === context.userId,
+  );
+  if (index < 0) {
+    return res.status(404).json({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "Note not found",
+      },
+    });
+  }
+
+  const current = notes[index];
+  const updated = {
+    ...current,
+    updated_at: new Date().toISOString(),
+  };
+  if (typeof body.noteText === "string") updated.body = body.noteText;
+  if (Array.isArray(body.tags)) {
+    updated.tags = JSON.stringify(
+      body.tags.map((tag) => String(tag)).filter(Boolean),
+    );
+  }
+  if (typeof body.title === "string") updated.title = body.title;
+
+  notes[index] = updated;
+  writeWebNotes(notes);
+
+  return res.json({
+    ok: true,
+    note: normalizeNoteRecord(updated),
+  });
+});
+
+app.delete("/internal/web/notes/:id", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const noteId = String(req.params.id || "").trim();
+  if (!noteId) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "Invalid note id",
+      },
+    });
+  }
+
+  const notes = readWebNotes();
+  const next = notes.filter(
+    (note) => !(note.id === noteId && note.user_id === context.userId),
+  );
+  if (next.length === notes.length) {
+    return res.status(404).json({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "Note not found",
+      },
+    });
+  }
+
+  writeWebNotes(next);
+  return res.json({ ok: true });
 });
 
 app.post("/internal/agent/run", requireInternalApiAuth, async (req, res) => {
