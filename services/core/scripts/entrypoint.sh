@@ -56,15 +56,7 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   # Start SFTPGo in the background, logging to the shared log directory.
   # If full serve fails (for example missing embedded templates in slim image),
   # fall back to portable mode so SFTP upload remains operational.
-  sftpgo serve -c /srv/sftpgo > "$SFTPGO_LOG_DIR/sftpgo.log" 2>&1 &
-  SFTPGO_PID=$!
-  sleep 2
-
-  if kill -0 "$SFTPGO_PID" 2>/dev/null; then
-    echo "[entrypoint] SFTPGo started (PID: ${SFTPGO_PID})"
-  else
-    echo "[entrypoint] SFTPGo full mode failed, starting portable SFTP fallback"
-
+  start_portable_sftpgo() {
     PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-book-uploader}"
     PORTABLE_PASS="${SFTPGO_PORTABLE_PASSWORD:-${SFTPGO_DEFAULT_ADMIN_PASSWORD:-change-me-now}}"
     PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-/data}"
@@ -78,11 +70,26 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
       --ftpd-port -1 \
       --username "$PORTABLE_USER" \
       --password "$PORTABLE_PASS" \
-      --permissions "*" \
+      --permissions '*' \
       > "$SFTPGO_LOG_DIR/sftpgo.log" 2>&1 &
 
     SFTPGO_PID=$!
     echo "[entrypoint] SFTPGo portable mode started (PID: ${SFTPGO_PID}, user: ${PORTABLE_USER}, dir: ${PORTABLE_DIR})"
+  }
+
+  sftpgo serve -c /srv/sftpgo > "$SFTPGO_LOG_DIR/sftpgo.log" 2>&1 &
+  SFTPGO_PID=$!
+  sleep 2
+
+  if kill -0 "$SFTPGO_PID" 2>/dev/null && sftpgo ping >/dev/null 2>&1; then
+    echo "[entrypoint] SFTPGo started (PID: ${SFTPGO_PID})"
+  else
+    echo "[entrypoint] SFTPGo full mode failed, starting portable SFTP fallback"
+    if kill -0 "$SFTPGO_PID" 2>/dev/null; then
+      kill "$SFTPGO_PID" 2>/dev/null || true
+      sleep 1
+    fi
+    start_portable_sftpgo
   fi
 else
   echo "[entrypoint] SFTPGo disabled or not installed — skipping"
