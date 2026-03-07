@@ -504,6 +504,23 @@ export default function AdminPage() {
     }
   };
 
+  const approveAllPendingDevices = async () => {
+    const data = await apiFetch<{ ok: boolean; requestIds: string[]; output: string }>(
+      '/api/admin/openclaw/setup/devices/pending',
+    );
+
+    const requestIds = data.requestIds ?? [];
+    for (const requestId of requestIds) {
+      await apiFetch('/api/admin/openclaw/setup/devices/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId }),
+      });
+    }
+
+    return requestIds.length;
+  };
+
   const approveDevice = async (requestId: string) => {
     try {
       await apiFetch('/api/admin/openclaw/setup/devices/approve', {
@@ -530,9 +547,17 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channel: pairingChannel, code: pairingCode.trim() }),
       });
-      toast.success(`Pairing approved for ${pairingChannel}.`);
+      const approvedCount = await approveAllPendingDevices();
+      if (approvedCount > 0) {
+        toast.success(
+          `Pairing approved for ${pairingChannel}. Auto-approved ${approvedCount} pending device request${approvedCount === 1 ? '' : 's'}.`,
+        );
+      } else {
+        toast.success(`Pairing approved for ${pairingChannel}.`);
+      }
       setPairingCode('');
       void loadSettings();
+      void loadDevices();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Pairing approval failed');
     } finally {
@@ -1343,6 +1368,7 @@ export default function AdminPage() {
                 <CardTitle>Approve Pairing</CardTitle>
                 <CardDescription>
                   Approve a channel pairing request (Telegram or Discord DM pairing).
+                  Pending dashboard device requests are auto-approved after success.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
