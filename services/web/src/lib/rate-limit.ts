@@ -1,9 +1,8 @@
 /**
  * Rate limiting for OpenClaw Web Service.
- * DECISION_197: MongoDB → SQLite migration.
- * Uses SQLite rate_limits table with ON CONFLICT upsert.
+ * DECISION_197 follow-up: uses core-backed rate limit store.
  */
-import { rateLimits } from '@/lib/db/repositories';
+import { coreFetch } from '@/lib/core-client';
 
 export interface RateLimitRule {
   keyPrefix: 'login:ip' | 'agent:user' | 'search:user' | 'admin:user';
@@ -35,7 +34,17 @@ export async function enforceRateLimit(
   const windowStart = buildWindowStart(rule.windowSeconds);
   const key = `${rule.keyPrefix}:${keyValue}`;
 
-  const count = rateLimits.increment(key, windowStart);
+  const result = await coreFetch<{ count: number }, { key: string; windowStart: number }>(
+    '/internal/web/rate-limit/increment',
+    {
+      method: 'POST',
+      body: {
+        key,
+        windowStart,
+      },
+    },
+  );
+  const count = result.count;
   const retryAfterSeconds = buildRetryAfter(windowStart, rule.windowSeconds);
 
   return {

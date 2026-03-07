@@ -120,6 +120,8 @@ const WEB_HIGHLIGHTS_STORE_PATH = path.join(STATE_DIR, "web-highlights.json");
 const WEB_BOOKMARKS_STORE_PATH = path.join(STATE_DIR, "web-bookmarks.json");
 const WEB_PROGRESS_STORE_PATH = path.join(STATE_DIR, "web-progress.json");
 const WEB_PLAYBOOKS_STORE_PATH = path.join(STATE_DIR, "web-playbooks.json");
+const WEB_RATE_LIMITS_STORE_PATH = path.join(STATE_DIR, "web-rate-limits.json");
+const WEB_AUDIT_LOG_STORE_PATH = path.join(STATE_DIR, "web-audit-log.json");
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -377,6 +379,98 @@ function normalizePlaybookRecord(item) {
     updated_at: item.updated_at,
     published_at: item.published_at ?? null,
   };
+}
+
+function readWebRateLimits() {
+  try {
+    const raw = fs.readFileSync(WEB_RATE_LIMITS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.entries)) return [];
+    return parsed.entries.filter((item) => item && typeof item === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebRateLimits(entries) {
+  fs.mkdirSync(path.dirname(WEB_RATE_LIMITS_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    entries,
+  };
+  const tempPath = `${WEB_RATE_LIMITS_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_RATE_LIMITS_STORE_PATH);
+}
+
+function incrementWebRateLimit(key, windowStart) {
+  const entries = readWebRateLimits();
+  const idx = entries.findIndex(
+    (item) => item.key === key && Number(item.window_start) === Number(windowStart),
+  );
+
+  let count = 1;
+  if (idx >= 0) {
+    count = Number(entries[idx].count || 0) + 1;
+    entries[idx] = {
+      ...entries[idx],
+      count,
+      updated_at: new Date().toISOString(),
+    };
+  } else {
+    entries.push({
+      key,
+      window_start: windowStart,
+      count,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  writeWebRateLimits(entries);
+  return count;
+}
+
+function readWebAuditLog() {
+  try {
+    const raw = fs.readFileSync(WEB_AUDIT_LOG_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.events)) return [];
+    return parsed.events.filter((item) => item && typeof item === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebAuditLog(events) {
+  fs.mkdirSync(path.dirname(WEB_AUDIT_LOG_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    events,
+  };
+  const tempPath = `${WEB_AUDIT_LOG_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_AUDIT_LOG_STORE_PATH);
+}
+
+function appendWebAuditEvent(event) {
+  const events = readWebAuditLog();
+  events.push(event);
+  writeWebAuditLog(events);
+}
+
+function findLastWebAuditByAction(action) {
+  const events = readWebAuditLog();
+  const match = events
+    .filter((event) => event.action === action)
+    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
+  return match || null;
+}
+
+function findWebAuthUserById(id) {
+  if (!id) return null;
+  const users = readWebAuthUsers();
+  return users.find((user) => user.id === id) || null;
 }
 
 function normalizeNoteRecord(note) {
@@ -1000,6 +1094,111 @@ app.post("/internal/web/auth/verify", requireInternalApiAuth, async (req, res) =
   return res.json({
     ok: true,
     user: result.user,
+  });
+});
+
+app.get("/internal/web/auth/me", requireInternalApiAuth, async (req, res) => {
+  const context = getInternalUserContext(req, res);
+  if (!context) return;
+
+  const user = findWebAuthUserById(context.userId);
+  if (!user) {
+    return res.status(401).json({
+      ok: false,
+      error: {
+        code: "unauthorized",
+        message: "User not found",
+      },
+    });
+  }
+
+  return res.json({
+    ok: true,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role === "admin" ? "admin" : "user",
+      prefs: null,
+    },
+  });
+});
+
+app.post("/internal/web/rate-limit/increment", requireInternalApiAuth, async (req, res) => {
+  const body = req.body || {};
+  const key = typeof body.key === "string" ? body.key : "";
+  const windowStart = Number.parseInt(String(body.windowStart ?? ""), 10);
+
+  if (!key || !Number.isFinite(windowStart)) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "key and windowStart are required",
+      },
+    });
+  }
+
+  const count = incrementWebRateLimit(key, windowStart);
+  return res.json({ ok: true, count });
+});
+
+app.post("/internal/web/audit-log", requireInternalApiAuth, async (req, res) => {
+  const body = req.body || {};
+  const action = typeof body.action === "string" ? body.action : "";
+  const actorUserId = typeof body.actorUserId === "string" ? body.actorUserId : null;
+  const details = body.details && typeof body.details === "object" ? body.details : {};
+
+  if (!action) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "action is required",
+      },
+    });
+  }
+
+  appendWebAuditEvent({
+    id: crypto.randomUUID(),
+    actor_user_id: actorUserId,
+    action,
+    details: JSON.stringify(details),
+    created_at: new Date().toISOString(),
+  });
+
+  return res.json({ ok: true });
+});
+
+app.get("/internal/web/audit-log/last", requireInternalApiAuth, async (req, res) => {
+  const action = typeof req.query.action === "string" ? req.query.action.trim() : "";
+  if (!action) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "action query parameter is required",
+      },
+    });
+  }
+
+  const row = findLastWebAuditByAction(action);
+  return res.json({ ok: true, row });
+});
+
+app.get("/internal/web/data/status", requireInternalApiAuth, async (_req, res) => {
+  return res.json({
+    ok: true,
+    stores: {
+      auth: fs.existsSync(WEB_AUTH_STORE_PATH) ? "present" : "missing",
+      notes: fs.existsSync(WEB_NOTES_STORE_PATH) ? "present" : "missing",
+      highlights: fs.existsSync(WEB_HIGHLIGHTS_STORE_PATH) ? "present" : "missing",
+      bookmarks: fs.existsSync(WEB_BOOKMARKS_STORE_PATH) ? "present" : "missing",
+      progress: fs.existsSync(WEB_PROGRESS_STORE_PATH) ? "present" : "missing",
+      playbooks: fs.existsSync(WEB_PLAYBOOKS_STORE_PATH) ? "present" : "missing",
+      rateLimits: fs.existsSync(WEB_RATE_LIMITS_STORE_PATH) ? "present" : "missing",
+      auditLog: fs.existsSync(WEB_AUDIT_LOG_STORE_PATH) ? "present" : "missing",
+    },
   });
 });
 

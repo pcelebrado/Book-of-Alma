@@ -1,9 +1,8 @@
 /**
  * Logging and audit trail for OpenClaw Web Service.
- * DECISION_197: MongoDB → SQLite migration.
- * Audit log now writes to SQLite via repositories.
+ * DECISION_197 follow-up: audit log writes to core datastore.
  */
-import { auditLog } from '@/lib/db/repositories';
+import { getCoreBaseUrl, getCorePublicUrl, getServiceToken } from '@/lib/env';
 
 type SecurityEventName =
   | 'auth.login.success'
@@ -30,6 +29,15 @@ interface AuditLogInput {
   details: Record<string, unknown>;
 }
 
+function getCoreAuditBaseUrl(): string {
+  const internal = getCoreBaseUrl().trim();
+  if (internal) {
+    return internal;
+  }
+
+  return getCorePublicUrl().trim();
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -51,11 +59,29 @@ export async function logSecurityEvent(event: SecurityEventName, input: LogEvent
 
 export async function writeAuditLog(input: AuditLogInput) {
   try {
-    auditLog.insert({
-      actorUserId: input.actorUserId,
-      action: input.action,
-      details: input.details,
+    const baseUrl = getCoreAuditBaseUrl();
+    const token = getServiceToken();
+    if (!baseUrl || !token) {
+      throw new Error('Core audit endpoint is not configured');
+    }
+
+    const response = await fetch(new URL('/internal/web/audit-log', baseUrl), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        actorUserId: input.actorUserId,
+        action: input.action,
+        details: input.details,
+      }),
+      cache: 'no-store',
     });
+
+    if (!response.ok) {
+      throw new Error(`Core audit write failed with status ${response.status}`);
+    }
   } catch (error) {
     await logSecurityEvent('db.error', {
       route: 'audit_log',

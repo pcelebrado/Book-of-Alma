@@ -7,8 +7,6 @@ import type { NextRequest } from 'next/server';
 import { isAdmin, requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
 import { coreFetch, CoreClientError } from '@/lib/core-client';
-import { auditLog } from '@/lib/db/repositories';
-import { isDbHealthy } from '@/lib/db/sqlite';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +20,7 @@ export async function GET(request: NextRequest) {
     return apiError('forbidden', 'Admin role required', 403);
   }
 
-  const sqlite: 'connected' | 'unreachable' = isDbHealthy() ? 'connected' : 'unreachable';
+  let sqlite: 'connected' | 'unreachable' = 'connected';
 
   let core: 'ok' | 'unreachable' = 'ok';
   let coreComponents: Record<string, unknown> = {};
@@ -40,8 +38,21 @@ export async function GET(request: NextRequest) {
       },
     );
     coreComponents = health.components ?? {};
+
+    const dataStatus = await coreFetch<{ stores?: Record<string, string> }>(
+      '/internal/web/data/status',
+      {
+        method: 'GET',
+        uid: session.id,
+        role: session.role,
+        rid: request.headers.get('x-request-id') ?? undefined,
+        timeoutMs: 12_000,
+      },
+    );
+    sqlite = dataStatus.stores ? 'connected' : 'unreachable';
   } catch (error) {
     core = 'unreachable';
+    sqlite = 'unreachable';
     if (error instanceof CoreClientError) {
       lastCoreUnavailableAt = new Date();
     }
@@ -49,7 +60,16 @@ export async function GET(request: NextRequest) {
 
   let lastReindex: { created_at?: string; details?: string } | null = null;
   try {
-    const row = auditLog.findLastByAction('reindex');
+    const result = await coreFetch<{ row: { created_at?: string; details?: string } | null }>(
+      '/internal/web/audit-log/last?action=reindex',
+      {
+        method: 'GET',
+        uid: session.id,
+        role: session.role,
+        rid: request.headers.get('x-request-id') ?? undefined,
+      },
+    );
+    const row = result.row;
     if (row) {
       lastReindex = { created_at: row.created_at, details: row.details };
     }

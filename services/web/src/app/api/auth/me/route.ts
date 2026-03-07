@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { apiError } from '@/lib/api/response';
 import { getSessionUser } from '@/lib/auth/auth-config';
-import { users } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +20,31 @@ export async function GET(_request: NextRequest) {
     return apiError('invalid_session', 'Session is invalid', 401);
   }
 
-  const user = users.findById(session.id);
-  if (!user) {
-    return apiError('unauthorized', 'User not found', 401);
+  let user: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'admin' | 'user';
+    prefs: unknown;
+  };
+
+  try {
+    const result = await coreFetch<{ user: {
+      id: string;
+      name: string;
+      email: string;
+      role: 'admin' | 'user';
+      prefs: unknown;
+    } }>('/internal/web/auth/me', {
+      uid: session.id,
+      role: session.role,
+    });
+    user = result.user;
+  } catch (error) {
+    if (error instanceof CoreClientError && error.statusCode === 401) {
+      return apiError('unauthorized', 'User not found', 401);
+    }
+    return apiError('core_auth_unavailable', 'Unable to load user profile', 503);
   }
 
   return Response.json({
@@ -32,6 +54,6 @@ export async function GET(_request: NextRequest) {
       email: user.email,
     },
     role: user.role,
-    prefs: user.prefs ? JSON.parse(user.prefs) : null,
+    prefs: user.prefs ?? null,
   });
 }
