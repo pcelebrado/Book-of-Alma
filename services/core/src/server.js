@@ -32,13 +32,14 @@ const PORT = Number.parseInt(process.env.PORT ?? process.env.OPENCLAW_PUBLIC_POR
 
 // State/workspace
 // OpenClaw defaults to ~/.openclaw.
+const IS_RAILWAY = Boolean(process.env.RAILWAY_ENVIRONMENT);
 const STATE_DIR =
   process.env.OPENCLAW_STATE_DIR?.trim() ||
-  path.join(os.homedir(), ".openclaw");
+  (IS_RAILWAY ? "/data/.openclaw" : path.join(os.homedir(), ".openclaw"));
 
 const WORKSPACE_DIR =
   process.env.OPENCLAW_WORKSPACE_DIR?.trim() ||
-  path.join(STATE_DIR, "workspace");
+  (IS_RAILWAY ? "/data/workspace" : path.join(STATE_DIR, "workspace"));
 
 // Protect /setup with a user-provided password.
 const SETUP_PASSWORD = process.env.SETUP_PASSWORD?.trim();
