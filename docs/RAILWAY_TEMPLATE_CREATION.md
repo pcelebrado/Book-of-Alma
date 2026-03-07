@@ -46,9 +46,7 @@
 | `OPENCLAW_STATE_DIR` | `/data/.openclaw` | |
 | `OPENCLAW_WORKSPACE_DIR` | `/data/workspace` | |
 | `RAILWAY_RUN_UID` | `0` | Required for volume permissions |
-| `MONGO_PORT` | `27017` | |
-| `MONGO_BIND_IP` | `::,0.0.0.0` | IPv6+IPv4 for private networking |
-| `MONGODB_URI` | `mongodb://127.0.0.1:27017/openclaw` | Local to container |
+| `PORT` | `8080` | Keep HTTP wrapper off SFTP TCP proxy port |
 | `SFTPGO_ENABLED` | `true` | |
 | `SFTPGO_DATA_ROOT` | `/data/sftpgo` | |
 | `SFTPGO_SFTPD__BINDINGS__0__PORT` | `2022` | |
@@ -56,6 +54,7 @@
 | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN` | `true` | |
 | `SFTPGO_DEFAULT_ADMIN_USERNAME` | `admin` | |
 | `SFTPGO_DEFAULT_ADMIN_PASSWORD` | `${{secret(32, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}}` | Auto-generated |
+| `SFTPGO_PORTABLE_USERNAME` | `admin` | Portable fallback login username |
 | `INTERNAL_GATEWAY_HOST` | `127.0.0.1` | |
 | `INTERNAL_GATEWAY_PORT` | `18789` | |
 | `OPENCLAW_ENTRY` | `/openclaw/dist/entry.js` | |
@@ -89,7 +88,6 @@
 |----------|-------|-------|
 | `NEXT_TELEMETRY_DISABLED` | `1` | |
 | `HOSTNAME` | `::` | IPv6 dual-stack |
-| `MONGODB_URI` | `mongodb://${{openclaw-core.RAILWAY_PRIVATE_DOMAIN}}:27017/openclaw` | References core service |
 | `INTERNAL_CORE_BASE_URL` | `http://${{openclaw-core.RAILWAY_PRIVATE_DOMAIN}}:8080` | References core service |
 | `INTERNAL_SERVICE_TOKEN` | `${{openclaw-core.INTERNAL_SERVICE_TOKEN}}` | Shared from core |
 | `AUTH_SECRET` | `${{secret(43, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/")}}=` | Auto-generated |

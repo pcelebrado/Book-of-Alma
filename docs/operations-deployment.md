@@ -67,7 +67,7 @@ curl -i https://your-domain/healthz
 Log the change for audit.
 
 ```bash
-# Automatically logged to audit_log collection
+# Automatically logged to core-backed audit store
 ```
 
 ### Phase 7: Learn
@@ -412,8 +412,7 @@ docker build -f services/web/Dockerfile services/web
 # Core service
 docker build -f services/core/Dockerfile services/core
 
-# MongoDB
-docker build -f services/mongo/nodes/Dockerfile services/mongo/nodes
+
 ```
 
 ### Configuration
@@ -427,8 +426,7 @@ docker build -f services/mongo/nodes/Dockerfile services/mongo/nodes
     "watchPatterns": [
       "railway.json",
       "services/web/**",
-      "services/core/**",
-      "services/mongo/**"
+      "services/core/**"
     ]
   },
   "deploy": {
@@ -467,7 +465,7 @@ curl http://localhost:7200/health  # OpenClaw
 
 **Check:**
 1. Core service healthy
-2. MongoDB connection working
+2. Core-backed data store reachable
 3. Sufficient disk space
 4. Book content valid
 

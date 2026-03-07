@@ -146,7 +146,7 @@ Core didn't respond within timeout after retry attempts.
 ```
 
 **Fallback Options:**
-1. **MongoDB text search** — If enabled, fall back to basic search
+1. **Core basic search** — Use core-backed substring search fallback
 2. **Retry button** — Attempt QMD again
 3. **Browse TOC** — Navigate without search
 
@@ -309,7 +309,7 @@ AUTO_RETRY_DELAY=2000
 ### Fallback Search
 
 ```bash
-# Enable MongoDB fallback for search
+# Enable core fallback for search
 SEARCH_FALLBACK_ENABLED=true
 
 # Fallback search collection

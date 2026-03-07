@@ -4,7 +4,7 @@
 
 The security layer implements defense in depth with authentication, rate limiting, and audit logging. Rate limits prevent abuse and accidental loops while preserving the calm UX with clear, non-accusatory error messages.
 
-MongoDB-backed counters with TTL ensure rate limits survive process restarts and work under Railway's sleep/scale-to-zero constraints.
+Core-backed counters persisted on the Railway volume ensure rate limits survive process restarts and work under Railway's sleep/scale-to-zero constraints.
 
 ---
 
@@ -12,13 +12,13 @@ MongoDB-backed counters with TTL ensure rate limits survive process restarts and
 
 ### Layer 1: Network Security
 - Only the web service is publicly exposed
-- Core and MongoDB services are internal-only
+- Core services are internal-only
 - No direct browser access to internal services
 
 ### Layer 2: Authentication
 - User authentication via NextAuth (HTTP-only cookies)
 - Service authentication via JWT or shared secret
-- MongoDB authentication with replica set credentials
+- Core service authentication with token/JWT verification
 
 ### Layer 3: Authorization
 - Role-based access control (admin vs user)
@@ -28,7 +28,7 @@ MongoDB-backed counters with TTL ensure rate limits survive process restarts and
 ### Layer 4: Rate Limiting
 - Per-endpoint rate limits
 - Per-user and per-IP tracking
-- MongoDB-backed counters for persistence
+- Core-backed counters for persistence
 
 ### Layer 5: Audit Logging
 - All admin actions logged
@@ -100,16 +100,14 @@ MongoDB-backed counters with TTL ensure rate limits survive process restarts and
 
 ## Implementation
 
-### MongoDB Collection
+### Core-Backed Store Record
 
-```javascript
-// rate_limits collection
+```json
 {
-  _id: ObjectId,
-  key: "agent:user:12345",      // Composite key
-  windowStart: ISODate(),        // Start of rate limit window
-  count: 5,                      // Current request count
-  createdAt: ISODate()           // For TTL cleanup
+  "key": "agent:user:12345",
+  "window_start": 1736300400,
+  "count": 5,
+  "updated_at": "2026-03-07T04:00:00.000Z"
 }
 ```
 
@@ -122,18 +120,11 @@ MongoDB-backed counters with TTL ensure rate limits survive process restarts and
 | Search | `search:user:{userId}` | `search:user:550e8400...` |
 | Admin | `admin:user:{userId}` | `admin:user:550e8400...` |
 
-### Indexes
+### Windowing Model
 
-```javascript
-// Standard index for lookups
-db.rate_limits.createIndex({ key: 1, windowStart: -1 });
-
-// TTL index for automatic cleanup (2 hours)
-db.rate_limits.createIndex(
-  { createdAt: 1 },
-  { expireAfterSeconds: 7200 }
-);
-```
+- Counters are keyed by `key + window_start`.
+- Window rollover is deterministic and reset by key window.
+- Cleanup runs as part of periodic maintenance in core.
 
 ### Algorithm
 
@@ -319,27 +310,27 @@ module.exports = {
 
 ### Logged Events
 
-| Event | Collection | Details |
-|-------|------------|---------|
-| Login success | audit_log | userId, timestamp, ip |
-| Login failure | audit_log | ip, reason, timestamp |
-| Rate limit hit | audit_log | key, endpoint, timestamp |
-| Admin action | audit_log | userId, action, details |
-| Agent run | agent_runs | userId, skill, context |
+| Event | Store | Details |
+|-------|-------|---------|
+| Login success | core audit store | userId, timestamp, ip |
+| Login failure | core audit store | ip, reason, timestamp |
+| Rate limit hit | core audit store | key, endpoint, timestamp |
+| Admin action | core audit store | userId, action, details |
+| Agent run | core run logs | userId, skill, context |
 
 ### Audit Log Schema
 
-```javascript
+```json
 {
-  _id: ObjectId,
-  actorUserId: ObjectId,  // null for system events
-  action: "login_fail",
-  details: {
-    ip: "192.168.1.1",
-    endpoint: "/api/auth/login",
-    reason: "invalid_credentials"
+  "id": "evt_01",
+  "actor_user_id": "usr_01",
+  "action": "login_fail",
+  "details": {
+    "ip": "192.168.1.1",
+    "endpoint": "/api/auth/login",
+    "reason": "invalid_credentials"
   },
-  createdAt: ISODate()
+  "created_at": "2026-03-07T04:00:00.000Z"
 }
 ```
 
@@ -350,7 +341,7 @@ module.exports = {
 ### Deployment Checklist
 
 - [ ] Only Web service is publicly exposed
-- [ ] MongoDB has no public port
+- [ ] No legacy database service is publicly exposed
 - [ ] Core service has no public HTTP
 - [ ] Service-to-service auth implemented (JWT)
 - [ ] Login rate limiting enabled (5/15min per IP)
@@ -418,8 +409,8 @@ db.audit_log.aggregate([
 **Symptoms:** No 429 responses, counters not incrementing
 
 **Check:**
-1. MongoDB connection
-2. TTL index exists on `createdAt`
+1. Core data store endpoint connectivity
+2. Counter window key format matches (`key + window_start`)
 3. Key format matches (case sensitivity)
 4. Middleware is applied to route
 
@@ -434,4 +425,4 @@ db.audit_log.aggregate([
 
 ---
 
-*For more details, see the [Internal Service Auth](./internal-service-auth.md) and [MongoDB Data Layer](./mongodb-data-layer.md) documentation.*
+*For more details, see the [Internal Service Auth](./internal-service-auth.md) and [Data Layer Migration Notes](./mongodb-data-layer.md).*

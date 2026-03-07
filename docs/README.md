@@ -14,7 +14,7 @@ Welcome to the comprehensive documentation for the OpenClaw Railway Template—a
 
 1. **[Service Architecture](./service-architecture.md)** — Two-service Railway deployment (Web + Core)
 2. **[Book-First UI](./book-first-ui.md)** — Calm research UI with three-column sacred shell
-3. **[MongoDB Data Layer](./mongodb-data-layer.md)** — Historical migration notes (core-backed stores)
+3. **[Data Layer Migration Notes](./mongodb-data-layer.md)** — Historical migration notes (core-backed stores)
 4. **[Internal Service Authentication](./internal-service-auth.md)** — JWT-based service-to-service auth
 5. **[Agent Skills & AI Integration](./agent-skills.md)** — Six AI-assisted study tools
 6. **[Security & Rate Limiting](./security-rate-limiting.md)** — Defense in depth with rate limiting
