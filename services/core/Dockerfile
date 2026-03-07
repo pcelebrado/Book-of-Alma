@@ -8,6 +8,7 @@
 # - Healthchecks use /setup/healthz endpoint
 # - RAILWAY_RUN_UID=0 is set in railway.toml for volume permissions
 # - TCP Proxy must be enabled in Railway dashboard for SFTP (port 2022)
+# - Set PORT=8080 in service variables when TCP proxy is enabled
 #
 # Volume layout (/data):
 #   /data/.openclaw       — OpenClaw state and config

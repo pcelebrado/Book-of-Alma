@@ -38,6 +38,9 @@ Browser → [web] (public) → [core] (internal, this service)
    - `OPENCLAW_WORKSPACE_DIR=/data/workspace` (recommended)
    - `OPENCLAW_GATEWAY_TOKEN` — auth token (auto-generated if not set)
    - `INTERNAL_SERVICE_TOKEN` — must match the web service value
+   - `PORT=8080` — required when TCP Proxy is enabled for SFTP on 2022
+   - `SFTPGO_DEFAULT_ADMIN_USERNAME` / `SFTPGO_DEFAULT_ADMIN_PASSWORD`
+   - `SFTPGO_PORTABLE_USERNAME` (fallback mode login username)
 4. **Disable Public Networking** — this service is internal only
 5. Deploy
 6. Complete setup via the web service's admin panel or direct internal access
@@ -83,6 +86,7 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `disconnected (1008): pairing required` | Pending dashboard device not approved | In Admin, run Approve Pairing (auto-approves pending device requests); or use `openclaw devices list` then `approve <id>` |
+| `could not start SFTP server: bind: address already in use` | Core HTTP wrapper and SFTP both bound to 2022 | Set `PORT=8080` on core, keep `SFTPGO_SFTPD__BINDINGS__0__PORT=2022`, redeploy |
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
