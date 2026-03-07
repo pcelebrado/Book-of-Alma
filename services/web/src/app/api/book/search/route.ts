@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 import { requireSession } from '@/lib/api/auth-guards';
 import { apiError } from '@/lib/api/response';
 import { apiRateLimited } from '@/lib/api/response';
-import { bookSections } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -40,23 +40,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const docs = bookSections.search(q, 20);
-
-    const results = docs.map((doc) => {
-      const headings = doc.headings ? JSON.parse(doc.headings) : [];
-      const snippet = (doc.body_markdown ?? '').slice(0, 240);
-      const firstHeading = headings[0]?.id ?? '';
-      return {
-        sectionSlug: doc.slug,
-        anchorId: firstHeading,
-        score: Math.abs(doc.rank),
-        snippet,
-      };
+    const result = await coreFetch<{ q: string; results: Array<{
+      sectionSlug: string;
+      anchorId: string;
+      score: number;
+      snippet: string;
+    }> }>(`/internal/web/book/search?q=${encodeURIComponent(q)}`, {
+      uid: session.id,
+      role: session.role,
+      rid: request.headers.get('x-request-id') ?? undefined,
     });
 
-    return Response.json({ q, results });
+    return Response.json({ q: result.q, results: result.results });
   } catch (error) {
-    console.error('[api/book/search][GET] database_error', error);
+    if (error instanceof CoreClientError && error.statusCode === 400) {
+      return apiError('invalid_request', 'q is required', 400);
+    }
     return apiError('database_error', 'Unable to search sections', 503);
   }
 }

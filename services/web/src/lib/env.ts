@@ -8,13 +8,8 @@
  * Parity contract: every variable here must have a corresponding entry in
  * .env.example for the full variable list.
  *
- * DECISION_197: Removed getMongoUri — SQLite is now the data layer.
+ * DECISION_197 follow-up: web data flows are core-backed.
  */
-
-/** SQLite database file path (server-side only). */
-export function getSqliteDbPath(): string {
-  return process.env.SQLITE_DB_PATH ?? '/data/web.db';
-}
 
 /** Internal core service base URL (server-side only). */
 export function getCoreBaseUrl(): string {
@@ -111,7 +106,6 @@ export function getBookConfig() {
  */
 export function getConfigStatus() {
   return {
-    sqlite: Boolean(process.env.SQLITE_DB_PATH || true), // SQLite always available (file-based)
     core: Boolean(process.env.INTERNAL_CORE_BASE_URL),
     serviceAuth: Boolean(
       process.env.INTERNAL_SERVICE_TOKEN ||

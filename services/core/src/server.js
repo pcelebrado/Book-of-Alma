@@ -122,6 +122,8 @@ const WEB_PROGRESS_STORE_PATH = path.join(STATE_DIR, "web-progress.json");
 const WEB_PLAYBOOKS_STORE_PATH = path.join(STATE_DIR, "web-playbooks.json");
 const WEB_RATE_LIMITS_STORE_PATH = path.join(STATE_DIR, "web-rate-limits.json");
 const WEB_AUDIT_LOG_STORE_PATH = path.join(STATE_DIR, "web-audit-log.json");
+const WEB_BOOK_SECTIONS_STORE_PATH = path.join(STATE_DIR, "web-book-sections.json");
+const WEB_BOOK_TOC_STORE_PATH = path.join(STATE_DIR, "web-book-toc.json");
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -471,6 +473,48 @@ function findWebAuthUserById(id) {
   if (!id) return null;
   const users = readWebAuthUsers();
   return users.find((user) => user.id === id) || null;
+}
+
+function readWebBookSections() {
+  try {
+    const raw = fs.readFileSync(WEB_BOOK_SECTIONS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.sections)) return [];
+    return parsed.sections.filter((item) => item && typeof item === "object");
+  } catch {
+    return [];
+  }
+}
+
+function readWebBookToc() {
+  try {
+    const raw = fs.readFileSync(WEB_BOOK_TOC_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed;
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function getPublishedSectionsOrdered() {
+  return readWebBookSections()
+    .filter((item) => (item.status || "published") === "published")
+    .sort((a, b) => {
+      const ap = Number(a.part_index ?? 0);
+      const bp = Number(b.part_index ?? 0);
+      if (ap !== bp) return ap - bp;
+
+      const ac = Number(a.chapter_index ?? 0);
+      const bc = Number(b.chapter_index ?? 0);
+      if (ac !== bc) return ac - bc;
+
+      const as = Number(a.section_index ?? 0);
+      const bs = Number(b.section_index ?? 0);
+      if (as !== bs) return as - bs;
+
+      return String(a.slug || "").localeCompare(String(b.slug || ""));
+    });
 }
 
 function normalizeNoteRecord(note) {
@@ -1198,7 +1242,99 @@ app.get("/internal/web/data/status", requireInternalApiAuth, async (_req, res) =
       playbooks: fs.existsSync(WEB_PLAYBOOKS_STORE_PATH) ? "present" : "missing",
       rateLimits: fs.existsSync(WEB_RATE_LIMITS_STORE_PATH) ? "present" : "missing",
       auditLog: fs.existsSync(WEB_AUDIT_LOG_STORE_PATH) ? "present" : "missing",
+      bookSections: fs.existsSync(WEB_BOOK_SECTIONS_STORE_PATH) ? "present" : "missing",
+      bookToc: fs.existsSync(WEB_BOOK_TOC_STORE_PATH) ? "present" : "missing",
     },
+  });
+});
+
+app.get("/internal/web/book/toc", requireInternalApiAuth, async (_req, res) => {
+  const toc = readWebBookToc();
+  return res.json({
+    ok: true,
+    tocTree: toc.tree ?? {},
+    updatedAt: toc.updated_at ?? null,
+  });
+});
+
+app.get("/internal/web/book/section", requireInternalApiAuth, async (req, res) => {
+  const slug = typeof req.query.slug === "string" ? req.query.slug.trim() : "";
+  if (!slug) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "slug is required",
+      },
+    });
+  }
+
+  const ordered = getPublishedSectionsOrdered();
+  const section = ordered.find((item) => item.slug === slug) || null;
+  if (!section) {
+    return res.status(404).json({
+      ok: false,
+      error: {
+        code: "not_found",
+        message: "Section not found",
+      },
+    });
+  }
+
+  const slugs = ordered.map((item) => item.slug);
+  const index = slugs.findIndex((entry) => entry === section.slug);
+  const previousSlug = index > 0 ? slugs[index - 1] : null;
+  const nextSlug = index >= 0 && index < slugs.length - 1 ? slugs[index + 1] : null;
+
+  return res.json({
+    ok: true,
+    section,
+    previousSlug,
+    nextSlug,
+  });
+});
+
+app.get("/internal/web/book/search", requireInternalApiAuth, async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+  if (!q) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "q is required",
+      },
+    });
+  }
+
+  const docs = getPublishedSectionsOrdered();
+  const results = docs
+    .filter((item) => {
+      const haystack = `${item.slug || ""}\n${item.section_title || ""}\n${item.body_markdown || ""}`.toLowerCase();
+      return haystack.includes(q);
+    })
+    .slice(0, 20)
+    .map((item) => {
+      const snippet = String(item.body_markdown || "").slice(0, 240);
+      const headings = (() => {
+        try {
+          return item.headings ? JSON.parse(item.headings) : [];
+        } catch {
+          return [];
+        }
+      })();
+
+      return {
+        sectionSlug: item.slug,
+        anchorId: headings[0]?.id || "",
+        score: 1,
+        snippet,
+      };
+    });
+
+  return res.json({
+    ok: true,
+    q,
+    results,
   });
 });
 

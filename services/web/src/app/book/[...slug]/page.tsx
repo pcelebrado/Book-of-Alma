@@ -7,7 +7,8 @@ import Link from 'next/link';
 
 import { HighlightToolbar } from '@/components/highlight-toolbar';
 import { SectionBlocks } from '@/components/section-blocks';
-import { bookSections } from '@/lib/db/repositories';
+import { getSessionUser } from '@/lib/auth/auth-config';
+import { coreFetch } from '@/lib/core-client';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 
@@ -98,22 +99,32 @@ function renderMarkdown(markdown: string): string {
   return output.join('');
 }
 
-function getSection(slug: string): SectionPayload | null {
+async function getSection(
+  slug: string,
+  userId: string,
+  role: 'admin' | 'user',
+): Promise<SectionPayload | null> {
   try {
-    const section = bookSections.findBySlug(slug);
+    const result = await coreFetch<{
+      section: {
+        slug: string;
+        section_title: string;
+        part_slug: string;
+        part_title: string;
+        chapter_slug: string;
+        chapter_title: string;
+        frontmatter?: string | null;
+        body_markdown?: string;
+        headings?: string | null;
+      };
+      previousSlug?: string | null;
+      nextSlug?: string | null;
+    }>(`/internal/web/book/section?slug=${encodeURIComponent(slug)}`, {
+      uid: userId,
+      role,
+    });
 
-    if (!section) {
-      return null;
-    }
-
-    const orderedSlugs = bookSections.findPublishedSlugsOrdered();
-    const slugs = orderedSlugs.map((entry) => entry.slug);
-    const sectionPosition = slugs.findIndex((entrySlug) => entrySlug === section.slug);
-    const previousSlug = sectionPosition > 0 ? slugs[sectionPosition - 1] : undefined;
-    const nextSlug =
-      sectionPosition >= 0 && sectionPosition < slugs.length - 1
-        ? slugs[sectionPosition + 1]
-        : undefined;
+    const section = result.section;
 
     return {
       section: {
@@ -132,8 +143,8 @@ function getSection(slug: string): SectionPayload | null {
         content: section.body_markdown,
       },
       headings: section.headings ? JSON.parse(section.headings) : [],
-      previousSlug,
-      nextSlug,
+      previousSlug: result.previousSlug ?? undefined,
+      nextSlug: result.nextSlug ?? undefined,
     };
   } catch {
     return null;
@@ -142,7 +153,10 @@ function getSection(slug: string): SectionPayload | null {
 
 export default async function ReaderPage({ params }: SectionPageProps) {
   const sectionSlug = params.slug?.join('/') ?? '';
-  const payload = getSection(sectionSlug);
+  const session = await getSessionUser();
+  const payload = session
+    ? await getSection(sectionSlug, session.id, session.role)
+    : null;
 
   if (!payload?.section) {
     return (

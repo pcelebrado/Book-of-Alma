@@ -42,6 +42,19 @@ export async function GET() {
     checks.core_auth = 'not_configured';
   }
 
+  // Check core-backed web data stores
+  if (checks.core === 'reachable') {
+    try {
+      const { coreFetch } = await import('@/lib/core-client');
+      await coreFetch('/internal/web/data/status', { timeoutMs: 20_000 });
+      checks.data_store = 'reachable';
+    } catch {
+      checks.data_store = 'unreachable';
+    }
+  } else {
+    checks.data_store = 'not_configured';
+  }
+
   // Check service auth config
   const serviceToken = process.env.INTERNAL_SERVICE_TOKEN;
   const jwtKeySet = process.env.INTERNAL_JWT_SIGNING_KEYS;

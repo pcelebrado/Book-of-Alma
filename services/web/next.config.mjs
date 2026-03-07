@@ -1,11 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-
-  // Keep native sqlite binding external in standalone output.
-  experimental: {
-    serverComponentsExternalPackages: ['better-sqlite3'],
-  },
   
   // Production optimizations
   poweredByHeader: false,
