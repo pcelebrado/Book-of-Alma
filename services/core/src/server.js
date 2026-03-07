@@ -102,6 +102,63 @@ const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   true,
 );
 
+const QMD_INDEX_SQLITE_PATH = path.join(
+  STATE_DIR,
+  "agents",
+  "main",
+  "qmd",
+  "xdg-cache",
+  "qmd",
+  "index.sqlite",
+);
+
+const WORKSPACE_QMD_SQLITE_LINK = path.join(WORKSPACE_DIR, "qmd-index.sqlite");
+const WORKSPACE_SQLITE_SOURCES_DOC = path.join(WORKSPACE_DIR, "SQLITE_SOURCES.md");
+
+function syncWorkspaceSqliteScaffold() {
+  fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+  const qmdExists = fs.existsSync(QMD_INDEX_SQLITE_PATH);
+  const lines = [
+    "# SQLite Sources",
+    "",
+    "This workspace exposes SQLite locations used by OpenClaw runtime.",
+    "",
+    "- qmd-index.sqlite (symlink in workspace)",
+    `  - target: ${QMD_INDEX_SQLITE_PATH}`,
+    `  - target_exists: ${qmdExists ? "yes" : "no"}`,
+    "- web service sqlite path: /data/web.db",
+    "  - note: lives in the web service container filesystem, not this core container",
+  ];
+  fs.writeFileSync(WORKSPACE_SQLITE_SOURCES_DOC, `${lines.join("\n")}\n`, "utf8");
+
+  try {
+    const stat = fs.lstatSync(WORKSPACE_QMD_SQLITE_LINK);
+    if (!stat.isSymbolicLink()) {
+      fs.rmSync(WORKSPACE_QMD_SQLITE_LINK, { force: true });
+    }
+  } catch {
+    // missing path is expected on first boot
+  }
+
+  try {
+    const linked = fs.readlinkSync(WORKSPACE_QMD_SQLITE_LINK);
+    if (linked !== QMD_INDEX_SQLITE_PATH) {
+      fs.rmSync(WORKSPACE_QMD_SQLITE_LINK, { force: true });
+      fs.symlinkSync(QMD_INDEX_SQLITE_PATH, WORKSPACE_QMD_SQLITE_LINK);
+    }
+    return;
+  } catch {
+    // link missing or unreadable, create it below
+  }
+
+  try {
+    fs.symlinkSync(QMD_INDEX_SQLITE_PATH, WORKSPACE_QMD_SQLITE_LINK);
+  } catch {
+    // Non-fatal: workspace doc still provides deterministic paths.
+  }
+}
+
 function clawArgs(args) {
   return [OPENCLAW_ENTRY, ...args];
 }
@@ -2430,6 +2487,14 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
 
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);
   console.log(`[wrapper] gateway target: ${GATEWAY_TARGET}`);
+
+  try {
+    syncWorkspaceSqliteScaffold();
+    console.log("[wrapper] sqlite scaffold synced into workspace");
+  } catch (err) {
+    console.warn(`[wrapper] failed to sync sqlite scaffold: ${String(err)}`);
+  }
+
   if (!SETUP_PASSWORD) {
     console.warn("[wrapper] WARNING: SETUP_PASSWORD is not set; /setup will error.");
   }
