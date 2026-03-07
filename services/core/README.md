@@ -65,6 +65,8 @@ Railway containers have an ephemeral filesystem. Only the mounted volume at `/da
 What persists:
 - **OpenClaw config and credentials** — `/data/.openclaw/`
 - **Agent workspace** — `/data/workspace/`
+- **QMD sqlite index** — `/data/.openclaw/agents/main/qmd/xdg-cache/qmd/index.sqlite`
+- **Workspace sqlite pointers** — `/data/workspace/SQLITE_SOURCES.md`, `/data/workspace/qmd-index.sqlite`
 - **Node global tools** — `/data/npm/`, `/data/pnpm/`
 - **Python venvs** — create under `/data/`
 
@@ -80,7 +82,7 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `disconnected (1008): pairing required` | No device approved yet | Use debug console: `openclaw devices list` then `approve <id>` |
+| `disconnected (1008): pairing required` | Pending dashboard device not approved | In Admin, run Approve Pairing (auto-approves pending device requests); or use `openclaw devices list` then `approve <id>` |
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
