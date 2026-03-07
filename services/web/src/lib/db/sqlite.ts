@@ -37,8 +37,10 @@ function initDatabase(database: DatabaseType): void {
     database.exec(schema);
   } catch {
     // In production (standalone Next.js output), schema.sql may not be at __dirname.
-    // Fall back to inline schema creation. The schema is idempotent (IF NOT EXISTS).
-    // If both fail, the first query will surface the real error.
+    // Docker runtime copies schema.sql to /app/src/lib/db/schema.sql.
+    const runtimeSchemaPath = join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
+    const runtimeSchema = readFileSync(runtimeSchemaPath, 'utf-8');
+    database.exec(runtimeSchema);
   }
 }
 
