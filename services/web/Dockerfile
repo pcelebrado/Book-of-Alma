@@ -1,7 +1,7 @@
 # OpenClaw Web Service Dockerfile
 # Multi-stage build for Next.js 14+ with standalone output
 # Optimized for Railway deployment with IPv4/IPv6 dual-stack support
-# DECISION_197: SQLite replaces MongoDB — better-sqlite3 needs native build tools
+# DECISION_197 follow-up: web runtime is fully core-backed
 
 # =============================================================================
 # Stage 1: Dependencies
@@ -9,9 +9,6 @@
 FROM node:20-alpine AS deps
 
 WORKDIR /app
-
-# better-sqlite3 requires build tools for native addon compilation
-RUN apk add --no-cache python3 make g++
 
 # Copy package files
 COPY package.json package-lock.json ./
@@ -45,22 +42,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# SQLite database path — persisted on Railway volume
-ENV SQLITE_DB_PATH=/data/web.db
-
 # Create non-root user for security
 RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 
-# Create data directory for SQLite (Railway volume mount point)
+# Create data directory for optional runtime artifacts
 RUN mkdir -p /data && chown nextjs:nodejs /data
 
 # Copy built application
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Copy schema.sql for runtime database initialization
-COPY --from=builder --chown=nextjs:nodejs /app/src/lib/db/schema.sql ./src/lib/db/schema.sql
 
 # Switch to non-root user
 USER nextjs

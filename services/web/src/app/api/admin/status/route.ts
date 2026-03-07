@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return apiError('forbidden', 'Admin role required', 403);
   }
 
-  let sqlite: 'connected' | 'unreachable' = 'connected';
+  let dataStore: 'connected' | 'unreachable' = 'connected';
 
   let core: 'ok' | 'unreachable' = 'ok';
   let coreComponents: Record<string, unknown> = {};
@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
         timeoutMs: 12_000,
       },
     );
-    sqlite = dataStatus.stores ? 'connected' : 'unreachable';
+    dataStore = dataStatus.stores ? 'connected' : 'unreachable';
   } catch (error) {
     core = 'unreachable';
-    sqlite = 'unreachable';
+    dataStore = 'unreachable';
     if (error instanceof CoreClientError) {
       lastCoreUnavailableAt = new Date();
     }
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
   }
 
   return Response.json({
-    sqlite,
+    dataStore,
     core,
     components: coreComponents,
     lastReindexRun: {
@@ -87,6 +87,6 @@ export async function GET(request: NextRequest) {
     },
     lastCoreHealthCheck: new Date().toISOString(),
     lastCoreUnavailableAt,
-    lastDbErrorAt: sqlite === 'unreachable' ? new Date().toISOString() : null,
+    lastDbErrorAt: dataStore === 'unreachable' ? new Date().toISOString() : null,
   });
 }

@@ -15,7 +15,7 @@ with a browser-based setup wizard for zero-CLI deployment.
 
 ## Architecture
 
-This is **Service B** in the OpenClaw 3-service Railway deployment:
+This is **Service B** in the OpenClaw Railway deployment:
 
 ```
 Browser → [web] (public) → [core] (internal, this service)
@@ -95,7 +95,6 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 ## Related services
 
 - [`openclaw-web`](https://github.com/pcelebrado/openclaw-web) — Next.js frontend (public)
-- [`openclaw-mongo`](https://github.com/pcelebrado/openclaw-mongo) — MongoDB replica set (internal)
 
 ## License
 

@@ -1,9 +1,9 @@
 # =============================================================================
 # OpenClaw Core Service — Railway Config-as-Code
-# CONSOLIDATED SERVICE: OpenClaw + MongoDB + QMD + SFTPGo
+# CONSOLIDATED SERVICE: OpenClaw + QMD + SFTPGo + wrapper APIs
 # =============================================================================
-# Must use Dockerfile — this container runs multiple processes (mongod,
-# sftpgo, node) that Railpack cannot orchestrate.
+# Must use Dockerfile — this container runs multiple processes
+# (openclaw, gateway, sftpgo, node wrapper) that Railpack cannot orchestrate.
 # Environment variables are configured via Railway dashboard or
 # Raw Editor (see .env.railway for copy-paste values).
 # =============================================================================

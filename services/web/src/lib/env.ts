@@ -85,21 +85,6 @@ export function getJwtSigningKeys(): JwtSigningKey[] {
   ];
 }
 
-/** Book content configuration (safe to read on server). */
-export function getBookConfig() {
-  return {
-    sourceMode: process.env.BOOK_SOURCE_MODE ?? 'external',
-    sourceDir: process.env.BOOK_SOURCE_DIR ?? '/data/book-source',
-    importManifest:
-      process.env.BOOK_IMPORT_MANIFEST ?? '/data/book-source/manifest.json',
-    canonicalCollection:
-      process.env.BOOK_CANONICAL_COLLECTION ?? 'book_sections',
-    tocCollection: process.env.BOOK_TOC_COLLECTION ?? 'book_toc',
-    importEnabled: process.env.BOOK_IMPORT_ENABLED === 'true',
-    importDryRun: process.env.BOOK_IMPORT_DRY_RUN !== 'false',
-  } as const;
-}
-
 /**
  * Quick readiness check for server components.
  * Returns which dependencies are configured (not connected — just configured).
@@ -112,6 +97,5 @@ export function getConfigStatus() {
         process.env.INTERNAL_JWT_SIGNING_KEYS ||
         process.env.INTERNAL_JWT_SIGNING_KEY
     ),
-    bookImport: process.env.BOOK_IMPORT_ENABLED === 'true',
   };
 }

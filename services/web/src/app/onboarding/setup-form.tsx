@@ -20,7 +20,6 @@ export function OnboardingForm() {
   const [stateErrorCode, setStateErrorCode] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<{
     data_store?: string;
-    sqlite?: string;
     core?: string;
     core_auth?: string;
     service_auth?: string;
@@ -70,7 +69,6 @@ export function OnboardingForm() {
         if (healthResponse.ok) {
           const healthPayload = (await healthResponse.json()) as {
             data_store?: string;
-            sqlite?: string;
             core?: string;
             core_auth?: string;
             service_auth?: string;
@@ -167,7 +165,7 @@ export function OnboardingForm() {
               <p>Code: <span className="font-mono">{stateErrorCode}</span></p>
               {diagnostics ? (
                 <div className="space-y-1 text-muted-foreground">
-                  <p>data_store: <span className="font-mono">{diagnostics.data_store ?? diagnostics.sqlite ?? 'unknown'}</span></p>
+                  <p>data_store: <span className="font-mono">{diagnostics.data_store ?? 'unknown'}</span></p>
                   <p>core: <span className="font-mono">{diagnostics.core ?? 'unknown'}</span></p>
                   <p>core_auth: <span className="font-mono">{diagnostics.core_auth ?? 'unknown'}</span></p>
                   <p>service_auth: <span className="font-mono">{diagnostics.service_auth ?? 'unknown'}</span></p>

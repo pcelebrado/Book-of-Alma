@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 // ---------------------------------------------------------------------------
 
 interface AdminStatusPayload {
-  sqlite?: string;
+  dataStore?: string;
   core?: string;
   components?: Record<string, string>;
   lastReindexRun?: { at?: string | null; details?: Record<string, unknown> | null };
@@ -665,9 +665,9 @@ export default function AdminPage() {
           </Badge>
         </div>
         <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-          <span className="font-medium">SQLite</span>
-          <Badge variant={status?.sqlite === 'connected' ? 'secondary' : 'destructive'}>
-            {status?.sqlite ?? 'unknown'}
+          <span className="font-medium">Data Store</span>
+          <Badge variant={status?.dataStore === 'connected' ? 'secondary' : 'destructive'}>
+            {status?.dataStore ?? 'unknown'}
           </Badge>
         </div>
         <div className="flex items-center gap-2 rounded-md border px-3 py-2">

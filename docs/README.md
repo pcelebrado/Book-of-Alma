@@ -12,9 +12,9 @@ Welcome to the comprehensive documentation for the OpenClaw Railway Template—a
 
 ### Core Features
 
-1. **[Service Architecture](./service-architecture.md)** — Two-service Railway deployment (Web + Core w/ embedded MongoDB)
+1. **[Service Architecture](./service-architecture.md)** — Two-service Railway deployment (Web + Core)
 2. **[Book-First UI](./book-first-ui.md)** — Calm research UI with three-column sacred shell
-3. **[MongoDB Data Layer](./mongodb-data-layer.md)** — Data model for book content and user data
+3. **[MongoDB Data Layer](./mongodb-data-layer.md)** — Historical migration notes (core-backed stores)
 4. **[Internal Service Authentication](./internal-service-auth.md)** — JWT-based service-to-service auth
 5. **[Agent Skills & AI Integration](./agent-skills.md)** — Six AI-assisted study tools
 6. **[Security & Rate Limiting](./security-rate-limiting.md)** — Defense in depth with rate limiting
@@ -40,19 +40,19 @@ Welcome to the comprehensive documentation for the OpenClaw Railway Template—a
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    [core] — Internal Only                         │   │
 │  │                                                                  │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │   │
-│  │  │   OpenClaw   │  │   MongoDB    │  │     QMD Search       │   │   │
-│  │  │  (AI Agent)  │  │  (embedded)  │  │  (Semantic Index)    │   │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────────────┘   │   │
+│  │  ┌──────────────┐  ┌────────────────────────────────────────┐   │   │
+│  │  │   OpenClaw   │  │     Core-backed Data + QMD Search     │   │   │
+│  │  │  (AI Agent)  │  │      (JSON stores + sqlite index)     │   │   │
+│  │  └──────────────┘  └────────────────────────────────────────┘   │   │
 │  │                                                                  │   │
-│  │  Single Railway volume: /data (500MB)                            │   │
-│  │  • /data/db — MongoDB   • /data/.openclaw — Config & state      │   │
-│  │  • /data/workspace      • /data/book-source — Content staging   │   │
+│  │  Single Railway volume: /data                                    │   │
+│  │  • /data/.openclaw — Config & state                              │   │
+│  │  • /data/workspace  • /data/web-*.json — web app stores         │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Two-service architecture:** Browsers talk only to `web`. The `core` service runs OpenClaw, MongoDB, and QMD together on a single 500MB persistent volume — optimized for Railway's free plan.
+**Two-service architecture:** Browsers talk only to `web`. The `core` service runs OpenClaw, QMD, and core-backed app stores together on a single persistent volume.
 
 ## Design Philosophy
 
@@ -101,20 +101,16 @@ See individual feature documents for detailed configuration options.
 
 ```bash
 # Web Service
-MONGODB_URI=mongodb://core.railway.internal:27017/openclaw
-INTERNAL_CORE_BASE_URL=http://core.railway.internal:8080
+INTERNAL_CORE_BASE_URL=http://openclaw-core.railway.internal:2022
 INTERNAL_SERVICE_TOKEN=changeme-generate-a-strong-random-token
 AUTH_SECRET=your-auth-secret
 AUTH_URL=https://your-app.railway.app
 
-# Core Service (MongoDB runs embedded — no separate mongo service needed)
+# Core Service (OpenClaw + QMD + core-backed stores)
 INTERNAL_SERVICE_TOKEN=changeme-generate-a-strong-random-token
 SETUP_PASSWORD=your-secure-setup-password
 OPENCLAW_STATE_DIR=/data/.openclaw
 OPENCLAW_WORKSPACE_DIR=/data/workspace
-MONGO_PORT=27017
-MONGO_BIND_IP=::,0.0.0.0
-MONGODB_URI=mongodb://127.0.0.1:27017/openclaw
 ```
 
 ## Deployment
