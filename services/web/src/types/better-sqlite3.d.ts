@@ -1,5 +1,5 @@
 declare module 'better-sqlite3' {
-  export default class Database {
+  class BetterSqliteDatabase {
     constructor(path: string, options?: Record<string, unknown>);
     prepare(sql: string): {
       get: (...args: unknown[]) => unknown;
@@ -10,4 +10,7 @@ declare module 'better-sqlite3' {
     exec(sql: string): void;
     close(): void;
   }
+
+  export type Database = BetterSqliteDatabase;
+  export default BetterSqliteDatabase;
 }
