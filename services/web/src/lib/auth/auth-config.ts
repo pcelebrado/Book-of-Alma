@@ -8,8 +8,7 @@ import Credentials from 'next-auth/providers/credentials';
 
 import { getAuthSecret } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/logger';
-import { verifyPassword } from '@/lib/auth/session';
-import { users } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 
 type Role = 'admin' | 'user';
 
@@ -56,12 +55,23 @@ export const {
         }
 
         try {
-          const user = users.findByEmail(email);
+          const verified = await coreFetch<{
+            ok: boolean;
+            user?: AuthUser;
+          }, {
+            email: string;
+            password: string;
+          }>('/internal/web/auth/verify', {
+            method: 'POST',
+            body: {
+              email,
+              password,
+            },
+            rid: requestId ?? undefined,
+          });
 
-          if (!user || !verifyPassword(password, {
-            password: user.password,
-            passwordHash: user.password_hash,
-          })) {
+          const user = verified.user;
+          if (!user) {
             await logSecurityEvent('auth.login.fail', {
               requestId,
               route: '/api/auth/login',
@@ -69,8 +79,6 @@ export const {
             });
             return null;
           }
-
-          users.updateLastLogin(user.id);
 
           await logSecurityEvent('auth.login.success', {
             requestId,
@@ -86,6 +94,15 @@ export const {
             role: user.role,
           } satisfies AuthUser;
         } catch (error) {
+          if (error instanceof CoreClientError && error.statusCode === 401) {
+            await logSecurityEvent('auth.login.fail', {
+              requestId,
+              route: '/api/auth/login',
+              details: { reason: 'invalid_credentials', email },
+            });
+            return null;
+          }
+
           await logSecurityEvent('db.error', {
             requestId,
             route: '/api/auth/login',

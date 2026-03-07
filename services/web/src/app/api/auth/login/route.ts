@@ -7,8 +7,8 @@ import type { NextRequest } from 'next/server';
 
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
 import { signIn } from '@/lib/auth/auth-config';
-import { users } from '@/lib/db/repositories';
-import { logSecurityEvent, writeAuditLog } from '@/lib/logger';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
+import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,13 @@ interface LoginBody {
   username?: string;
   password?: string;
   code?: string;
+}
+
+interface CoreAuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'user';
 }
 
 function resolveIp(request: NextRequest): string {
@@ -54,7 +61,7 @@ export async function POST(request: NextRequest) {
     return apiRateLimited(RATE_LIMIT_RULES.login.message, loginLimit.retryAfterSeconds);
   }
 
-  const user = users.findByEmail(email);
+  let verifiedUser: CoreAuthUser | null = null;
 
   try {
     await signIn('credentials', {
@@ -73,31 +80,44 @@ export async function POST(request: NextRequest) {
           email,
         },
       });
-      await writeAuditLog({
-        action: 'login_fail',
-        details: {
-          requestId,
-          email,
-          reason: error.type,
-        },
-      });
       return apiError('invalid_credentials', 'Invalid email or password', 401);
     }
 
     throw error;
   }
 
-  if (!user) {
+  try {
+    const verified = await coreFetch<{ ok: boolean; user?: CoreAuthUser }>(
+      '/internal/web/auth/verify',
+      {
+        method: 'POST',
+        body: {
+          email,
+          password,
+        },
+        rid: requestId ?? undefined,
+      },
+    );
+    verifiedUser = verified.user ?? null;
+  } catch (error) {
+    if (error instanceof CoreClientError && error.statusCode === 401) {
+      return apiError('invalid_credentials', 'Invalid email or password', 401);
+    }
+
+    return apiError('core_auth_unavailable', 'Unable to verify account with core service', 503);
+  }
+
+  if (!verifiedUser) {
     return apiError('invalid_credentials', 'Invalid email or password', 401);
   }
 
   return Response.json({
     user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
+      id: verifiedUser.id,
+      name: verifiedUser.name,
+      email: verifiedUser.email,
     },
-    role: user.role,
-    prefs: user.prefs ? JSON.parse(user.prefs) : null,
+    role: verifiedUser.role,
+    prefs: null,
   });
 }

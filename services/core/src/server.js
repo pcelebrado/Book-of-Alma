@@ -114,6 +114,112 @@ const QMD_INDEX_SQLITE_PATH = path.join(
 
 const WORKSPACE_QMD_SQLITE_LINK = path.join(WORKSPACE_DIR, "qmd-index.sqlite");
 const WORKSPACE_SQLITE_SOURCES_DOC = path.join(WORKSPACE_DIR, "SQLITE_SOURCES.md");
+const WEB_AUTH_STORE_PATH = path.join(STATE_DIR, "web-auth-users.json");
+
+function hashPassword(password) {
+  return crypto.createHash("sha256").update(String(password)).digest("hex");
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function readWebAuthUsers() {
+  try {
+    const raw = fs.readFileSync(WEB_AUTH_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.users)) return [];
+    return parsed.users.filter((user) => user && typeof user === "object");
+  } catch {
+    return [];
+  }
+}
+
+function writeWebAuthUsers(users) {
+  fs.mkdirSync(path.dirname(WEB_AUTH_STORE_PATH), { recursive: true });
+  const payload = {
+    version: 1,
+    users,
+  };
+  const tempPath = `${WEB_AUTH_STORE_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tempPath, WEB_AUTH_STORE_PATH);
+}
+
+function countWebAuthUsers() {
+  return readWebAuthUsers().length;
+}
+
+function findWebAuthUserByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  const users = readWebAuthUsers();
+  return users.find((user) => normalizeEmail(user.email) === normalized) || null;
+}
+
+function registerInitialWebAdmin({ name, email, password }) {
+  const users = readWebAuthUsers();
+  if (users.length > 0) {
+    return { ok: false, code: "onboarding_closed", message: "Initial admin already exists" };
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  if (!name || !normalizedEmail || !password) {
+    return { ok: false, code: "invalid_request", message: "name, email, and password are required" };
+  }
+
+  const now = new Date().toISOString();
+  const user = {
+    id: crypto.randomUUID(),
+    name: String(name).trim(),
+    email: normalizedEmail,
+    role: "admin",
+    password_hash: hashPassword(password),
+    created_at: now,
+    updated_at: now,
+    last_login_at: null,
+  };
+
+  writeWebAuthUsers([user]);
+  return { ok: true, user };
+}
+
+function verifyWebAuthCredentials({ email, password }) {
+  const normalizedEmail = normalizeEmail(email);
+  const user = findWebAuthUserByEmail(normalizedEmail);
+  if (!user) return { ok: false, code: "invalid_credentials", user: null };
+
+  const incomingHash = hashPassword(password);
+  const storedHash = typeof user.password_hash === "string" ? user.password_hash : "";
+  const storedPlain = typeof user.password === "string" ? user.password : "";
+  if (storedHash !== incomingHash && storedPlain !== String(password)) {
+    return { ok: false, code: "invalid_credentials", user: null };
+  }
+
+  const users = readWebAuthUsers();
+  const now = new Date().toISOString();
+  const nextUsers = users.map((candidate) => {
+    if (candidate.id !== user.id) return candidate;
+    return {
+      ...candidate,
+      last_login_at: now,
+      updated_at: now,
+    };
+  });
+  writeWebAuthUsers(nextUsers);
+
+  const fresh = nextUsers.find((candidate) => candidate.id === user.id) || user;
+  return {
+    ok: true,
+    code: "ok",
+    user: {
+      id: fresh.id,
+      name: fresh.name,
+      email: fresh.email,
+      role: fresh.role === "admin" ? "admin" : "user",
+    },
+  };
+}
 
 function syncWorkspaceSqliteScaffold() {
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
@@ -611,6 +717,96 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
         toolsInvoke: "/tools/invoke",
       },
     },
+  });
+});
+
+app.get("/internal/web/auth/onboarding-state", requireInternalApiAuth, async (_req, res) => {
+  const userCount = countWebAuthUsers();
+  return res.json({
+    ok: true,
+    onboardingOpen: userCount === 0,
+    userCount,
+  });
+});
+
+app.post("/internal/web/auth/register", requireInternalApiAuth, async (req, res) => {
+  const body = req.body || {};
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const password = typeof body.password === "string" ? body.password : "";
+
+  if (!name || !email || !password) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "name, email, and password are required",
+      },
+    });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_password",
+        message: "Password must be at least 8 characters",
+      },
+    });
+  }
+
+  const result = registerInitialWebAdmin({ name, email, password });
+  if (!result.ok) {
+    const statusCode = result.code === "onboarding_closed" ? 403 : 400;
+    return res.status(statusCode).json({
+      ok: false,
+      error: {
+        code: result.code,
+        message: result.message,
+      },
+    });
+  }
+
+  return res.json({
+    ok: true,
+    user: {
+      id: result.user.id,
+      name: result.user.name,
+      email: result.user.email,
+    },
+    role: result.user.role,
+  });
+});
+
+app.post("/internal/web/auth/verify", requireInternalApiAuth, async (req, res) => {
+  const body = req.body || {};
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const password = typeof body.password === "string" ? body.password : "";
+
+  if (!email || !password) {
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "invalid_request",
+        message: "email and password are required",
+      },
+    });
+  }
+
+  const result = verifyWebAuthCredentials({ email, password });
+  if (!result.ok || !result.user) {
+    return res.status(401).json({
+      ok: false,
+      error: {
+        code: "invalid_credentials",
+        message: "Invalid email or password",
+      },
+    });
+  }
+
+  return res.json({
+    ok: true,
+    user: result.user,
   });
 });
 

@@ -3,12 +3,11 @@
  * GET  /api/auth/register — Check onboarding state.
  * DECISION_197: MongoDB → SQLite migration.
  */
-import { createHash } from 'node:crypto';
 
 import type { NextRequest } from 'next/server';
 
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
-import { users } from '@/lib/db/repositories';
+import { CoreClientError, coreFetch } from '@/lib/core-client';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -33,16 +32,14 @@ function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
-function toPasswordHash(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
-}
-
 export async function GET() {
   try {
-    const userCount = users.count();
+    const state = await coreFetch<{ onboardingOpen: boolean; userCount: number }>(
+      '/internal/web/auth/onboarding-state',
+    );
     return Response.json({
-      onboardingOpen: userCount === 0,
-      userCount,
+      onboardingOpen: state.onboardingOpen,
+      userCount: state.userCount,
     });
   } catch {
     return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
@@ -79,29 +76,52 @@ export async function POST(request: NextRequest) {
     return apiRateLimited(RATE_LIMIT_RULES.login.message, registerLimit.retryAfterSeconds);
   }
 
-  let userCount: number;
-
   try {
-    userCount = users.count();
+    const state = await coreFetch<{ onboardingOpen: boolean; userCount: number }>(
+      '/internal/web/auth/onboarding-state',
+      {
+        rid: requestId ?? undefined,
+      },
+    );
+
+    if (!state.onboardingOpen) {
+      return apiError('onboarding_closed', 'Initial admin has already been created', 403);
+    }
   } catch {
     return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
   }
 
-  if (userCount > 0) {
-    return apiError('onboarding_closed', 'Initial admin has already been created', 403);
-  }
+  let insertedId = '';
+  try {
+    const created = await coreFetch<{
+      ok: boolean;
+      role: string;
+      user: { id: string; name: string; email: string };
+    }, {
+      name: string;
+      email: string;
+      password: string;
+    }>('/internal/web/auth/register', {
+      method: 'POST',
+      body: {
+        name,
+        email,
+        password,
+      },
+      rid: requestId ?? undefined,
+    });
+    insertedId = created.user.id;
+  } catch (error) {
+    if (error instanceof CoreClientError && error.statusCode === 403) {
+      return apiError('onboarding_closed', 'Initial admin has already been created', 403);
+    }
 
-  const existing = users.findByEmail(email);
-  if (existing) {
-    return apiError('email_taken', 'An account with that email already exists', 409);
-  }
+    if (error instanceof CoreClientError && error.statusCode === 409) {
+      return apiError('email_taken', 'An account with that email already exists', 409);
+    }
 
-  const insertedId = users.insert({
-    name,
-    email,
-    role: 'admin',
-    passwordHash: toPasswordHash(password),
-  });
+    return apiError('onboarding_state_unavailable', 'Unable to create initial admin', 503);
+  }
 
   await logSecurityEvent('auth.login.success', {
     requestId,

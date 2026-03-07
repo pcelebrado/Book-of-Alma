@@ -15,14 +15,6 @@ export async function GET() {
     timestamp: new Date().toISOString(),
   };
 
-  // Check SQLite connectivity (non-blocking, best-effort)
-  try {
-    const { isDbHealthy } = await import('@/lib/db/sqlite');
-    checks.sqlite = isDbHealthy() ? 'connected' : 'unreachable';
-  } catch {
-    checks.sqlite = 'unreachable';
-  }
-
   // Check internal core reachability (non-blocking)
   const coreUrl = process.env.INTERNAL_CORE_BASE_URL;
   if (!coreUrl) {
@@ -35,6 +27,19 @@ export async function GET() {
     } catch {
       checks.core = 'unreachable';
     }
+  }
+
+  // Check core auth datastore reachability (non-blocking)
+  if (checks.core === 'reachable') {
+    try {
+      const { coreFetch } = await import('@/lib/core-client');
+      await coreFetch('/internal/web/auth/onboarding-state', { timeoutMs: 20_000 });
+      checks.core_auth = 'reachable';
+    } catch {
+      checks.core_auth = 'unreachable';
+    }
+  } else {
+    checks.core_auth = 'not_configured';
   }
 
   // Check service auth config
