@@ -4,10 +4,13 @@
  * DECISION_197: MongoDB → SQLite migration.
  */
 
+import { createHash } from 'node:crypto';
+
 import type { NextRequest } from 'next/server';
 
 import { apiError, apiRateLimited, parseJsonBody } from '@/lib/api/response';
 import { CoreClientError, coreFetch } from '@/lib/core-client';
+import { users } from '@/lib/db/repositories';
 import { logSecurityEvent } from '@/lib/logger';
 import { RATE_LIMIT_RULES, enforceRateLimit } from '@/lib/rate-limit';
 
@@ -32,6 +35,10 @@ function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+function toPasswordHash(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
+
 export async function GET() {
   try {
     const state = await coreFetch<{ onboardingOpen: boolean; userCount: number }>(
@@ -42,7 +49,15 @@ export async function GET() {
       userCount: state.userCount,
     });
   } catch {
-    return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
+    try {
+      const userCount = users.count();
+      return Response.json({
+        onboardingOpen: userCount === 0,
+        userCount,
+      });
+    } catch {
+      return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
+    }
   }
 }
 
@@ -88,7 +103,14 @@ export async function POST(request: NextRequest) {
       return apiError('onboarding_closed', 'Initial admin has already been created', 403);
     }
   } catch {
-    return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
+    try {
+      const userCount = users.count();
+      if (userCount > 0) {
+        return apiError('onboarding_closed', 'Initial admin has already been created', 403);
+      }
+    } catch {
+      return apiError('onboarding_state_unavailable', 'Unable to verify onboarding state', 503);
+    }
   }
 
   let insertedId = '';
@@ -116,11 +138,21 @@ export async function POST(request: NextRequest) {
       return apiError('onboarding_closed', 'Initial admin has already been created', 403);
     }
 
-    if (error instanceof CoreClientError && error.statusCode === 409) {
-      return apiError('email_taken', 'An account with that email already exists', 409);
-    }
+    try {
+      const existing = users.findByEmail(email);
+      if (existing) {
+        return apiError('email_taken', 'An account with that email already exists', 409);
+      }
 
-    return apiError('onboarding_state_unavailable', 'Unable to create initial admin', 503);
+      insertedId = users.insert({
+        name,
+        email,
+        role: 'admin',
+        passwordHash: toPasswordHash(password),
+      });
+    } catch {
+      return apiError('onboarding_state_unavailable', 'Unable to create initial admin', 503);
+    }
   }
 
   await logSecurityEvent('auth.login.success', {

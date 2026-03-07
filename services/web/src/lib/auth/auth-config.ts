@@ -8,7 +8,9 @@ import Credentials from 'next-auth/providers/credentials';
 
 import { getAuthSecret } from '@/lib/env';
 import { logSecurityEvent } from '@/lib/logger';
+import { verifyPassword } from '@/lib/auth/session';
 import { CoreClientError, coreFetch } from '@/lib/core-client';
+import { users } from '@/lib/db/repositories';
 
 type Role = 'admin' | 'user';
 
@@ -55,22 +57,46 @@ export const {
         }
 
         try {
-          const verified = await coreFetch<{
-            ok: boolean;
-            user?: AuthUser;
-          }, {
-            email: string;
-            password: string;
-          }>('/internal/web/auth/verify', {
-            method: 'POST',
-            body: {
-              email,
-              password,
-            },
-            rid: requestId ?? undefined,
-          });
+          let user: AuthUser | null = null;
+          try {
+            const verified = await coreFetch<{
+              ok: boolean;
+              user?: AuthUser;
+            }, {
+              email: string;
+              password: string;
+            }>('/internal/web/auth/verify', {
+              method: 'POST',
+              body: {
+                email,
+                password,
+              },
+              rid: requestId ?? undefined,
+            });
+            user = verified.user ?? null;
+          } catch (error) {
+            if (error instanceof CoreClientError && error.statusCode === 401) {
+              user = null;
+            } else {
+              const local = users.findByEmail(email);
+              if (
+                local &&
+                verifyPassword(password, {
+                  password: local.password,
+                  passwordHash: local.password_hash,
+                })
+              ) {
+                users.updateLastLogin(local.id);
+                user = {
+                  id: local.id,
+                  email: local.email,
+                  name: local.name,
+                  role: local.role,
+                };
+              }
+            }
+          }
 
-          const user = verified.user;
           if (!user) {
             await logSecurityEvent('auth.login.fail', {
               requestId,
