@@ -1,0 +1,11 @@
+# logs
+
+command: railway logs --service openclaw-web --deployment --latest --lines 180
+status: 0
+error: none
+
+## stdout
+
+
+## stderr
+

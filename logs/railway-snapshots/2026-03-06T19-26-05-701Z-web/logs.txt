@@ -1,0 +1,23 @@
+# logs
+
+command: railway logs --service openclaw-web --deployment --latest --lines 180
+status: 0
+error: none
+
+## stdout
+Starting Container
+  - Network:      http://[::]:8080
+
+ ✓ Starting...
+ ✓ Ready in 102ms
+  ▲ Next.js 14.2.35
+  - Local:        http://[::1]:8080
+2026-03-06T07:56:31.255873535Z [INFO]  details={"reason":"wake_probe_sent","publicUrl":"https://openclaw-core-production.up.railway.app"} event="core.unavailable" timestamp="2026-03-06T07:56:31.203Z" requestId="310f9c65-ecbd-43c1-827a-088edb4dd1ea" route="/internal/health" userId=null ip=null
+2026-03-06T07:56:31.255978766Z [INFO]  details={"reason":"wake_probe_sent","publicUrl":"https://openclaw-core-production.up.railway.app"} event="core.unavailable" timestamp="2026-03-06T07:56:31.159Z" requestId="de170c97-2918-48cf-b604-e2c58a86010d" route="/internal/health" userId=null ip=null
+2026-03-06T07:56:33.556703841Z [INFO]  details={"reason":"wake_probe_sent","publicUrl":"https://openclaw-core-production.up.railway.app"} event="core.unavailable" timestamp="2026-03-06T07:56:33.552Z" requestId="98a308f2-11ce-46d8-ae3c-f52c01289027" route="/internal/health" userId=null ip=null
+2026-03-06T07:56:53.548780756Z [INFO]  details={"reason":"wake_probe_sent","publicUrl":"https://openclaw-core-production.up.railway.app"} event="core.unavailable" timestamp="2026-03-06T07:56:47.542Z" requestId="0c55a47f-ba1a-4245-beea-2bafbf2b57c6" route="/internal/health" userId=null ip=null
+2026-03-06T07:57:12.884999926Z [INFO]  details={"reason":"wake_probe_sent","publicUrl":"https://openclaw-core-production.up.railway.app"} event="core.unavailable" timestamp="2026-03-06T07:57:05.603Z" requestId="ee16a47d-7480-4db2-9e0b-c2369bd3efb6" route="/internal/health" userId=null ip=null
+
+
+## stderr
+

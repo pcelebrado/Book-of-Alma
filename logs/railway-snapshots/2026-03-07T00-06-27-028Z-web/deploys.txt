@@ -1,0 +1,13 @@
+# deploys
+
+command: railway deployment list --service openclaw-web
+status: 0
+error: none
+
+## stdout
+Recent Deployments
+  ced50911-9c27-4c2c-9682-2ee61e745828 | SUCCESS | 2026-03-06 16:53:48 -07:00
+
+
+## stderr
+

@@ -1,0 +1,398 @@
+# logs
+
+command: railway logs --service openclaw-core --deployment --latest --lines 180
+status: 0
+error: none
+
+## stdout
+[INFO] ℹ dist/links-Rt4SFKTM.js                      0.49 kB │ gzip:   0.31 kB
+ℹ dist/ws-6_dFpKWQ.js                         0.47 kB │ gzip:   0.24 kB
+
+[INFO] ℹ dist/parse-timeout-DV8NQQWk.js              0.46 kB │ gzip:   0.26 kB
+
+[INFO] ℹ dist/prompt-style-DjZDxcFg.js               0.45 kB │ gzip:   0.25 kB
+
+[INFO] ℹ dist/rolldown-runtime-Cbj13DAv.js           0.42 kB │ gzip:   0.28 kB
+
+[INFO] ℹ dist/helpers-BMCIHKoi.js                    0.41 kB │ gzip:   0.26 kB
+ℹ dist/pairing-labels-D6CBX9y8.js             0.26 kB │ gzip:   0.19 kB
+
+[INFO] ℹ dist/prompts--d-6l5Ln.js                    0.24 kB │ gzip:   0.17 kB
+
+[INFO] ℹ dist/logging-kuFzZMsG.js                    0.01 kB │ gzip:   0.03 kB
+
+[INFO] ℹ 144 files, total: 6103.63 kB
+
+[INFO] ✔ Build complete in 703ms
+
+[INFO] ℹ dist/entry.js                              47.98 kB │ gzip:  13.24 kB
+
+[INFO] ℹ dist/loader-Ds3or8QX.js                  2305.94 kB
+
+[INFO] ℹ dist/gateway-cli-DZge3TdL.js              656.08 kB │ gzip: 153.76 kB
+ℹ dist/config-guard-Ju243EuT.js             227.27 kB │ gzip:  49.38 kB
+ℹ dist/config-Cz6PlSb8.js                   177.87 kB │ gzip:  34.62 kB
+
+[INFO] ℹ dist/status-MxU7F9sH.js                   120.69 kB │ gzip:  31.21 kB
+
+[INFO] ℹ dist/manager-BghcUcWX.js                  118.64 kB │ gzip:  24.63 kB
+
+[INFO] ℹ dist/onboard-skills-BMZpHZe4.js           117.35 kB │ gzip:  25.24 kB
+
+[INFO] ℹ dist/sandbox-npOXJ84S.js                  108.99 kB │ gzip:  24.24 kB
+
+[INFO] ℹ dist/auth-profiles-zEppz1dW.js            101.86 kB │ gzip:  22.79 kB
+
+[INFO] ℹ dist/doctor-BZNWjlZK.js                   101.30 kB │ gzip:  25.70 kB
+
+[INFO] ℹ dist/models-cli-Dxx7UZWi.js                97.94 kB │ gzip:  22.11 kB
+
+[INFO] ℹ dist/deliver-D6MIjM7L.js                   84.80 kB │ gzip:  21.23 kB
+
+[INFO] ℹ dist/tui-CvbxznTw.js                       83.58 kB │ gzip:  19.90 kB
+
+[INFO] ℹ dist/routes-BZSffgT3.js                    78.94 kB │ gzip:  15.64 kB
+
+[INFO] ℹ dist/audit-C8fKP_pz.js                     74.53 kB │ gzip:  18.23 kB
+
+[INFO] ℹ dist/client-Dzx1FlLz.js                    73.51 kB │ gzip:  13.70 kB
+
+[INFO] ℹ dist/chrome-C-gAdv-3.js                    61.10 kB │ gzip:  15.51 kB
+
+[INFO] ℹ dist/channels-cli-DOLweM8h.js              55.51 kB │ gzip:  14.02 kB
+
+[INFO] ℹ dist/pw-ai-DwLA8_G2.js                     54.78 kB │ gzip:  12.65 kB
+ℹ dist/health-format-CO_2F0Gi.js             53.71 kB │ gzip:  13.04 kB
+ℹ dist/nodes-cli-GzX1PQc3.js                 51.76 kB │ gzip:  11.19 kB
+
+[INFO] ℹ dist/node-cli-Di6cXk3F.js                  48.70 kB │ gzip:  12.30 kB
+
+[INFO] ℹ dist/pi-embedded-helpers-CCNP0B92.js       45.47 kB │ gzip:  11.94 kB
+
+[INFO] ℹ dist/update-runner-D9E8xr35.js             42.52 kB │ gzip:   9.39 kB
+ℹ dist/github-copilot-auth-COb5oGZR.js       40.90 kB │ gzip:   7.87 kB
+ℹ dist/update-cli-DR5li-Yx.js                38.77 kB │ gzip:  10.85 kB
+ℹ dist/hooks-cli-D07itMo9.js                 35.47 kB │ gzip:   8.12 kB
+ℹ dist/tui-formatters-BdppNVAm.js            30.54 kB │ gzip:   6.96 kB
+
+[INFO] ℹ dist/configure-MwZ3jPFl.js                 29.85 kB │ gzip:   7.80 kB
+
+[INFO] ℹ dist/daemon-cli-BV6xFMSq.js                29.73 kB │ gzip:   7.08 kB
+
+[INFO] ℹ dist/exec-approvals-BrCstKZw.js            29.48 kB │ gzip:   6.89 kB
+ℹ dist/agent-C-LFFPB6.js                     28.99 kB │ gzip:   7.28 kB
+
+[INFO] ℹ dist/acp-cli-CG62muTd.js                   28.73 kB │ gzip:   7.82 kB
+
+[INFO] ℹ dist/server-context-Di_oV8Uv.js            27.84 kB │ gzip:   7.24 kB
+
+[INFO] ℹ dist/skills-7JHw-ZEf.js                    26.75 kB │ gzip:   6.92 kB
+
+[INFO] ℹ dist/session-cost-usage-72xDw9gJ.js        25.86 kB │ gzip:   6.05 kB
+
+[INFO] ℹ dist/qmd-manager-CKljR8gx.js               24.81 kB │ gzip:   7.15 kB
+
+[INFO] ℹ dist/cron-cli-MAF0wQYu.js                  23.40 kB │ gzip:   5.81 kB
+
+[INFO] ℹ dist/service-DDPRbf8a.js                   23.22 kB │ gzip:   5.55 kB
+
+[INFO] ℹ dist/onboard-channels-kxI3_baa.js          22.92 kB │ gzip:   5.85 kB
+
+[INFO] ℹ dist/image-xjbY_CBB.js                     22.31 kB │ gzip:   6.54 kB
+
+[INFO] ℹ dist/sandbox-cli-0mnsq_K5.js               21.65 kB │ gzip:   5.54 kB
+
+[INFO] ℹ dist/manifest-registry-Cu0J9bfE.js         20.28 kB │ gzip:   5.11 kB
+
+[INFO] ℹ dist/service-audit-Bf1JrA1B.js             18.65 kB │ gzip:   4.84 kB
+
+[INFO] ℹ dist/daemon-runtime-nbFDEt3d.js            18.23 kB │ gzip:   5.09 kB
+
+[INFO] ℹ dist/plugins-B-QGH1FX.js                   17.93 kB │ gzip:   3.93 kB
+
+[INFO] ℹ dist/login-qr-BYs1-VOE.js                  16.68 kB │ gzip:   5.51 kB
+
+[INFO] ℹ dist/completion-cli-CBBRZsM4.js            16.66 kB │ gzip:   4.44 kB
+
+[INFO] ℹ dist/plugin-auto-enable-C9YNTk3o.js        16.60 kB │ gzip:   4.30 kB
+
+[INFO] ℹ dist/tool-display-CefFeFx1.js              16.39 kB │ gzip:   3.82 kB
+
+[INFO] ℹ dist/security-cli-CBuPskgR.js              16.17 kB │ gzip:   4.61 kB
+
+[INFO] ℹ dist/plugins-cli-BrVGHY4M.js               16.13 kB │ gzip:   4.43 kB
+ℹ dist/hooks-status-Cn8_mGAg.js              16.06 kB │ gzip:   4.24 kB
+
+[INFO] ℹ dist/gmail-setup-utils-DyEedMBt.js         15.37 kB │ gzip:   4.47 kB
+
+[INFO] ℹ dist/webhooks-cli-CRKzNe4u.js              14.46 kB │ gzip:   3.95 kB
+
+[INFO] ℹ dist/systemd-BEWwfwn0.js                   14.34 kB │ gzip:   4.12 kB
+
+[INFO] ℹ dist/installs-DNzuaAfs.js                  14.05 kB │ gzip:   3.50 kB
+
+[INFO] ℹ dist/exec-approvals-cli-DgANOXAQ.js        13.75 kB │ gzip:   3.42 kB
+
+[INFO] ℹ dist/agent-scope-nWSUqWp6.js               13.48 kB │ gzip:   3.58 kB
+
+[INFO] ℹ dist/pairing-store-ByGGu2oo.js             11.97 kB │ gzip:   3.14 kB
+
+[INFO] ℹ dist/skills-cli-CZRRcazN.js                11.83 kB │ gzip:   2.93 kB
+
+[INFO] ℹ dist/ws-log-BE6gwUTM.js                    11.82 kB │ gzip:   2.86 kB
+
+[INFO] ℹ dist/call--K7CqSE5.js                      11.40 kB │ gzip:   3.43 kB
+
+[INFO] ℹ dist/register.subclis-j2wKBNOr.js          10.61 kB │ gzip:   2.90 kB
+
+[INFO] ℹ dist/accounts-DLdxtdRR.js                   8.84 kB │ gzip:   2.57 kB
+
+[INFO] ℹ dist/commands-CFg6P_WC.js                   8.81 kB │ gzip:   2.43 kB
+
+[INFO] ℹ dist/update-DUQ6JAyI.js                     8.71 kB │ gzip:   2.19 kB
+
+[INFO] ℹ dist/table-bnfGkIN7.js                      8.47 kB │ gzip:   2.75 kB
+
+[INFO] ℹ dist/logs-cli-COGWPbmF.js                   8.22 kB │ gzip:   2.76 kB
+
+[INFO] ℹ dist/program-Dkp_5B9j.js                    8.14 kB │ gzip:   3.25 kB
+
+[INFO] ℹ dist/tailscale-iX1Q6arn.js                  8.09 kB │ gzip:   2.48 kB
+
+[INFO] ℹ dist/directory-cli-CbovwrLn.js              7.79 kB │ gzip:   1.86 kB
+
+[INFO] ℹ dist/session-key-BRdRr5Ah.js                7.70 kB │ gzip:   1.88 kB
+ℹ dist/server-node-events-W3MqVimM.js         7.68 kB │ gzip:   2.20 kB
+
+[INFO] ℹ dist/dns-cli-RXfK5B57.js                    7.68 kB │ gzip:   2.85 kB
+ℹ dist/skill-scanner-Bp1D9gra.js              7.68 kB │ gzip:   2.56 kB
+
+[INFO] ℹ dist/utils-kK6fjsN0.js                      7.48 kB │ gzip:   2.76 kB
+
+[INFO] ℹ dist/run-main-CXp6H6-6.js                   7.29 kB │ gzip:   2.85 kB
+
+[INFO] ℹ dist/skills-status-DJBHAFFn.js              7.28 kB │ gzip:   2.27 kB
+
+[INFO] ℹ dist/exec-B8JKbXKW.js                       7.15 kB │ gzip:   2.38 kB
+
+[INFO] ℹ dist/devices-cli-D48Uhew6.js                6.97 kB │ gzip:   2.07 kB
+
+[INFO] ℹ dist/sqlite-DODNHWJb.js                     6.67 kB │ gzip:   2.25 kB
+
+[INFO] ℹ dist/auth-DVIDxtSd.js                       6.36 kB │ gzip:   1.80 kB
+
+[INFO] ℹ dist/shared-CM3GOUql.js                     5.81 kB │ gzip:   2.07 kB
+
+[INFO] ℹ dist/docs-cli-WcCdRxa1.js                   5.47 kB │ gzip:   1.98 kB
+ℹ dist/pairing-cli-fDXB0YeZ.js                5.09 kB │ gzip:   1.87 kB
+
+[INFO] ℹ dist/widearea-dns-C-xzPxiS.js               5.04 kB │ gzip:   1.93 kB
+
+[INFO] ℹ dist/nodes-screen-DGlNPbk4.js               4.96 kB │ gzip:   1.32 kB
+
+[INFO] ℹ dist/auth-health-BKjcLUpk.js                4.93 kB │ gzip:   1.51 kB
+
+[INFO] ℹ dist/message-channel-BlgPSDAh.js            4.29 kB │ gzip:   1.27 kB
+
+[INFO] ℹ dist/progress-Da1ehW-x.js                   4.14 kB │ gzip:   1.37 kB
+
+[INFO] ℹ dist/github-copilot-token-SLWintYd.js       3.96 kB │ gzip:   1.54 kB
+
+[INFO] ℹ dist/wsl-RTs6kjQP.js                        3.90 kB │ gzip:   1.56 kB
+
+[INFO] ℹ dist/rpc-DLkc0yOH.js                        3.84 kB │ gzip:   1.63 kB
+
+[INFO] ℹ dist/system-cli-DMcYeqj6.js                 3.79 kB │ gzip:   1.14 kB
+
+[INFO] ℹ dist/redact-BHmk44DI.js                     3.62 kB │ gzip:   1.43 kB
+
+[INFO] ℹ dist/shared-CagUDdmp.js                     3.20 kB │ gzip:   1.15 kB
+
+[INFO] ℹ dist/systemd-linger-CDo2UbHM.js             3.19 kB │ gzip:   1.01 kB
+
+[INFO] ℹ dist/ports-BEoMoDmN.js                      3.14 kB │ gzip:   1.12 kB
+
+[INFO] ℹ dist/archive-D0z3LZDK.js                    3.00 kB │ gzip:   1.16 kB
+
+[INFO] ℹ dist/cli-DECiVSgx.js                        2.97 kB │ gzip:   1.28 kB
+
+[INFO] ℹ dist/constants-DuoCkWRh.js                  2.88 kB │ gzip:   0.79 kB
+
+[INFO] ℹ dist/path-env-Mj23v3sw.js                   2.83 kB │ gzip:   1.10 kB
+
+[INFO] ℹ dist/openclaw-root-9ILYSmJ9.js              2.80 kB │ gzip:   0.80 kB
+
+[INFO] ℹ dist/tui-cli-BwCGtCPA.js                    2.70 kB │ gzip:   1.26 kB
+
+[INFO] ℹ dist/clack-prompter-DuBVnTKy.js             2.60 kB │ gzip:   0.84 kB
+
+[INFO] ℹ dist/paths-C27OFaz1.js                      2.57 kB │ gzip:   0.79 kB
+
+[INFO] ℹ dist/note-Ci08TSbV.js                       2.45 kB │ gzip:   0.90 kB
+
+[INFO] ℹ dist/control-service-1sfEiP_b.js            2.42 kB │ gzip:   0.94 kB
+ℹ dist/format-duration-DCXJx2ba.js            2.42 kB │ gzip:   0.91 kB
+
+[INFO] ℹ dist/format-relative-79_Y1n2Y.js            2.13 kB │ gzip:   0.86 kB
+
+[INFO] ℹ dist/node-service-u8g85nD3.js               2.09 kB │ gzip:   0.62 kB
+
+[INFO] ℹ dist/channel-selection-B-ovKJj_.js          2.06 kB │ gzip:   0.73 kB
+
+[INFO] ℹ dist/brew-C1IaBotH.js                       1.65 kB │ gzip:   0.58 kB
+
+[INFO] ℹ dist/command-format-ayFsmwwz.js             1.58 kB │ gzip:   0.64 kB
+
+[INFO] ℹ dist/usage-format-6Uar63S0.js               1.50 kB │ gzip:   0.58 kB
+
+[INFO] ℹ dist/parse-log-line-CUrpqe1w.js             1.23 kB │ gzip:   0.52 kB
+
+[INFO] ℹ dist/tailnet-CabhakZ7.js                    1.21 kB │ gzip:   0.55 kB
+
+[INFO] ℹ dist/channel-options-Cc5wan4l.js            1.18 kB │ gzip:   0.56 kB
+
+[INFO] ℹ dist/gateway-rpc-Cu95hbYd.js                1.17 kB │ gzip:   0.63 kB
+
+[INFO] ℹ dist/command-options-BA_srPlo.js            1.13 kB │ gzip:   0.51 kB
+
+[INFO] ℹ dist/systemd-hints-zi4ohCOY.js              1.11 kB │ gzip:   0.55 kB
+
+[INFO] ℹ dist/is-main-qJ675wPV.js                    1.00 kB │ gzip:   0.40 kB
+ℹ dist/status-cOnptvBV.js                     0.96 kB │ gzip:   0.43 kB
+
+[INFO] ℹ dist/errors-JRo_LuMk.js                     0.90 kB │ gzip:   0.38 kB
+
+[INFO] ℹ dist/cli-utils-PlLcDZlM.js                  0.86 kB │ gzip:   0.42 kB
+
+[INFO] ℹ dist/pi-model-discovery-DzEIEgHL.js         0.84 kB │ gzip:   0.37 kB
+
+[INFO] ℹ dist/status-Drziap9H.js                     0.82 kB │ gzip:   0.35 kB
+
+[INFO] ℹ dist/deps-BrnYfb2t.js                       0.81 kB │ gzip:   0.31 kB
+ℹ dist/helpers-CQI-5xS9.js                    0.79 kB │ gzip:   0.39 kB
+
+[INFO] ℹ dist/format-CaxeRcue.js                     0.76 kB │ gzip:   0.40 kB
+
+[INFO] ℹ dist/parse-Cjiudy6x.js                      0.70 kB │ gzip:   0.36 kB
+
+[INFO] ℹ dist/help-format-CUnac_bT.js                0.66 kB │ gzip:   0.28 kB
+
+[INFO] ℹ dist/transcript-events-CZ8CG4ht.js          0.59 kB │ gzip:   0.29 kB
+
+[INFO] ℹ dist/channels-status-issues-BthewJlG.js     0.55 kB │ gzip:   0.31 kB
+
+[INFO] ℹ dist/links-Dh-sSJXk.js                      0.49 kB │ gzip:   0.31 kB
+
+[INFO] ℹ dist/logging-DJkpOGZF.js                    0.49 kB │ gzip:   0.29 kB
+
+[INFO] ℹ dist/ws-D091yo4M.js                         0.47 kB │ gzip:   0.24 kB
+
+[INFO] ℹ dist/parse-timeout-DFSPLxpY.js              0.46 kB │ gzip:   0.26 kB
+
+[INFO] ℹ dist/prompt-style-Dc0C5HC9.js               0.44 kB │ gzip:   0.23 kB
+
+[INFO] ℹ dist/rolldown-runtime-Cbj13DAv.js           0.42 kB │ gzip:   0.28 kB
+ℹ dist/helpers-D4gM-kkY.js                    0.41 kB │ gzip:   0.26 kB
+
+[INFO] ℹ dist/pairing-labels-trbTEDI9.js             0.26 kB │ gzip:   0.18 kB
+
+[INFO] ℹ dist/prompts-CXLLIBwP.js                    0.24 kB │ gzip:   0.17 kB
+
+[INFO] ℹ dist/logging-CfEk_PnX.js                    0.01 kB │ gzip:   0.03 kB
+
+[INFO] ℹ 146 files, total: 6111.86 kB
+
+[INFO] ✔ Build complete in 716ms
+
+[INFO] 
+> openclaw@2026.2.9 build:plugin-sdk:dts /openclaw
+> tsc -p tsconfig.plugin-sdk.dts.json
+
+
+[INFO] [copy-hook-metadata] Copied boot-md/HOOK.md
+
+[INFO] [copy-hook-metadata] Copied command-logger/HOOK.md
+
+[INFO] [copy-hook-metadata] Copied session-memory/HOOK.md
+
+[INFO] [copy-hook-metadata] Copied soul-evil/HOOK.md
+[copy-hook-metadata] Done
+
+[INFO] [openclaw-build  9/10] RUN pnpm build
+[INFO] [openclaw-build 10/10] RUN pnpm ui:install && pnpm ui:build
+[INFO] 
+> openclaw@2026.2.9 ui:install /openclaw
+> node scripts/ui.js install
+
+
+[INFO] Scope: all 34 workspace projects
+
+[INFO] 
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: @discordjs/opus, core-js, koffi.                    │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+[INFO] .. prepare$ command -v git >/dev/null 2>&1 && git config core.hooksPath git-hooks || exit 0
+
+[INFO] .. prepare: Done
+
+[INFO] Done in 1.3s using pnpm v10.23.0
+
+[INFO] 
+> openclaw@2026.2.9 ui:build /openclaw
+> node scripts/ui.js build
+
+
+[INFO] 
+> openclaw-control-ui@ build /openclaw/ui
+> vite build
+
+
+[INFO] vite v7.3.1 building client environment for production...
+
+[INFO] transforming...
+
+[INFO] ✓ 130 modules transformed.
+
+[INFO] rendering chunks...
+
+[INFO] computing gzip size...
+
+[INFO] ../dist/control-ui/index.html                   0.69 kB │ gzip:   0.37 kB
+
+[INFO] ../dist/control-ui/assets/index-DWhx-9JL.css   83.87 kB │ gzip:  14.63 kB
+
+[INFO] ../dist/control-ui/assets/index-BeKTXH1m.js   542.77 kB │ gzip: 136.47 kB │ map: 1,485.01 kB
+
+[INFO] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+[INFO] ✓ built in 1.21s
+
+[INFO] [openclaw-build 10/10] RUN pnpm ui:install && pnpm ui:build
+[INFO] [stage-2 11/14] COPY --from=openclaw-build /openclaw /openclaw
+[INFO] [stage-2 11/14] COPY --from=openclaw-build /openclaw /openclaw
+[INFO] [stage-2 12/14] RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"' > /usr/local/bin/openclaw   && chmod +x /usr/local/bin/openclaw
+[INFO] [stage-2 12/14] RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"' > /usr/local/bin/openclaw   && chmod +x /usr/local/bin/openclaw
+[INFO] [stage-2 13/14] COPY src ./src
+[INFO] [stage-2 13/14] COPY src ./src
+[INFO] [stage-2 14/14] COPY scripts ./scripts
+[INFO] [stage-2 14/14] COPY scripts ./scripts
+[INFO] exporting to docker image format
+[INFO] exporting to image
+[INFO] [auth] sharing credentials for production-us-west2.railway-registry.com
+[INFO] [auth] sharing credentials for production-us-west2.railway-registry.com
+[INFO] importing to docker
+[INFO] importing to docker
+
+
+## stderr
+

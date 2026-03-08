@@ -1,0 +1,14 @@
+# ssh-probe-2
+
+command: railway ssh --service openclaw-web ls -la /tmp
+status: 0
+error: none
+
+## stdout
+total 8
+drwxrwxrwt    2 root     root          4096 Jan 27 21:19 [1;34m.[m
+drwxr-xr-x    1 root     root          4096 Mar  6 07:55 [1;34m..[m
+
+
+## stderr
+

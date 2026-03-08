@@ -1,0 +1,13 @@
+# domain
+
+command: railway domain --service openclaw-core
+status: 0
+error: none
+
+## stdout
+Service Domain created:
+🚀 https://openclaw-core-reality-check.up.railway.app
+
+
+## stderr
+

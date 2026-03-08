@@ -1,0 +1,32 @@
+# ssh-probe-2
+
+command: railway ssh --service openclaw-core openclaw health
+status: 1
+error: none
+
+## stdout
+
+[1m[91m🦞 OpenClaw[39m[22m [93m2026.2.9[39m [31m(33c75cb)[39m
+   [31mPairing codes exist because even bots believe in consent—and good security hygiene.[39m
+
+[?25l[90m│[39m
+[32m◇[39m  
+[?25h[2K[openclaw] Failed to start CLI: Error: gateway closed (1006 abnormal closure (no close frame)): no close reason
+Gateway target: ws://127.0.0.1:18789
+Source: local loopback
+Config: /data/.openclaw/openclaw.json
+Bind: loopback
+    at Object.onClose (file:///openclaw/dist/call--K7CqSE5.js:265:10)
+    at WebSocket.<anonymous> (file:///openclaw/dist/client-Dzx1FlLz.js:1606:23)
+    at WebSocket.emit (node:events:519:28)
+    at WebSocket.emitClose (/openclaw/node_modules/.pnpm/ws@8.19.0/node_modules/ws/lib/websocket.js:263:12)
+    at emitErrorAndClose (/openclaw/node_modules/.pnpm/ws@8.19.0/node_modules/ws/lib/websocket.js:1047:13)
+    at ClientRequest.<anonymous> (/openclaw/node_modules/.pnpm/ws@8.19.0/node_modules/ws/lib/websocket.js:886:5)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at Socket.socketErrorListener (node:_http_client:575:5)
+    at Socket.emit (node:events:519:28)
+
+
+## stderr
+

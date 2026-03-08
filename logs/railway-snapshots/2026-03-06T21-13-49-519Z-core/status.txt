@@ -1,0 +1,14 @@
+# status
+
+command: railway service status --service openclaw-core
+status: 0
+error: none
+
+## stdout
+Service: openclaw-core
+Deployment: 69a6703d-f63d-4e85-9fe6-cf4dff292615
+Status: FAILED
+
+
+## stderr
+

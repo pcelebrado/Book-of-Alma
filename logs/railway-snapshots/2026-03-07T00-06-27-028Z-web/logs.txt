@@ -1,0 +1,18 @@
+# logs
+
+command: railway logs --service openclaw-web --deployment --latest --lines 180
+status: 0
+error: none
+
+## stdout
+Starting Container
+  - Local:        http://[::1]:8080
+  ▲ Next.js 14.2.35
+  - Network:      http://[::]:8080
+
+ ✓ Starting...
+ ✓ Ready in 97ms
+
+
+## stderr
+

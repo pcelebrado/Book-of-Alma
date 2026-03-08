@@ -1,0 +1,16 @@
+# ssh-probe-3
+
+command: railway ssh --service openclaw-core openclaw config get memory.backend
+status: 1
+error: none
+
+## stdout
+
+[1m[91m🦞 OpenClaw[39m[22m [93m2026.2.9[39m [31m(33c75cb)[39m
+   [31mSay "stop" and I'll stop—say "ship" and we'll both learn a lesson.[39m
+
+[31mConfig path not found: memory.backend[39m
+[0m[?25h[?1000l[?1002l[?1003l[?1006l[?2004l
+
+## stderr
+

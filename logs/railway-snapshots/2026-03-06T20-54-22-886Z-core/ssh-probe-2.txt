@@ -1,0 +1,22 @@
+# ssh-probe-2
+
+command: railway ssh --service openclaw-core openclaw health
+status: 0
+error: none
+
+## stdout
+
+[1m[91m🦞 OpenClaw[39m[22m [93m2026.2.9[39m [31m(33c75cb)[39m
+   [31mYour inbox, your infra, your rules.[39m
+
+[?25l[90m│[39m
+[32m◇[39m  
+[?25h[2KTelegram: [32mok[39m (@Almastockbot) (288ms)
+[93mAgents: main (default)[39m
+[93mHeartbeat interval: 30m (main)[39m
+[93mSession store (main): /data/.openclaw/agents/main/sessions/sessions.json (1 entries)[39m
+- agent:main:main (1077m ago)
+
+
+## stderr
+

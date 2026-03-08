@@ -1,0 +1,14 @@
+# status
+
+command: railway service status --service openclaw-web
+status: 0
+error: none
+
+## stdout
+Service: openclaw-web
+Deployment: ced50911-9c27-4c2c-9682-2ee61e745828
+Status: SUCCESS
+
+
+## stderr
+

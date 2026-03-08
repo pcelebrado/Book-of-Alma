@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-03-06T19:36:12.633Z",
+  "serviceKey": "core",
+  "serviceName": "openclaw-core",
+  "snapshotDir": "c:\\P4NTH30N\\OP3NF1XER\\nate-alma\\openclaw-template\\logs\\railway-snapshots\\2026-03-06T19-34-30-586Z-core",
+  "checks": [
+    {
+      "name": "status",
+      "command": "railway service status --service openclaw-core",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "domain",
+      "command": "railway domain --service openclaw-core",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "deploys",
+      "command": "railway deployment list --service openclaw-core",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "logs",
+      "command": "railway logs --service openclaw-core --deployment --latest --lines 180",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "ssh-probe-1",
+      "command": "railway ssh --service openclaw-core openclaw status --all",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "ssh-probe-2",
+      "command": "railway ssh --service openclaw-core openclaw doctor",
+      "status": 1,
+      "error": "spawnSync powershell.exe ETIMEDOUT"
+    },
+    {
+      "name": "ssh-probe-3",
+      "command": "railway ssh --service openclaw-core ls -la /data",
+      "status": 0,
+      "error": null
+    }
+  ]
+}

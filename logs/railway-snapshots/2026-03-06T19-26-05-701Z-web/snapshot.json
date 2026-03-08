@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-03-06T19:26:15.252Z",
+  "serviceKey": "web",
+  "serviceName": "openclaw-web",
+  "snapshotDir": "c:\\P4NTH30N\\OP3NF1XER\\nate-alma\\openclaw-template\\logs\\railway-snapshots\\2026-03-06T19-26-05-701Z-web",
+  "checks": [
+    {
+      "name": "status",
+      "command": "railway service status --service openclaw-web",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "domain",
+      "command": "railway domain --service openclaw-web",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "deploys",
+      "command": "railway deployment list --service openclaw-web",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "logs",
+      "command": "railway logs --service openclaw-web --deployment --latest --lines 180",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "ssh-probe-1",
+      "command": "railway ssh --service openclaw-web ls -la /app",
+      "status": 0,
+      "error": null
+    },
+    {
+      "name": "ssh-probe-2",
+      "command": "railway ssh --service openclaw-web ls -la /tmp",
+      "status": 0,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+# ssh-probe-1
+
+command: railway ssh --service openclaw-web ls -la /app
+status: 0
+error: none
+
+## stdout
+total 36
+drwxr-xr-x    1 root     root          4096 Mar  6 23:55 [1;34m.[m
+drwxr-xr-x    1 root     root          4096 Mar  7 00:02 [1;34m..[m
+drwxr-xr-x    1 nextjs   nodejs        4096 Mar  6 23:55 [1;34m.next[m
+drwxr-xr-x   20 nextjs   nodejs        4096 Mar  6 23:55 [1;34mnode_modules[m
+-rw-rw-r--    1 nextjs   nodejs        1354 Mar  6 23:55 [0;0mpackage.json[m
+drwxr-xr-x    2 root     root          4096 Mar  6 20:50 [1;34mpublic[m
+-rw-r--r--    1 nextjs   nodejs        4585 Mar  6 23:55 [0;0mserver.js[m
+drwxr-xr-x    1 nextjs   nodejs        4096 Mar  6 23:55 [1;34msrc[m
+
+
+## stderr
+

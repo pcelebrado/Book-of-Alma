@@ -1,0 +1,21 @@
+# ssh-probe-3
+
+command: railway ssh --service openclaw-core ls -la /data
+status: 0
+error: none
+
+## stdout
+total 48
+drwxr-xr-x 9 root root  4096 Mar  6 04:08 .
+drwxr-xr-x 1 root root  4096 Mar  6 07:57 ..
+drwx------ 9 root root  4096 Mar  6 07:57 .openclaw
+drwxr-xr-x 2 root root  4096 Mar  6 04:08 book-source
+drwxr-xr-x 4 root root  4096 Mar  6 19:35 db
+drwxr-xr-x 2 root root  4096 Mar  5 22:31 log
+drwx------ 2 root root 16384 Mar  5 22:26 lost+found
+drwxr-xr-x 4 root root  4096 Mar  5 22:31 sftpgo
+drwxr-xr-x 3 root root  4096 Mar  5 23:01 workspace
+
+
+## stderr
+

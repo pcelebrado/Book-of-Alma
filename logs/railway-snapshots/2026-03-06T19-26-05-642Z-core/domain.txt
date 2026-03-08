@@ -1,0 +1,13 @@
+# domain
+
+command: railway domain --service openclaw-core
+status: 0
+error: none
+
+## stdout
+Domains already exist on the service:
+🚀 https://openclaw-core-production.up.railway.app
+
+
+## stderr
+

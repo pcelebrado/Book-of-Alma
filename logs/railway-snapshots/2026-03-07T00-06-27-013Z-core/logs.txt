@@ -1,0 +1,23 @@
+# logs
+
+command: railway logs --service openclaw-core --deployment --latest --lines 180
+status: 0
+error: none
+
+## stdout
+Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/0605d6eb-6683-4b2f-a4cb-b69d52b3dd44/vol_vljja1dl6v3ahokq
+[entrypoint] Runtime UID:GID 0:0
+[entrypoint] Starting SFTPGo (SFTP: 2022, HTTP admin: 2080)
+Starting Container
+[entrypoint] SFTPGo full mode failed, starting portable SFTP fallback
+[entrypoint] SFTPGo portable mode started (PID: 30, user: book-uploader, dir: /data)
+[entrypoint] Starting Node.js wrapper...
+[wrapper] listening on :8080
+[wrapper] state dir: /data/.openclaw
+[wrapper] workspace dir: /data/workspace
+[wrapper] gateway token: (set)
+[wrapper] gateway target: http://127.0.0.1:18789
+
+
+## stderr
+

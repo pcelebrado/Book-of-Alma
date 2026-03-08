@@ -1,0 +1,40 @@
+# logs
+
+command: railway logs --service openclaw-core --deployment --latest --lines 180
+status: 0
+error: none
+
+## stdout
+Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/6f61ef87-b067-4f4f-bc43-8595c8b2fd0d/vol_fggxjjeijfrvuyui
+Starting Container
+[entrypoint] Runtime UID:GID 0:0
+[entrypoint] Starting MongoDB on ::,0.0.0.0:27017 (data: /data/db)
+[entrypoint] MongoDB launched (PID: 9, WT cache: 0.25GB)
+[entrypoint] MongoDB ready (attempt 2)
+[entrypoint] MONGODB_URI=mongodb://127.0.0.1:27017/openclaw
+[entrypoint] Starting SFTPGo (SFTP: 2022, HTTP admin: 2080)
+[wrapper] gateway token: (set)
+[wrapper] gateway target: http://127.0.0.1:18789
+[wrapper] syncing gateway tokens in config...
+[entrypoint] SFTPGo full mode failed, starting portable SFTP fallback
+[entrypoint] SFTPGo portable mode started (PID: 101, user: book-uploader, dir: /data/book-source)
+[entrypoint] Starting Node.js wrapper...
+[wrapper] listening on :2022
+[wrapper] state dir: /data/.openclaw
+[wrapper] workspace dir: /data/workspace
+2026-03-06T07:57:47.006Z [gateway] listening on ws://[::1]:18789
+2026-03-06T07:57:47.007Z [gateway] log file: /tmp/openclaw/openclaw-2026-03-06.log
+2026-03-06T07:57:47.017Z [browser/service] Browser control service ready (profiles=2)
+[wrapper] gateway ready
+2026-03-06T07:57:47.606Z [telegram] [default] starting provider (@Almastockbot)
+2026-03-06T07:57:47.621Z [telegram] autoSelectFamily=false (default-node22)
+[wrapper] gateway tokens synced
+[wrapper] config detected; starting gateway...
+2026-03-06T07:57:46.963Z [canvas] host mounted at http://127.0.0.1:18789/__openclaw__/canvas/ (root /data/.openclaw/canvas)
+2026-03-06T07:57:47.000Z [heartbeat] started
+2026-03-06T07:57:47.004Z [gateway] agent model: kimi-coding/k2p5
+2026-03-06T07:57:47.005Z [gateway] listening on ws://127.0.0.1:18789 (PID 209)
+
+
+## stderr
+
