@@ -35,13 +35,19 @@ const PORT = Number.parseInt(process.env.PORT ?? process.env.OPENCLAW_PUBLIC_POR
 // State/workspace
 // OpenClaw defaults to ~/.openclaw.
 const IS_RAILWAY = Boolean(process.env.RAILWAY_ENVIRONMENT);
+const DATA_ROOT = process.env.OPENCLAW_DATA_ROOT?.trim() || "/data";
 const STATE_DIR =
   process.env.OPENCLAW_STATE_DIR?.trim() ||
-  (IS_RAILWAY ? "/data/.openclaw" : path.join(os.homedir(), ".openclaw"));
+  (IS_RAILWAY ? path.join(DATA_ROOT, ".openclaw") : path.join(os.homedir(), ".openclaw"));
+
+const WORKSPACE_VOLUME_DIR =
+  process.env.OPENCLAW_WORKSPACE_VOLUME_DIR?.trim() ||
+  (IS_RAILWAY ? path.join(DATA_ROOT, "workspace") : path.join(STATE_DIR, "workspace"));
 
 const WORKSPACE_DIR =
   process.env.OPENCLAW_WORKSPACE_DIR?.trim() ||
-  (IS_RAILWAY ? "/data/workspace" : path.join(STATE_DIR, "workspace"));
+  (IS_RAILWAY ? path.join(os.homedir(), ".openclaw", "workspace") : WORKSPACE_VOLUME_DIR);
+const CREDENTIALS_DIR = path.join(STATE_DIR, "credentials");
 
 // Protect /setup with a user-provided password.
 const SETUP_PASSWORD = process.env.SETUP_PASSWORD?.trim();
@@ -104,6 +110,43 @@ const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
   true,
 );
+
+function resolveRealPathOrSelf(targetPath) {
+  try {
+    return fs.realpathSync(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
+function safeMode(targetPath) {
+  try {
+    return (fs.statSync(targetPath).mode & 0o777).toString(8).padStart(3, "0");
+  } catch {
+    return null;
+  }
+}
+
+function collectWorkspaceMemoryStats() {
+  const memoryDir = path.join(WORKSPACE_DIR, "memory");
+  let dailyFiles = 0;
+  try {
+    const entries = fs.readdirSync(memoryDir, { withFileTypes: true });
+    dailyFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).length;
+  } catch {
+    dailyFiles = 0;
+  }
+
+  return {
+    rootMemoryPresent: fs.existsSync(path.join(WORKSPACE_DIR, "MEMORY.md")),
+    altMemoryPresent: fs.existsSync(path.join(WORKSPACE_DIR, "memory.md")),
+    dailyFiles,
+    totalFiles:
+      (fs.existsSync(path.join(WORKSPACE_DIR, "MEMORY.md")) ? 1 : 0) +
+      (fs.existsSync(path.join(WORKSPACE_DIR, "memory.md")) ? 1 : 0) +
+      dailyFiles,
+  };
+}
 
 const QMD_INDEX_SQLITE_PATH = path.join(
   STATE_DIR,
@@ -1019,12 +1062,21 @@ app.get("/healthz", async (_req, res) => {
     }
   }
 
+  const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
+  const memoryStats = collectWorkspaceMemoryStats();
+
   res.json({
     ok: true,
     wrapper: {
       configured: isConfigured(),
       stateDir: STATE_DIR,
       workspaceDir: WORKSPACE_DIR,
+      workspaceRealDir,
+      workspaceVolumeDir: WORKSPACE_VOLUME_DIR,
+      workspaceUnified: workspaceRealDir === resolveRealPathOrSelf(WORKSPACE_VOLUME_DIR),
+      stateDirMode: safeMode(STATE_DIR),
+      credentialsDirMode: safeMode(CREDENTIALS_DIR),
+      memoryFiles: memoryStats.totalFiles,
     },
     gateway: {
       target: GATEWAY_TARGET,
@@ -1044,15 +1096,33 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
     gatewayReachable = false;
   }
 
+  const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
+  const memoryStats = collectWorkspaceMemoryStats();
+
   return res.json({
     ok: true,
     components: {
       wrapper: {
         configured: isConfigured(),
+        stateDir: STATE_DIR,
+        workspaceDir: WORKSPACE_DIR,
+        workspaceRealDir,
+        workspaceUnified: workspaceRealDir === resolveRealPathOrSelf(WORKSPACE_VOLUME_DIR),
+        stateDirMode: safeMode(STATE_DIR),
+        credentialsDirMode: safeMode(CREDENTIALS_DIR),
       },
       gateway: {
         reachable: gatewayReachable,
         target: GATEWAY_TARGET,
+      },
+      qmd: {
+        command: OPENCLAW_MEMORY_QMD_COMMAND,
+        indexPath: QMD_INDEX_SQLITE_PATH,
+        indexPresent: fs.existsSync(QMD_INDEX_SQLITE_PATH),
+      },
+      memory: {
+        files: memoryStats.totalFiles,
+        dailyFiles: memoryStats.dailyFiles,
       },
       httpApi: {
         chatCompletions: "/v1/chat/completions",
@@ -2518,6 +2588,12 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
         port: PORT,
         stateDir: STATE_DIR,
         workspaceDir: WORKSPACE_DIR,
+        workspaceRealDir: resolveRealPathOrSelf(WORKSPACE_DIR),
+        workspaceVolumeDir: WORKSPACE_VOLUME_DIR,
+        workspaceUnified:
+          resolveRealPathOrSelf(WORKSPACE_DIR) === resolveRealPathOrSelf(WORKSPACE_VOLUME_DIR),
+        stateDirMode: safeMode(STATE_DIR),
+        credentialsDirMode: safeMode(CREDENTIALS_DIR),
         configured: isConfigured(),
         configPathResolved: configPath(),
         gatewayTarget: GATEWAY_TARGET,
@@ -2534,10 +2610,12 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
           command: OPENCLAW_MEMORY_QMD_COMMAND,
           binaryPresent: qmd.code === 0,
           version: redactSecrets(qmd.output),
+          indexPresent: fs.existsSync(QMD_INDEX_SQLITE_PATH),
           configuredBackend: redactSecrets(memoryBackend.output),
           configuredCommand: redactSecrets(memoryQmdCommand.output),
           configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
         },
+        memoryCorpus: collectWorkspaceMemoryStats(),
         channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
         channels: {
           telegram: { exit: tg.code, output: redactSecrets(tg.output) },
@@ -4001,10 +4079,10 @@ app.get("/setup/export", requireSetupAuth, async (_req, res) => {
 
   // Prefer exporting from a common /data root so archives are easy to inspect and restore.
   // This preserves dotfiles like /data/.openclaw/openclaw.json.
-  const stateAbs = path.resolve(STATE_DIR);
-  const workspaceAbs = path.resolve(WORKSPACE_DIR);
+  const stateAbs = resolveRealPathOrSelf(STATE_DIR);
+  const workspaceAbs = resolveRealPathOrSelf(WORKSPACE_DIR);
 
-  const dataRoot = "/data";
+  const dataRoot = DATA_ROOT;
   const underData = (p) => p === dataRoot || p.startsWith(dataRoot + path.sep);
 
   let cwd = "/";
@@ -4040,8 +4118,8 @@ app.get("/setup/export", requireSetupAuth, async (_req, res) => {
 });
 
 function isUnderDir(p, root) {
-  const abs = path.resolve(p);
-  const r = path.resolve(root);
+  const abs = resolveRealPathOrSelf(p);
+  const r = resolveRealPathOrSelf(root);
   return abs === r || abs.startsWith(r + path.sep);
 }
 
@@ -4078,7 +4156,7 @@ async function readBodyBuffer(req, maxBytes) {
 // This is intentionally limited to restoring into /data to avoid overwriting arbitrary host paths.
 app.post("/setup/import", requireSetupAuth, async (req, res) => {
   try {
-    const dataRoot = "/data";
+    const dataRoot = DATA_ROOT;
     if (!isUnderDir(STATE_DIR, dataRoot) || !isUnderDir(WORKSPACE_DIR, dataRoot)) {
       return res
         .status(400)
@@ -4256,13 +4334,17 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[wrapper] listening on :${PORT}`);
   console.log(`[wrapper] state dir: ${STATE_DIR}`);
   console.log(`[wrapper] workspace dir: ${WORKSPACE_DIR}`);
+  console.log(`[wrapper] workspace real dir: ${resolveRealPathOrSelf(WORKSPACE_DIR)}`);
 
   // Harden state dir for OpenClaw and avoid missing credentials dir on fresh volumes.
   try {
-    fs.mkdirSync(path.join(STATE_DIR, "credentials"), { recursive: true });
+    fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
   } catch {}
   try {
     fs.chmodSync(STATE_DIR, 0o700);
+  } catch {}
+  try {
+    fs.chmodSync(CREDENTIALS_DIR, 0o700);
   } catch {}
 
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);

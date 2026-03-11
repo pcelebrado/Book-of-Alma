@@ -16,8 +16,12 @@
     "description": "Persistent directory for OpenClaw state, credentials, and runtime config."
   },
   "OPENCLAW_WORKSPACE_DIR": {
+    "value": "/root/.openclaw/workspace",
+    "description": "Active OpenClaw workspace path inside the container. Startup rewires this symlink to the persistent Railway volume at /data/workspace."
+  },
+  "OPENCLAW_WORKSPACE_VOLUME_DIR": {
     "value": "/data/workspace",
-    "description": "Persistent workspace path for generated files, tools, and project artifacts."
+    "description": "Physical Railway volume path that backs the active OpenClaw workspace."
   },
   "RAILWAY_RUN_UID": {
     "value": "0",
@@ -60,8 +64,8 @@
     "description": "Fallback SFTP password used in portable mode (set explicitly for deterministic testing)."
   },
   "SFTPGO_PORTABLE_DIRECTORY": {
-    "value": "/data",
-    "description": "Directory exposed via SFTP portable mode; /data grants access to uploaded content, OpenClaw state, and workspace paths."
+    "value": "/data/workspace",
+    "description": "Directory exposed via SFTP portable mode. This must match the persistent OpenClaw workspace to avoid split-brain restores."
   },
   "INTERNAL_GATEWAY_HOST": {
     "value": "127.0.0.1",
@@ -102,6 +106,14 @@
   "OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY": {
     "value": "true",
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
+  },
+  "OPENAI_API_KEY": {
+    "value": "",
+    "description": "Optional. If set, OpenClaw can use OpenAI embeddings for memory search fallbacks and non-QMD memory tooling."
+  },
+  "GEMINI_API_KEY": {
+    "value": "",
+    "description": "Optional. If set, OpenClaw can use Gemini embeddings for memory search fallbacks."
   },
   "BOOK_SOURCE_MODE": {
     "value": "external",

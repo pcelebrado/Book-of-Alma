@@ -111,6 +111,13 @@ ENV NPM_CONFIG_CACHE=/tmp/npm-cache
 ENV PNPM_HOME=/data/pnpm
 ENV PNPM_STORE_DIR=/tmp/pnpm-store
 ENV PATH="/data/npm/bin:/data/pnpm:${PATH}"
+ENV OPENCLAW_DATA_ROOT=/data
+ENV OPENCLAW_STATE_DIR=/data/.openclaw
+ENV OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace
+ENV OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace
+ENV OPENCLAW_MEMORY_BACKEND=qmd
+ENV OPENCLAW_MEMORY_QMD_COMMAND=qmd
+ENV SFTPGO_PORTABLE_DIRECTORY=/data/workspace
 WORKDIR /app
 
 # Wrapper deps

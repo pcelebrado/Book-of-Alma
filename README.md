@@ -163,6 +163,16 @@ Railway will create a project with the repo attached. Configure
 | **Data volumes** | Mounted at `/data` on both core and web services |
 | **Book content defaults** | Preconfigured for external upload workflow |
 
+### Persistence Model
+
+Core now enforces one durable workspace layout on every boot:
+
+- `/data/.openclaw` stores persistent OpenClaw state
+- `/data/workspace` stores the physical workspace contents
+- `/root/.openclaw/workspace` is the active OpenClaw workspace path
+- `/root/.openclaw/workspace` is recreated as a symlink to `/data/workspace`
+- SFTPGo transfers must target `/data/workspace`
+
 ### 3. After Deploy
 
 1. Wait for both services to build and deploy (core first, then web)
@@ -170,6 +180,7 @@ Railway will create a project with the repo attached. Configure
 3. Open `/onboarding` to create the first admin account, then sign in
 4. Open the Core service `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
 5. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
+6. Run `bash /app/scripts/post-deploy-verify.sh` in the core container
 
 ### URL Surfaces (Important)
 
@@ -187,7 +198,7 @@ If your core domain opens OpenClaw pages at `/setup` and `/admin`, that is expec
 
 1. Enable the SFTPGo service
 2. Connect via SFTP client (FileZilla, Cyberduck, etc.)
-3. Upload your Markdown files to `/data/book-source/`
+3. Upload your Markdown files and restored workspace assets to `/data/workspace/`
 4. Run reindex from Admin panel
 
 SFTP connection profile (core service):
@@ -196,10 +207,12 @@ SFTP connection profile (core service):
 - Port: `2022` (requires Railway TCP Proxy enabled for core service)
 - Username: value of `SFTPGO_PORTABLE_USERNAME` (default: `book-uploader`)
 - Password: value of `SFTPGO_PORTABLE_PASSWORD`
-- Remote directory: `/`
+- Remote directory: `/data/workspace`
 
 If full SFTPGo mode cannot start in the runtime image, core automatically falls
-back to `sftpgo portable` so SFTP uploads remain available for testing.
+back to `sftpgo portable` so SFTP uploads remain available for testing. Portable
+mode is pinned to `/data/workspace` to keep SFTP transfers and the active
+OpenClaw workspace aligned.
 
 ### Option 2: Git-based Import
 
@@ -423,9 +436,16 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
 - `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
 
-If QMD is unavailable at runtime, OpenClaw falls back to its builtin SQLite memory manager.
+The template also seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` and warms QMD on
+boot using the same XDG directories that OpenClaw uses at runtime.
 
-See `docs/PREDEPLOY_NEXT_STEPS.md` for the full deployment checklist.
+Fresh deployments can have a slow first memory query while QMD downloads its
+local model assets. If memory search still reports disabled after warmup, set
+`OPENAI_API_KEY` or `GEMINI_API_KEY`, or configure a local
+`memorySearch.local.modelPath` in the raw OpenClaw config.
+
+See `docs/PREDEPLOY_NEXT_STEPS.md`, [MIGRATION.md](./MIGRATION.md), and
+[VERIFY.md](./VERIFY.md) for the full deployment, migration, and verification flow.
 
 ---
 

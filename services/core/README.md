@@ -35,12 +35,14 @@ Browser → [web] (public) → [core] (internal, this service)
 3. Set environment variables:
    - `SETUP_PASSWORD` — password for the `/setup` wizard and Control UI
    - `OPENCLAW_STATE_DIR=/data/.openclaw` (recommended)
-   - `OPENCLAW_WORKSPACE_DIR=/data/workspace` (recommended)
+   - `OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace` (recommended active path)
+   - `OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace` (recommended persistent path)
    - `OPENCLAW_GATEWAY_TOKEN` — auth token (auto-generated if not set)
    - `INTERNAL_SERVICE_TOKEN` — must match the web service value
    - `PORT=8080` — required when TCP Proxy is enabled for SFTP on 2022
    - `SFTPGO_DEFAULT_ADMIN_USERNAME` / `SFTPGO_DEFAULT_ADMIN_PASSWORD`
    - `SFTPGO_PORTABLE_USERNAME` (fallback mode login username)
+   - `SFTPGO_PORTABLE_DIRECTORY=/data/workspace`
 4. **Disable Public Networking** — this service is internal only
 5. Deploy
 6. Complete setup via the web service's admin panel or direct internal access
@@ -56,7 +58,8 @@ docker run --rm -p 8080:8080 \
   -e PORT=8080 \
   -e SETUP_PASSWORD=test \
   -e OPENCLAW_STATE_DIR=/data/.openclaw \
-  -e OPENCLAW_WORKSPACE_DIR=/data/workspace \
+  -e OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace \
+  -e OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace \
   -v $(pwd)/.tmpdata:/data \
   openclaw-core
 ```
@@ -67,7 +70,8 @@ Railway containers have an ephemeral filesystem. Only the mounted volume at `/da
 
 What persists:
 - **OpenClaw config and credentials** — `/data/.openclaw/`
-- **Agent workspace** — `/data/workspace/`
+- **Physical agent workspace** — `/data/workspace/`
+- **Active agent workspace** — `/root/.openclaw/workspace` (symlink to `/data/workspace`)
 - **QMD sqlite index** — `/data/.openclaw/agents/main/qmd/xdg-cache/qmd/index.sqlite`
 - **Workspace sqlite pointers** — `/data/workspace/SQLITE_SOURCES.md`, `/data/workspace/qmd-index.sqlite`
 - **Node global tools** — `/data/npm/`, `/data/pnpm/`
@@ -75,6 +79,18 @@ What persists:
 
 What does **not** persist:
 - `apt-get install` packages (use bootstrap.sh for these)
+
+### Startup invariants
+
+On every boot the service:
+
+- creates `/data/workspace` and `/data/.openclaw`
+- migrates or backs up non-symlink `/root/.openclaw/workspace`
+- rewires `/root/.openclaw/workspace -> /data/workspace`
+- maps legacy `/workspace -> /data/workspace`
+- enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
+- seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing
+- runs best-effort `qmd update` and `qmd embed`
 
 ### Bootstrap hook
 
@@ -89,7 +105,13 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | `could not start SFTP server: bind: address already in use` | Core HTTP wrapper and SFTP both bound to 2022 | Set `PORT=8080` on core, keep `SFTPGO_SFTPD__BINDINGS__0__PORT=2022`, redeploy |
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
+| `memory search disabled` | QMD warmup still running or no fallback embedding provider is configured | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index`; if needed set `OPENAI_API_KEY`, `GEMINI_API_KEY`, or configure `memorySearch.local.modelPath` |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
+
+## Migration and verification
+
+- Existing deployments: [`MIGRATION.md`](../../MIGRATION.md)
+- Post-deploy checks: [`VERIFY.md`](../../VERIFY.md)
 
 ## GitHub Actions
 
