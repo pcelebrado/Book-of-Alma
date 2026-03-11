@@ -103,6 +103,10 @@
     "value": "true",
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
   },
+  "OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH": {
+    "value": "true",
+    "description": "Compatibility toggle for Railway-hosted Control UI/WebChat so the wrapper's injected bearer auth can be used without device pairing."
+  },
   "OPENCLAW_MEMORY_SEARCH_PROVIDER": {
     "value": "",
     "description": "Optional override for agents.defaults.memorySearch.provider (`openai`, `gemini`, `voyage`, or `local`). If blank, runtime prefers OpenAI when OPENAI_API_KEY is set and otherwise falls back to local embeddings."

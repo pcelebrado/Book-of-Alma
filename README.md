@@ -433,6 +433,7 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m`
 - `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
 - `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
+- `OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true`
 - `OPENCLAW_MEMORY_SEARCH_PROVIDER=` (blank = auto)
 - `OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL=text-embedding-3-small`
 - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`

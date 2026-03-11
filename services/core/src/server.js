@@ -128,6 +128,10 @@ const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
   true,
 );
+const OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH = parseBoolEnv(
+  process.env.OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH,
+  IS_RAILWAY,
+);
 
 function resolveMemorySearchStrategy() {
   const explicit = OPENCLAW_MEMORY_SEARCH_PROVIDER;
@@ -3591,6 +3595,15 @@ async function applyConfiguredSetupPayload(payload) {
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]));
+  await runCmd(
+    OPENCLAW_NODE,
+    clawArgs([
+      "config",
+      "set",
+      "gateway.controlUi.allowInsecureAuth",
+      OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH ? "true" : "false",
+    ]),
+  );
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
@@ -3836,6 +3849,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
       ["gateway.http.endpoints.chatCompletions.enabled", true],
       ["gateway.http.endpoints.responses.enabled", true],
+      ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
       ["gateway.bind", "loopback"],
       ["gateway.port", INTERNAL_GATEWAY_PORT],
       ["gateway.trustedProxies", ["127.0.0.1"]],
@@ -4609,6 +4623,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
         ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
         ["gateway.http.endpoints.chatCompletions.enabled", true],
         ["gateway.http.endpoints.responses.enabled", true],
+        ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
         ["gateway.bind", "loopback"],
         ["gateway.port", INTERNAL_GATEWAY_PORT],
         ["gateway.trustedProxies", ["127.0.0.1"]],
