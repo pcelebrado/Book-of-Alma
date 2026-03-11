@@ -100,7 +100,7 @@ const OPENCLAW_MEMORY_QMD_COMMAND =
 const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
 const OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN =
-  process.env.OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN?.trim() || "**/*";
+  process.env.OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN?.trim() || "**/*.md";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || "";
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY?.trim() || "";
@@ -1117,6 +1117,69 @@ function removeConfigKeys(dottedPaths) {
   }
   if (cleanup.changed) {
     console.log(`[migration] Scrubbed legacy config keys: ${cleanup.removed.join(", ")}`);
+  }
+})();
+
+(function scrubLegacyQmdWorkspaceState() {
+  const agentsRoot = path.join(STATE_DIR, "agents");
+  let agentDirs = [];
+  try {
+    agentDirs = fs
+      .readdirSync(agentsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return;
+  }
+
+  for (const agentId of agentDirs) {
+    const qmdConfigDir = path.join(agentsRoot, agentId, "qmd", "xdg-config", "qmd");
+    let configFiles = [];
+    try {
+      configFiles = fs
+        .readdirSync(qmdConfigDir, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".yml"))
+        .map((entry) => path.join(qmdConfigDir, entry.name));
+    } catch {
+      continue;
+    }
+
+    let needsReset = false;
+    for (const configFile of configFiles) {
+      try {
+        const content = fs.readFileSync(configFile, "utf8");
+        if (/^\s{2}workspace-[^:\r\n]+:/m.test(content) || content.includes("/data/workspace/_debug.json")) {
+          needsReset = true;
+          break;
+        }
+      } catch {
+        // ignore unreadable config files
+      }
+    }
+
+    if (!needsReset) {
+      continue;
+    }
+
+    for (const configFile of configFiles) {
+      try {
+        fs.rmSync(configFile, { force: true });
+      } catch (err) {
+        console.warn(`[migration] Failed to remove stale QMD config ${configFile}: ${String(err)}`);
+      }
+    }
+
+    const qmdCacheDir = path.join(agentsRoot, agentId, "qmd", "xdg-cache", "qmd");
+    for (const cacheFile of ["index.sqlite", "index.sqlite-shm", "index.sqlite-wal"]) {
+      const cachePath = path.join(qmdCacheDir, cacheFile);
+      try {
+        fs.rmSync(cachePath, { force: true });
+      } catch (err) {
+        console.warn(`[migration] Failed to remove stale QMD cache ${cachePath}: ${String(err)}`);
+      }
+    }
+
+    console.log(`[migration] Reset stale QMD workspace state for agent ${agentId}`);
   }
 })();
 

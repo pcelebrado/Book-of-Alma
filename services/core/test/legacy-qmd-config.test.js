@@ -38,14 +38,19 @@ test("template env surfaces no longer expose the removed qmd searchMode setting"
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_PROVIDER=local/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true/);
-  assert.match(envExample, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*/);
-  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*\.md/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*\.md/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note/);
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
+});
+
+test("runtime defaults workspace qmd indexing to markdown globs", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN\?\.trim\(\) \|\| "\*\*\/\*\.md"/);
 });
 
 test("runtime bootstrap seeds the Alma verification note for fresh Railway volumes", () => {
@@ -79,4 +84,11 @@ test("workspace qmd indexes the whole working directory as one collection", () =
     src,
     /name: `workspace-file-\$\{slug\}`/,
   );
+});
+
+test("runtime scrubs stale qmd workspace collections from persisted agent state", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /Reset stale QMD workspace state for agent/);
+  assert.match(src, /workspace-\[\^:\\r\\n\]\+:/);
+  assert.match(src, /index\.sqlite-wal/);
 });

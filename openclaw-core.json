@@ -100,7 +100,7 @@
     "description": "If true, the wrapper adds workspace-wide QMD collections so memory_search can recall more than MEMORY.md and memory/*.md."
   },
   "OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN": {
-    "value": "**/*",
+    "value": "**/*.md",
     "description": "Glob used for workspace-wide QMD collections under memory.qmd.paths."
   },
   "OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC": {
