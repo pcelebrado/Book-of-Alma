@@ -15,6 +15,14 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   assert.match(src, /gateway\.controlUi\.allowInsecureAuth/);
   assert.match(src, /"gateway",\s*"run",\s*"--force"/);
   assert.match(src, /"memory\.qmd\.scope\.default",\s*"allow"/);
+  assert.match(src, /"commands\.native",\s*true/);
+  assert.match(src, /"commands\.restart",\s*true/);
+  assert.match(src, /"commands\.useAccessGroups",\s*false/);
+  assert.match(src, /"tools\.profile",\s*"full"/);
+  assert.match(src, /"tools\.exec\.host",\s*"gateway"/);
+  assert.match(src, /"tools\.exec\.security",\s*"full"/);
+  assert.match(src, /"tools\.message\.crossContext\.allowAcrossProviders",\s*true/);
+  assert.match(src, /"tools\.agentToAgent\.enabled",\s*true/);
   assert.match(src, /OPENCLAW_GATEWAY_READY_TIMEOUT_MS/);
 });
 
@@ -36,6 +44,8 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   );
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_PROVIDER=local/);
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_PROVIDER=local/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*\.md/);
@@ -59,6 +69,7 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
 test("runtime defaults workspace qmd indexing to markdown globs", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(src, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN\?\.trim\(\) \|\| "\*\*\/\*\.md"/);
+  assert.match(src, /OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,\s*false/);
 });
 
 test("runtime bootstrap removes the legacy Alma verification note and keeps generic workspace memory seeds", () => {

@@ -108,8 +108,8 @@
     "description": "If false, OpenClaw does not block startup waiting for QMD boot sync."
   },
   "OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY": {
-    "value": "true",
-    "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
+    "value": "false",
+    "description": "Disable OpenClaw's derived default-memory QMD roots. The template indexes the whole workspace via memory.qmd.paths instead, which avoids QMD file-root ENOTDIR failures on MEMORY.md."
   },
   "OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS": {
     "value": "120000",

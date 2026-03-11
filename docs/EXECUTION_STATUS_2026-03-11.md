@@ -2,8 +2,9 @@
 
 ## Scope
 
-This note records the direct Railway deployments performed from the local
-working tree on March 10-11, 2026 for `codex/railway-state-qmd-remediation`.
+This note records the direct Railway deployments and live remediations performed
+from the local working tree on March 10-11, 2026 for
+`codex/railway-state-qmd-remediation` and the later `main` follow-up.
 
 ## How deployments were done
 
@@ -32,7 +33,8 @@ All timestamps below are America/Denver (`-06:00`).
 | `db3a7bba-38be-4540-a35f-2de5ddfc1290` | success | 2026-03-11 03:14:55 | OpenClaw-supported QMD command-timeout fix for Railway cold starts. |
 | `f774feca-0cff-4ee9-be11-0f4459f76e7e` | success | 2026-03-11 03:49:38 | Commit `b4838ac` removes Alma-specific QMD warmup drift, disables custom warmups by default, and scrubs the legacy Alma verification seed from persisted volumes. |
 | `e05bc772-6db0-4277-a376-cf2b26a816bc` | success | 2026-03-11 06:22:51 | Commit `26a48cb` restored `memory.qmd.searchMode=search`, but the image is pinned to OpenClaw `v2026.2.9`, so the live deployment rejected that key and had to be remediated in-place. |
-| `b1ac0213-af1c-4219-bb15-4927a89babc2` | building | 2026-03-11 06:49:44 | Commit `e2bdfc0` re-aligns the template with the pinned OpenClaw `v2026.2.9` release by scrubbing unsupported `memory.qmd.searchMode` instead of writing it. |
+| `b1ac0213-af1c-4219-bb15-4927a89babc2` | removed | 2026-03-11 06:49:44 | Commit `e2bdfc0` re-aligns the template with the pinned OpenClaw `v2026.2.9` release by scrubbing unsupported `memory.qmd.searchMode` instead of writing it. |
+| `7621eb81-6c00-4ccd-9d96-74f8cb2a93cd` | success | 2026-03-11 08:35:20 | Railway restart requested by the Alma bot so live config changes could apply. After restart, a direct live config hotfix set `memory.qmd.includeDefaultMemory=false` and the gateway reloaded cleanly. |
 
 ## Implemented during this pass
 
@@ -48,38 +50,31 @@ All timestamps below are America/Denver (`-06:00`).
 - New finding from live deploy `e05bc772-6db0-4277-a376-cf2b26a816bc`: the image is pinned to OpenClaw `v2026.2.9`, and that release rejects `memory.qmd.searchMode` as an unknown key even though newer OpenClaw docs/source now support it.
 - Live remediation applied on March 11, 2026: `openclaw doctor --fix` removed `memory.qmd.searchMode` from `/data/.openclaw/openclaw.json`, after which the gateway resumed listening on `127.0.0.1:18789`.
 - Corrective template commit `e2bdfc0` is now pushed to `main`, and Railway deploy `b1ac0213-af1c-4219-bb15-4927a89babc2` is the image rollout that should preserve that behavior across future restarts.
+- New finding from live config and QMD `2.0.x`: OpenClaw's `includeDefaultMemory=true` derives a file-root collection at `/data/workspace/MEMORY.md`, which QMD rejects with `ENOTDIR`.
+- Live remediation applied on March 11, 2026: the running Railway deployment was patched in-place to set `memory.qmd.includeDefaultMemory=false` while keeping `memory.qmd.paths=[{path:\"/data/workspace\",pattern:\"**/*.md\"}]`. Railway detected the config change and restarted the gateway successfully.
 
 ## Current live findings
 
-Latest public health probe:
+Latest public health probe after the live `includeDefaultMemory=false` hotfix:
 
 ```json
-{
-  "ok": true,
-  "wrapper": {
-    "memorySearchProvider": "local",
-    "memorySearchSource": "env:OPENCLAW_MEMORY_SEARCH_PROVIDER",
-    "memorySearchStorePath": "/data/.openclaw/memory/{agentId}.sqlite",
-    "memorySearchWarnings": []
-  },
-  "gateway": {
-    "reachable": false,
-    "lastError": "[gateway] start failure: Error: Gateway did not become ready in time"
-  }
-}
+{"ok":true}
 ```
 
 Operational interpretation:
 
 - Memory search is no longer in the original `disabled:true` state due to
   missing embedding config.
-- The remaining wrapper health issue is the pre-existing false-negative gateway
-  readiness check.
+- The latest live restart completed cleanly and `/setup/healthz` returned
+  `{"ok":true}` after the `includeDefaultMemory=false` hotfix.
 - Live shell investigation showed the generic `qmd` launcher path on Railway is
   unreliable under Bun-oriented environment state.
 - This repository catch-up commit therefore pins
   `OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
   for the next deploy instead of relying on `/usr/local/bin/qmd`.
+- The active live config now keeps QMD generic for the whole workspace by using
+  `/data/workspace` as the collection root and disabling derived default-memory
+  roots.
 
 ## Files changed for this deployment chain
 
@@ -97,8 +92,8 @@ Operational interpretation:
 
 ## Follow-up still worth doing
 
-1. Fix the wrapper gateway readiness false-negative so `/healthz` reflects the
-   healthy post-boot state.
-2. Re-run the live in-container verifier after the current generic-workspace
-   cleanup deploy and capture the final `openclaw memory status` and
-   `openclaw memory search "Railway workspace"` outputs into this repo.
+1. Re-deploy the template image that hard-codes `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false`
+   so the live hotfix survives future image replacements.
+2. Re-run the live in-container verifier and capture the final
+   `openclaw memory status` and `openclaw memory search "Railway workspace"`
+   outputs into this repo.

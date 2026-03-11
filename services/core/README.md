@@ -90,7 +90,9 @@ On every boot the service:
 - maps legacy `/workspace -> /data/workspace`
 - enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
 - seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing
-- configures QMD to index the rest of `/data/workspace` via `memory.qmd.paths`
+- configures QMD to index `/data/workspace` via `memory.qmd.paths`
+- disables OpenClaw's derived default-memory roots so QMD does not try to bind `/data/workspace/MEMORY.md` as a collection root
+- forces the hosted Railway command/tool profile expected by the live service (`commands.restart=true`, `tools.profile=full`, gateway exec host, cross-context messaging, and agent-to-agent enabled)
 - scrubs unsupported `memory.qmd.searchMode` keys on boot for the pinned OpenClaw `v2026.2.9` release
 - removes the legacy `memory/railway-alma-verification.md` seed if present
 
@@ -108,6 +110,7 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
 | `memory search disabled` | QMD or local embedding warmup is still running, or the provider override is wrong | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index` and `openclaw config get memory.qmd.paths --json`; Railway defaults to explicit local embeddings with the GGUF cached under `/data/.openclaw/models/node-llama-cpp` unless you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` |
+| `qmd ... ENOTDIR: not a directory, scandir '/data/workspace/MEMORY.md'` | OpenClaw derived a file-root default-memory collection and QMD `2.0.x` rejected it | Set `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false`, keep `memory.qmd.paths` pointed at `/data/workspace`, then redeploy or restart so the gateway reloads the config |
 | `memory.qmd: Unrecognized key: "searchMode"` | The current pinned OpenClaw release (`v2026.2.9`) does not support that config key | Remove it with `openclaw doctor --fix`, or redeploy the template so the wrapper scrubs it automatically |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
 

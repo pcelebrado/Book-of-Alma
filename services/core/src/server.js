@@ -144,7 +144,7 @@ const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
 );
 const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
-  true,
+  false,
 );
 const OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE,
@@ -4084,7 +4084,7 @@ async function applyMemoryBackendDefaults() {
   const memorySearch = await applyMemorySearchDefaults();
   const workspaceQmdPaths = resolveWorkspaceQmdPaths();
   const output = [
-    `[memory-qmd] workspaceIndex=${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE} paths=${workspaceQmdPaths.length} pattern=${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN}`,
+    `[memory-qmd] includeDefaultMemory=${OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY} workspaceIndex=${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE} paths=${workspaceQmdPaths.length} pattern=${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN}`,
     patch.output || "",
     memorySearch.output || "",
   ]
@@ -4202,6 +4202,24 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       ["gateway.bind", "loopback"],
       ["gateway.port", INTERNAL_GATEWAY_PORT],
       ["gateway.trustedProxies", ["127.0.0.1"]],
+      ["commands.native", true],
+      ["commands.nativeSkills", true],
+      ["commands.text", true],
+      ["commands.bash", true],
+      ["commands.config", true],
+      ["commands.debug", true],
+      ["commands.restart", true],
+      ["commands.useAccessGroups", false],
+      ["tools.profile", "full"],
+      ["tools.elevated.enabled", true],
+      ["tools.exec.host", "gateway"],
+      ["tools.exec.security", "full"],
+      ["tools.exec.ask", "off"],
+      ["tools.message.allowCrossContextSend", true],
+      ["tools.message.crossContext.allowWithinProvider", true],
+      ["tools.message.crossContext.allowAcrossProviders", true],
+      ["tools.message.broadcast.enabled", true],
+      ["tools.agentToAgent.enabled", true],
     ]);
     extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}\n${runtimePatch.output || ""}`;
 
@@ -4989,6 +5007,24 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
         ["gateway.bind", "loopback"],
         ["gateway.port", INTERNAL_GATEWAY_PORT],
         ["gateway.trustedProxies", ["127.0.0.1"]],
+        ["commands.native", true],
+        ["commands.nativeSkills", true],
+        ["commands.text", true],
+        ["commands.bash", true],
+        ["commands.config", true],
+        ["commands.debug", true],
+        ["commands.restart", true],
+        ["commands.useAccessGroups", false],
+        ["tools.profile", "full"],
+        ["tools.elevated.enabled", true],
+        ["tools.exec.host", "gateway"],
+        ["tools.exec.security", "full"],
+        ["tools.exec.ask", "off"],
+        ["tools.message.allowCrossContextSend", true],
+        ["tools.message.crossContext.allowWithinProvider", true],
+        ["tools.message.crossContext.allowAcrossProviders", true],
+        ["tools.message.broadcast.enabled", true],
+        ["tools.agentToAgent.enabled", true],
       ]);
       console.log(`[wrapper] runtime config: ${runtimePatch.ok ? "configured" : "failed"}`);
       if (runtimePatch.output) {

@@ -25,7 +25,7 @@ OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace
 SFTPGO_PORTABLE_DIRECTORY=/data/workspace
 OPENCLAW_MEMORY_BACKEND=qmd
 OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd
-OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true
+OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false
 OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m
 OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true
 OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=**/*.md
@@ -52,6 +52,7 @@ Default Railway memory-search strategy:
 
 - QMD remains the memory backend.
 - QMD now indexes the whole active workspace by default via `memory.qmd.paths`, not just `MEMORY.md` and `memory/*.md`.
+- OpenClaw's derived default-memory roots are disabled on Railway because QMD `2.0.x` treats collection roots as directories and will fail on a file-rooted `MEMORY.md` collection.
 - QMD scope default is set to `allow` so CLI verification searches are not denied.
 - QMD query/update/embed timeouts are raised for Railway cold starts and model downloads.
 - The wrapper clears `BUN_INSTALL` and pins `OPENCLAW_MEMORY_QMD_COMMAND` to the direct `@tobilu/qmd` entrypoint on Railway.
@@ -67,6 +68,7 @@ Default Railway memory-search strategy:
 - migrate or back up any transient `/workspace`
 - ensure `/root/.openclaw/workspace -> /data/workspace`
 - seed `MEMORY.md` and `memory/YYYY-MM-DD.md` if missing
+- keep `memory.qmd.includeDefaultMemory=false` so QMD binds `/data/workspace` as the collection root instead of `/data/workspace/MEMORY.md`
 - remove the legacy `memory/railway-alma-verification.md` seed if it exists on an older volume
 
 5. Run the verifier:
