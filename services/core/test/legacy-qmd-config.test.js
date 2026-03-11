@@ -55,3 +55,16 @@ test("runtime bootstrap seeds the Alma verification note for fresh Railway volum
   assert.match(bootstrap, /QMD_WARMUP_QUERY/);
   assert.match(bootstrap, /workspace-all/);
 });
+
+test("runtime image and entrypoint pin the direct qmd command path", () => {
+  const dockerfile = fs.readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  const entrypoint = fs.readFileSync(new URL("../scripts/entrypoint.sh", import.meta.url), "utf8");
+  assert.match(
+    dockerfile,
+    /ENV OPENCLAW_MEMORY_QMD_COMMAND=\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
+  );
+  assert.match(
+    entrypoint,
+    /OPENCLAW_MEMORY_QMD_COMMAND:\-\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
+  );
+});
