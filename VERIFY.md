@@ -25,6 +25,8 @@ It also sets `memory.qmd.paths` for the active workspace so QMD can recall
 general workspace files instead of only the default memory Markdown files.
 It also raises the QMD timeouts used during search and bootstrap so first-run
 local model downloads have longer to complete on Railway.
+The runtime also issues a best-effort warmup query at boot so query-time QMD
+models are more likely to be cached before user traffic.
 QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
 with `BUN_INSTALL` cleared so the verification shell matches the wrapper's
 runtime behavior.

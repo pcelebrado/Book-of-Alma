@@ -112,8 +112,8 @@
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
   },
   "OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS": {
-    "value": "15000",
-    "description": "QMD search timeout in milliseconds for Railway runtime memory_search calls."
+    "value": "120000",
+    "description": "QMD search timeout in milliseconds for Railway runtime memory_search calls. Keep this high enough for first-query model warmup."
   },
   "OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS": {
     "value": "60000",
@@ -122,6 +122,10 @@
   "OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS": {
     "value": "300000",
     "description": "QMD embed timeout in milliseconds so first-run local model warmups can finish on Railway."
+  },
+  "OPENCLAW_MEMORY_QMD_WARMUP_QUERY": {
+    "value": "Alma verification note",
+    "description": "Best-effort boot query used to pull QMD query-time models into cache before live traffic."
   },
   "OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH": {
     "value": "true",

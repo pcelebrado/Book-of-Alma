@@ -23,6 +23,7 @@ BOOTSTRAP_DAILY_MEMORY_FILE="${WORKSPACE_DIR}/memory/${BOOTSTRAP_DATE}.md"
 BOOTSTRAP_ALMA_MEMORY_FILE="${WORKSPACE_DIR}/memory/railway-alma-verification.md"
 MEMORY_SEARCH_CACHE_DIR="${OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR:-${STATE_DIR}/models/node-llama-cpp}"
 MEMORY_SEARCH_STORE_PATH="${OPENCLAW_MEMORY_SEARCH_STORE_PATH:-${STATE_DIR}/memory/{agentId}.sqlite}"
+QMD_WARMUP_QUERY="${OPENCLAW_MEMORY_QMD_WARMUP_QUERY:-Alma verification note}"
 
 log() {
   printf '[runtime-bootstrap] %s\n' "$*"
@@ -298,6 +299,7 @@ warm_qmd() {
 
   "${QMD_COMMAND}" update || true
   "${QMD_COMMAND}" embed || true
+  "${QMD_COMMAND}" query "${QMD_WARMUP_QUERY}" --json -n 1 >/dev/null 2>&1 || true
 }
 
 prepare_runtime() {

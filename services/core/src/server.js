@@ -156,7 +156,7 @@ const OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH = parseBoolEnv(
 );
 const OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
-  15_000,
+  120_000,
 );
 const OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS,
@@ -166,6 +166,8 @@ const OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS,
   300_000,
 );
+const OPENCLAW_MEMORY_QMD_WARMUP_QUERY =
+  process.env.OPENCLAW_MEMORY_QMD_WARMUP_QUERY?.trim() || "Alma verification note";
 const WORKSPACE_QMD_IGNORED_NAMES = new Set([
   ".git",
   ".hg",
@@ -4057,7 +4059,22 @@ function startMemoryIndexWarmup(reason = "boot") {
       timeoutMs: 300_000,
     });
     if (index.code === 0) {
-      console.log(`[memory-search] warmup complete reason=${reason}`);
+      const search = await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY]),
+        {
+          timeoutMs: 300_000,
+        },
+      );
+      if (search.code === 0) {
+        console.log(`[memory-search] warmup complete reason=${reason}`);
+        return;
+      }
+
+      console.warn(`[memory-search] warmup query warning: openclaw memory search exited ${search.code}`);
+      if (search.output) {
+        console.warn(trimCommandOutput(search.output));
+      }
       return;
     }
 
