@@ -115,6 +115,10 @@
     "value": "120000",
     "description": "QMD search timeout in milliseconds for Railway runtime memory_search calls. Keep this high enough for first-query model warmup."
   },
+  "OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS": {
+    "value": "120000",
+    "description": "QMD command timeout in milliseconds for collection add/list/remove maintenance work."
+  },
   "OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS": {
     "value": "60000",
     "description": "QMD update timeout in milliseconds for Railway bootstrap and background sync."
@@ -126,6 +130,10 @@
   "OPENCLAW_MEMORY_QMD_WARMUP_QUERY": {
     "value": "Alma verification note",
     "description": "Best-effort boot query used to pull QMD query-time models into cache before live traffic."
+  },
+  "OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS": {
+    "value": "300000",
+    "description": "Wrapper-only timeout in milliseconds for the background OpenClaw memory warmup search."
   },
   "OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH": {
     "value": "true",

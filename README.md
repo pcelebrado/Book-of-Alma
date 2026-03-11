@@ -436,9 +436,11 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true`
 - `OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=**/*.md`
 - `OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000`
+- `OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000`
 - `OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000`
 - `OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000`
 - `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note`
+- `OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000`
 - `OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true`
 - `OPENCLAW_MEMORY_SEARCH_PROVIDER=local`
 - `OPENCLAW_MEMORY_SEARCH_FALLBACK=none`
@@ -457,6 +459,8 @@ checks like `openclaw memory search "Alma"` work from Railway shells without a
 chat session key.
 It also raises the QMD query/update/embed timeouts for Railway cold starts so
 first-run model downloads do not fail memory verification prematurely.
+It also raises the supported OpenClaw QMD command timeout so `qmd collection add`
+has enough time to bind the workspace on first boot.
 It runs a best-effort boot query warmup as well, so QMD can cache its query-time
 models before the first live `memory_search` request.
 The wrapper and helper scripts clear `BUN_INSTALL` before calling QMD and pin

@@ -43,8 +43,12 @@ test("template env surfaces no longer expose the removed qmd searchMode setting"
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*\.md/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note/);
+  assert.match(envExample, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
 });
@@ -99,6 +103,9 @@ test("runtime scrubs stale qmd workspace collections from persisted agent state"
 
 test("runtime warmup uses memory search without forcing a full memory index", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
+  assert.match(src, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS/);
+  assert.match(src, /"memory\.qmd\.update\.commandTimeoutMs", OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
   assert.match(src, /clawArgs\(\["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY\]\)/);
   assert.doesNotMatch(src, /clawArgs\(\["memory", "index", "--agent", "main"\]\)/);
   assert.match(src, /writeHead\(booting \? 503 : 502/);

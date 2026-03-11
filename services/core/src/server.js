@@ -158,6 +158,10 @@ const OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
   120_000,
 );
+const OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS,
+  120_000,
+);
 const OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS,
   60_000,
@@ -175,6 +179,10 @@ const OPENCLAW_MEMORY_WARMUP_RETRIES = parsePositiveIntEnv(
 const OPENCLAW_MEMORY_WARMUP_BACKOFF_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_WARMUP_BACKOFF_MS,
   10_000,
+);
+const OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS,
+  300_000,
 );
 const OPENCLAW_GATEWAY_READY_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_GATEWAY_READY_TIMEOUT_MS,
@@ -4061,6 +4069,7 @@ async function applyMemoryBackendDefaults() {
     ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
     ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
     ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
+    ["memory.qmd.update.commandTimeoutMs", OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS],
     ["memory.qmd.update.updateTimeoutMs", OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS],
     ["memory.qmd.update.embedTimeoutMs", OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS],
     ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
@@ -4104,7 +4113,7 @@ function startMemoryIndexWarmup(reason = "boot") {
         OPENCLAW_NODE,
         clawArgs(["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY]),
         {
-          timeoutMs: OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
+          timeoutMs: OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS,
         },
       );
       if (search.code === 0) {
