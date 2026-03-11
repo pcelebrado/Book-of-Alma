@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+unset BUN_INSTALL
+
 DATA_ROOT="${OPENCLAW_DATA_ROOT:-/data}"
 STATE_DIR="${OPENCLAW_STATE_DIR:-${DATA_ROOT}/.openclaw}"
 WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR:-${DATA_ROOT}/workspace}"
@@ -10,13 +12,16 @@ ROOT_HOME_OPENCLAW_DIR="$(dirname "${WORKSPACE_COMPAT_DIR}")"
 CREDENTIALS_DIR="${STATE_DIR}/credentials"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-${DATA_ROOT}/sftpgo}"
 SFTPGO_SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
-QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-qmd}"
+QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
 QMD_STATE_DIR="${STATE_DIR}/agents/main/qmd"
 QMD_XDG_CONFIG_HOME="${QMD_STATE_DIR}/xdg-config"
 QMD_XDG_CACHE_HOME="${QMD_STATE_DIR}/xdg-cache"
 BOOTSTRAP_DATE="$(date -u +%F)"
 BOOTSTRAP_MEMORY_FILE="${WORKSPACE_DIR}/MEMORY.md"
 BOOTSTRAP_DAILY_MEMORY_FILE="${WORKSPACE_DIR}/memory/${BOOTSTRAP_DATE}.md"
+BOOTSTRAP_ALMA_MEMORY_FILE="${WORKSPACE_DIR}/memory/railway-alma-verification.md"
+MEMORY_SEARCH_CACHE_DIR="${OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR:-${STATE_DIR}/models/node-llama-cpp}"
+MEMORY_SEARCH_STORE_PATH="${OPENCLAW_MEMORY_SEARCH_STORE_PATH:-${STATE_DIR}/memory/{agentId}.sqlite}"
 
 log() {
   printf '[runtime-bootstrap] %s\n' "$*"
@@ -205,6 +210,18 @@ EOF
     chmod 600 "${BOOTSTRAP_DAILY_MEMORY_FILE}" 2>/dev/null || true
     log "Seeded ${BOOTSTRAP_DAILY_MEMORY_FILE}"
   fi
+
+  if [ ! -f "${BOOTSTRAP_ALMA_MEMORY_FILE}" ]; then
+    cat > "${BOOTSTRAP_ALMA_MEMORY_FILE}" <<EOF
+# Book of Alma Verification Seed
+
+This Railway workspace keeps OpenClaw memory search ready for the Book of Alma.
+Verification query: Alma
+Expected outcome: \`openclaw memory search "Alma"\` returns at least one snippet on a fresh deploy.
+EOF
+    chmod 600 "${BOOTSTRAP_ALMA_MEMORY_FILE}" 2>/dev/null || true
+    log "Seeded ${BOOTSTRAP_ALMA_MEMORY_FILE}"
+  fi
 }
 
 expose_workspace_for_sftpgo() {
@@ -226,9 +243,15 @@ prepare_qmd_dirs() {
   ensure_dir "${QMD_XDG_CACHE_HOME}/qmd"
 }
 
+prepare_memory_search_dirs() {
+  local concrete_store_path="${MEMORY_SEARCH_STORE_PATH/\{agentId\}/main}"
+  ensure_dir "${MEMORY_SEARCH_CACHE_DIR}"
+  ensure_dir "$(dirname "${concrete_store_path}")"
+}
+
 qmd_collection_exists() {
   local name="$1"
-  qmd collection list --json 2>/dev/null | grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${name}\""
+  "${QMD_COMMAND}" collection list --json 2>/dev/null | grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${name}\""
 }
 
 ensure_qmd_collection() {
@@ -239,7 +262,7 @@ ensure_qmd_collection() {
   if qmd_collection_exists "$name"; then
     return 0
   fi
-  qmd collection add "$name" "$root" --pattern "$pattern" >/dev/null
+  "${QMD_COMMAND}" collection add "$name" "$root" --pattern "$pattern" >/dev/null
 }
 
 warm_qmd() {
@@ -275,6 +298,7 @@ prepare_runtime() {
   seed_memory_corpus
   expose_workspace_for_sftpgo
   prepare_qmd_dirs
+  prepare_memory_search_dirs
 
   if sqlite_extension_probe; then
     log "sqlite3 extension support detected"
@@ -285,6 +309,8 @@ prepare_runtime() {
   log "Active workspace configured at ${WORKSPACE_DIR}"
   log "Active workspace resolves to $(readlink -f "${WORKSPACE_DIR}" || echo unresolved)"
   log "Compatibility workspace resolves to $(readlink -f "${WORKSPACE_COMPAT_DIR}" || echo unresolved)"
+  log "Memory search cache dir prepared at ${MEMORY_SEARCH_CACHE_DIR}"
+  log "Memory search store template prepared at ${MEMORY_SEARCH_STORE_PATH}"
 }
 
 case "${1:-prepare}" in

@@ -105,7 +105,7 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | `could not start SFTP server: bind: address already in use` | Core HTTP wrapper and SFTP both bound to 2022 | Set `PORT=8080` on core, keep `SFTPGO_SFTPD__BINDINGS__0__PORT=2022`, redeploy |
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
-| `memory search disabled` | QMD or local embedding warmup is still running, or the provider override is wrong | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index`; by default runtime chooses `openai` when `OPENAI_API_KEY` is set and otherwise configures a local GGUF embedding model under `/data/.openclaw/models/node-llama-cpp` |
+| `memory search disabled` | QMD or local embedding warmup is still running, or the provider override is wrong | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index`; Railway defaults to explicit local embeddings with the GGUF cached under `/data/.openclaw/models/node-llama-cpp` unless you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
 
 ## Migration and verification

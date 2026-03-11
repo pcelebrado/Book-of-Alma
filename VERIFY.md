@@ -10,6 +10,23 @@ bash /app/scripts/post-deploy-verify.sh
 
 Expected result: every line starts with `[verify] PASS`, including the active workspace path, the compatibility symlink, permissions, QMD version, memory file/chunk counts, and memory search snippets.
 
+The verifier fails if any of these commands reports disabled memory search or returns zero snippets:
+
+```bash
+openclaw status
+openclaw memory status
+openclaw memory index
+openclaw memory search "Alma"
+```
+
+The template explicitly sets `memory.qmd.scope.default=allow` so the CLI search
+path above is valid even without an active chat session.
+It also raises the QMD timeouts used during search and bootstrap so first-run
+local model downloads have longer to complete on Railway.
+QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
+with `BUN_INSTALL` cleared so the verification shell matches the wrapper's
+runtime behavior.
+
 ## Manual checks
 
 1. Active workspace and compatibility path resolve to the same persistent volume:
@@ -42,7 +59,7 @@ Expected output:
 3. OpenClaw status is clean:
 
 ```bash
-openclaw status --all
+openclaw status
 ```
 
 Expected output: no warning mentioning credentials permissions.
@@ -50,7 +67,7 @@ Expected output: no warning mentioning credentials permissions.
 4. QMD is installed and reachable:
 
 ```bash
-qmd --version
+"${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}" --version
 sqlite3 ':memory:' "SELECT sqlite_compileoption_used('ENABLE_LOAD_EXTENSION');"
 ```
 
@@ -65,6 +82,8 @@ Expected output:
 
 ```bash
 find /data/workspace -maxdepth 2 -type f \( -name 'MEMORY.md' -o -path '/data/workspace/memory/*.md' \) | sort
+openclaw memory status
+openclaw memory index
 openclaw memory status --agent main --deep --index --json
 ```
 
@@ -72,17 +91,22 @@ Expected output:
 
 - at least one `MEMORY.md`
 - at least one dated file under `memory/`
+- `memory/railway-alma-verification.md` exists on fresh Railway volumes
+- `openclaw memory status` does not report `disabled:true`
+- `openclaw memory index` does not report `Memory search disabled`
 - JSON with `results[0].status.files > 0`
 - JSON with `results[0].status.chunks > 0`
 
 6. Runtime memory search returns snippets:
 
 ```bash
-openclaw memory search --agent main --json "railway persistent workspace"
+openclaw memory search "Alma"
+openclaw memory search --agent main --json "Alma"
 ```
 
 Expected output:
 
+- plain-text search returns at least one snippet
 - JSON with `results.length > 0`
 - first result contains a non-empty `snippet`
 

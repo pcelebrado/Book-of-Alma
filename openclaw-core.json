@@ -88,8 +88,8 @@
     "description": "OpenClaw memory backend (`qmd` to enable QMD sidecar retrieval, `sqlite` for builtin manager)."
   },
   "OPENCLAW_MEMORY_QMD_COMMAND": {
-    "value": "qmd",
-    "description": "QMD executable path used when `OPENCLAW_MEMORY_BACKEND=qmd`."
+    "value": "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd",
+    "description": "QMD executable path used when `OPENCLAW_MEMORY_BACKEND=qmd`. Railway should use the direct @tobilu/qmd entrypoint."
   },
   "OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL": {
     "value": "5m",
@@ -103,13 +103,25 @@
     "value": "true",
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
   },
+  "OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS": {
+    "value": "15000",
+    "description": "QMD search timeout in milliseconds for Railway runtime memory_search calls."
+  },
+  "OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS": {
+    "value": "60000",
+    "description": "QMD update timeout in milliseconds for Railway bootstrap and background sync."
+  },
+  "OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS": {
+    "value": "300000",
+    "description": "QMD embed timeout in milliseconds so first-run local model warmups can finish on Railway."
+  },
   "OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH": {
     "value": "true",
     "description": "Compatibility toggle for Railway-hosted Control UI/WebChat so the wrapper's injected bearer auth can be used without device pairing."
   },
   "OPENCLAW_MEMORY_SEARCH_PROVIDER": {
-    "value": "",
-    "description": "Optional override for agents.defaults.memorySearch.provider (`openai`, `gemini`, `voyage`, or `local`). If blank, runtime prefers OpenAI when OPENAI_API_KEY is set and otherwise falls back to local embeddings."
+    "value": "local",
+    "description": "Default Railway memory-search provider. Keep `local` for deterministic no-secret embeddings, or intentionally override to `openai`, `gemini`, or `voyage`."
   },
   "OPENCLAW_MEMORY_SEARCH_FALLBACK": {
     "value": "none",
@@ -127,17 +139,21 @@
     "value": "/data/.openclaw/models/node-llama-cpp",
     "description": "Persistent cache directory for local node-llama-cpp embedding models."
   },
+  "OPENCLAW_MEMORY_SEARCH_STORE_PATH": {
+    "value": "/data/.openclaw/memory/{agentId}.sqlite",
+    "description": "Persistent semantic memory store path template. `{agentId}` is materialized per OpenClaw agent."
+  },
   "OPENAI_API_KEY": {
     "value": "",
-    "description": "Optional. If set, runtime auto-selects the OpenAI embedding provider for agents.defaults.memorySearch unless OPENCLAW_MEMORY_SEARCH_PROVIDER overrides it."
+    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=openai or models.providers.openai.apiKey is not defined elsewhere."
   },
   "GEMINI_API_KEY": {
     "value": "",
-    "description": "Optional. If set and OPENAI_API_KEY is blank, runtime can select Gemini embeddings for agents.defaults.memorySearch unless OPENCLAW_MEMORY_SEARCH_PROVIDER overrides it."
+    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=gemini or models.providers.gemini.apiKey is not defined elsewhere."
   },
   "VOYAGE_API_KEY": {
     "value": "",
-    "description": "Optional. If set and neither OPENAI_API_KEY nor GEMINI_API_KEY is present, runtime can select Voyage embeddings for agents.defaults.memorySearch unless OPENCLAW_MEMORY_SEARCH_PROVIDER overrides it."
+    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=voyage or models.providers.voyage.apiKey is not defined elsewhere."
   },
   "BOOK_SOURCE_MODE": {
     "value": "external",

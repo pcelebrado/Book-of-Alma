@@ -25,6 +25,11 @@ for (const suffix of ["PUBLIC_PORT", "STATE_DIR", "WORKSPACE_DIR", "GATEWAY_TOKE
   delete process.env[oldKey];
 }
 
+// Railway images can export BUN_INSTALL, which makes the packaged qmd launcher
+// prefer `bun` over `node`. In this container the bun-side qmd path is broken,
+// so force node-backed qmd/OpenClaw subprocesses by clearing the hint.
+delete process.env.BUN_INSTALL;
+
 // Railway injects PORT at runtime and routes traffic to that port.
 // Do not force a different public port in the container image, or the service may
 // boot but the Railway domain will be routed to a different port.
@@ -89,14 +94,16 @@ const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
 const OPENCLAW_MEMORY_BACKEND = process.env.OPENCLAW_MEMORY_BACKEND?.trim() || "qmd";
-const OPENCLAW_MEMORY_QMD_COMMAND = process.env.OPENCLAW_MEMORY_QMD_COMMAND?.trim() || "qmd";
+const OPENCLAW_MEMORY_QMD_COMMAND =
+  process.env.OPENCLAW_MEMORY_QMD_COMMAND?.trim() ||
+  "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd";
 const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || "";
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY?.trim() || "";
 const OPENCLAW_MEMORY_SEARCH_PROVIDER =
-  process.env.OPENCLAW_MEMORY_SEARCH_PROVIDER?.trim().toLowerCase() || "";
+  process.env.OPENCLAW_MEMORY_SEARCH_PROVIDER?.trim().toLowerCase() || "local";
 const OPENCLAW_MEMORY_SEARCH_FALLBACK =
   process.env.OPENCLAW_MEMORY_SEARCH_FALLBACK?.trim() || "none";
 const OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL =
@@ -111,6 +118,9 @@ const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH =
 const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR =
   process.env.OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR?.trim() ||
   path.join(STATE_DIR, "models", "node-llama-cpp");
+const OPENCLAW_MEMORY_SEARCH_STORE_PATH =
+  process.env.OPENCLAW_MEMORY_SEARCH_STORE_PATH?.trim() ||
+  path.join(STATE_DIR, "memory", "{agentId}.sqlite");
 
 function parseBoolEnv(value, fallback) {
   if (value == null) return fallback;
@@ -118,6 +128,12 @@ function parseBoolEnv(value, fallback) {
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
+}
+
+function parsePositiveIntEnv(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number.parseInt(String(value).trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
@@ -132,20 +148,24 @@ const OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH = parseBoolEnv(
   process.env.OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH,
   IS_RAILWAY,
 );
+const OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
+  15_000,
+);
+const OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS,
+  60_000,
+);
+const OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS,
+  300_000,
+);
 
 function resolveMemorySearchStrategy() {
   const explicit = OPENCLAW_MEMORY_SEARCH_PROVIDER;
   const normalizedExplicit =
     explicit && ["openai", "gemini", "voyage", "local"].includes(explicit) ? explicit : "";
-  const provider =
-    normalizedExplicit ||
-    (OPENAI_API_KEY
-      ? "openai"
-      : GEMINI_API_KEY
-        ? "gemini"
-        : VOYAGE_API_KEY
-          ? "voyage"
-          : "local");
+  const provider = normalizedExplicit || "local";
 
   if (provider === "openai") {
     return {
@@ -183,6 +203,120 @@ function resolveMemorySearchStrategy() {
       modelCacheDir: OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR,
     },
   };
+}
+
+function getJsonValue(target, dottedPath) {
+  return String(dottedPath || "")
+    .split(".")
+    .filter(Boolean)
+    .reduce((cursor, key) => (cursor && typeof cursor === "object" ? cursor[key] : undefined), target);
+}
+
+function remoteMemorySearchEnvVar(provider) {
+  switch (provider) {
+    case "openai":
+      return "OPENAI_API_KEY";
+    case "gemini":
+      return "GEMINI_API_KEY";
+    case "voyage":
+      return "VOYAGE_API_KEY";
+    default:
+      return "";
+  }
+}
+
+function materializeAgentToken(templatePath, agentId = "main") {
+  return String(templatePath || "").replaceAll("{agentId}", agentId);
+}
+
+function readConfiguredProviderApiKey(provider) {
+  if (!provider || !isConfigured()) return "";
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const configuredApiKey = getJsonValue(snapshot.config, `models.providers.${provider}.apiKey`);
+    return typeof configuredApiKey === "string" ? configuredApiKey.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function resolveMemorySearchRuntime() {
+  const strategy = resolveMemorySearchStrategy();
+  const runtime = {
+    ...strategy,
+    storePath: OPENCLAW_MEMORY_SEARCH_STORE_PATH,
+    warnings: [],
+    hints: [],
+  };
+
+  if (strategy.provider === "local") {
+    const modelPath = strategy.local?.modelPath?.trim() || "";
+    const modelCacheDir = strategy.local?.modelCacheDir?.trim() || "";
+
+    if (!modelPath) {
+      runtime.warnings.push("Local memory search is configured but OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH is blank.");
+      runtime.hints.push(
+        "Set OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH to a GGUF file path or hf: URI before running openclaw memory search.",
+      );
+    } else if (!modelPath.startsWith("hf:") && !fs.existsSync(modelPath)) {
+      runtime.warnings.push(`Local memory search model path does not exist: ${modelPath}`);
+      runtime.hints.push(
+        "Mount the GGUF file into the image or switch OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH to the default hf: embeddinggemma URI.",
+      );
+    }
+
+    if (!modelCacheDir) {
+      runtime.warnings.push("Local memory search cache directory is blank.");
+      runtime.hints.push("Set OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR to a persistent directory under /data.");
+    }
+    return runtime;
+  }
+
+  const envVar = remoteMemorySearchEnvVar(strategy.provider);
+  const envApiKey = envVar ? process.env[envVar]?.trim() || "" : "";
+  const configuredApiKey = readConfiguredProviderApiKey(strategy.provider);
+  if (!envApiKey && !configuredApiKey) {
+    runtime.warnings.push(
+      `${strategy.provider} memory search is selected but neither ${envVar} nor models.providers.${strategy.provider}.apiKey is configured.`,
+    );
+    runtime.hints.push(
+      `Set ${envVar} in Railway Variables, or define models.providers.${strategy.provider}.apiKey before running openclaw memory search.`,
+    );
+  }
+
+  return runtime;
+}
+
+function ensureMemorySearchRuntimeLayout(runtime = resolveMemorySearchRuntime()) {
+  const dirs = [path.dirname(materializeAgentToken(runtime.storePath, "main"))];
+
+  if (runtime.provider === "local" && runtime.local?.modelCacheDir) {
+    dirs.push(runtime.local.modelCacheDir);
+  }
+
+  for (const dir of dirs.filter(Boolean)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  return runtime;
+}
+
+function describeMemorySearchRuntime(runtime = resolveMemorySearchRuntime()) {
+  const modelSummary =
+    runtime.provider === "local"
+      ? `modelPath=${runtime.local?.modelPath || "(unset)"} cacheDir=${runtime.local?.modelCacheDir || "(unset)"}`
+      : `model=${runtime.model || "(unset)"}`;
+  return `provider=${runtime.provider} source=${runtime.source} fallback=${runtime.fallback} ${modelSummary} store=${runtime.storePath}`;
+}
+
+function logMemorySearchRuntime(runtime = resolveMemorySearchRuntime(), context = "boot") {
+  console.log(`[memory-search] ${context} resolved ${describeMemorySearchRuntime(runtime)}`);
+  for (const warning of runtime.warnings) {
+    console.warn(`[memory-search] warning: ${warning}`);
+  }
+  for (const hint of runtime.hints) {
+    console.warn(`[memory-search] remediation: ${hint}`);
+  }
 }
 
 function resolveRealPathOrSelf(targetPath) {
@@ -954,6 +1088,7 @@ let lastGatewayError = null;
 let lastGatewayExit = null;
 let lastDoctorOutput = null;
 let lastDoctorAt = null;
+let memoryIndexWarmup = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -1301,7 +1436,7 @@ app.get("/healthz", async (_req, res) => {
 
   const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
   const memoryStats = collectWorkspaceMemoryStats();
-  const memorySearchStrategy = resolveMemorySearchStrategy();
+  const memorySearch = resolveMemorySearchRuntime();
 
   res.json({
     ok: true,
@@ -1315,8 +1450,10 @@ app.get("/healthz", async (_req, res) => {
       stateDirMode: safeMode(STATE_DIR),
       credentialsDirMode: safeMode(CREDENTIALS_DIR),
       memoryFiles: memoryStats.totalFiles,
-      memorySearchProvider: memorySearchStrategy.provider,
-      memorySearchSource: memorySearchStrategy.source,
+      memorySearchProvider: memorySearch.provider,
+      memorySearchSource: memorySearch.source,
+      memorySearchStorePath: memorySearch.storePath,
+      memorySearchWarnings: memorySearch.warnings,
     },
     gateway: {
       target: GATEWAY_TARGET,
@@ -1338,7 +1475,7 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
 
   const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
   const memoryStats = collectWorkspaceMemoryStats();
-  const memorySearchStrategy = resolveMemorySearchStrategy();
+  const memorySearch = resolveMemorySearchRuntime();
 
   return res.json({
     ok: true,
@@ -1364,8 +1501,15 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
       memory: {
         files: memoryStats.totalFiles,
         dailyFiles: memoryStats.dailyFiles,
-        searchProvider: memorySearchStrategy.provider,
-        searchSource: memorySearchStrategy.source,
+        searchProvider: memorySearch.provider,
+        searchSource: memorySearch.source,
+        searchStorePath: memorySearch.storePath,
+        searchModel: memorySearch.provider === "local" ? null : memorySearch.model || null,
+        searchLocalModelPath:
+          memorySearch.provider === "local" ? memorySearch.local?.modelPath || null : null,
+        searchLocalModelCacheDir:
+          memorySearch.provider === "local" ? memorySearch.local?.modelCacheDir || null : null,
+        warnings: memorySearch.warnings,
       },
       httpApi: {
         chatCompletions: "/v1/chat/completions",
@@ -3614,6 +3758,9 @@ async function applyConfiguredSetupPayload(payload) {
   if (memoryDefaults.output) {
     extra += `\n${memoryDefaults.output}`;
   }
+  if (memoryDefaults.ok) {
+    startMemoryIndexWarmup("configured-setup");
+  }
 
   if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
     const providerId = payload.customProviderId.trim();
@@ -3719,27 +3866,30 @@ async function applyMemoryBackendDefaults() {
 
   const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
   const applyMemorySearchDefaults = async () => {
-    const strategy = resolveMemorySearchStrategy();
+    const runtime = ensureMemorySearchRuntimeLayout();
     const entries = [
-      ["agents.defaults.memorySearch.provider", strategy.provider],
-      ["agents.defaults.memorySearch.fallback", strategy.fallback],
+      ["agents.defaults.memorySearch.provider", runtime.provider],
+      ["agents.defaults.memorySearch.fallback", runtime.fallback],
+      ["agents.defaults.memorySearch.store.path", runtime.storePath],
     ];
 
-    if (strategy.model) {
-      entries.push(["agents.defaults.memorySearch.model", strategy.model]);
+    if (runtime.model) {
+      entries.push(["agents.defaults.memorySearch.model", runtime.model]);
     }
 
-    if (strategy.local) {
-      entries.push(["agents.defaults.memorySearch.local.modelPath", strategy.local.modelPath]);
+    if (runtime.local) {
+      entries.push(["agents.defaults.memorySearch.local.modelPath", runtime.local.modelPath]);
       entries.push([
         "agents.defaults.memorySearch.local.modelCacheDir",
-        strategy.local.modelCacheDir,
+        runtime.local.modelCacheDir,
       ]);
     }
 
     const patch = applyConfigPatch(entries);
     const output = [
-      `[memory-search] provider=${strategy.provider} source=${strategy.source} fallback=${strategy.fallback}`,
+      `[memory-search] ${describeMemorySearchRuntime(runtime)}`,
+      ...runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`),
+      ...runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`),
       patch.output || "",
     ].join("\n");
 
@@ -3787,7 +3937,11 @@ async function applyMemoryBackendDefaults() {
     ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
     ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
     ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
+    ["memory.qmd.update.updateTimeoutMs", OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS],
+    ["memory.qmd.update.embedTimeoutMs", OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS],
     ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
+    ["memory.qmd.limits.timeoutMs", OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS],
+    ["memory.qmd.scope.default", "allow"],
   ]);
   const memorySearch = await applyMemorySearchDefaults();
   const output = [patch.output || "", memorySearch.output || ""].filter(Boolean).join("\n");
@@ -3796,6 +3950,41 @@ async function applyMemoryBackendDefaults() {
     reason: !patch.ok ? "set_failed" : memorySearch.ok ? "configured" : memorySearch.reason,
     output,
   };
+}
+
+function trimCommandOutput(output, limit = 4000) {
+  const text = redactSecrets(String(output || ""));
+  return text.length > limit ? `${text.slice(0, limit)}\n... (truncated)\n` : text;
+}
+
+function startMemoryIndexWarmup(reason = "boot") {
+  if (!isConfigured() || memoryIndexWarmup) {
+    return;
+  }
+
+  const runtime = ensureMemorySearchRuntimeLayout();
+  logMemorySearchRuntime(runtime, `warmup:${reason}`);
+  memoryIndexWarmup = (async () => {
+    console.log(`[memory-search] warmup starting reason=${reason}`);
+    const index = await runCmd(OPENCLAW_NODE, clawArgs(["memory", "index", "--agent", "main"]), {
+      timeoutMs: 300_000,
+    });
+    if (index.code === 0) {
+      console.log(`[memory-search] warmup complete reason=${reason}`);
+      return;
+    }
+
+    console.warn(`[memory-search] warmup warning: openclaw memory index exited ${index.code}`);
+    if (index.output) {
+      console.warn(trimCommandOutput(index.output));
+    }
+  })()
+    .catch((err) => {
+      console.warn(`[memory-search] warmup error: ${String(err)}`);
+    })
+    .finally(() => {
+      memoryIndexWarmup = null;
+    });
 }
 
 app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
@@ -3861,6 +4050,9 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     extra += `\n[memory backend] ${memoryDefaults.reason}`;
     if (memoryDefaults.output) {
       extra += `\n${memoryDefaults.output}`;
+    }
+    if (memoryDefaults.ok) {
+      startMemoryIndexWarmup("setup-api-run");
     }
 
     // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
@@ -4565,6 +4757,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[wrapper] state dir: ${STATE_DIR}`);
   console.log(`[wrapper] workspace dir: ${WORKSPACE_DIR}`);
   console.log(`[wrapper] workspace real dir: ${resolveRealPathOrSelf(WORKSPACE_DIR)}`);
+  logMemorySearchRuntime(ensureMemorySearchRuntimeLayout(), "boot");
 
   // Harden state dir for OpenClaw and avoid missing credentials dir on fresh volumes.
   try {
@@ -4638,6 +4831,9 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       if (memoryDefaults.output) {
         console.log(memoryDefaults.output);
       }
+      if (memoryDefaults.ok) {
+        startMemoryIndexWarmup("boot-sync");
+      }
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
@@ -4648,6 +4844,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   // work even if nobody visits the web UI.
   if (isConfigured()) {
     console.log("[wrapper] config detected; starting gateway...");
+    startMemoryIndexWarmup("boot-config-detected");
     try {
       await ensureGatewayRunning();
       console.log("[wrapper] gateway ready");
