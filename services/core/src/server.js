@@ -1214,6 +1214,11 @@ let lastDoctorAt = null;
 let memoryIndexWarmup = null;
 let lastProxyUnavailableLogAt = 0;
 
+function isGatewayProcessConflict(text) {
+  const value = String(text || "");
+  return /gateway already running|Port \d+ is already in use|lock timeout after \d+ms/i.test(value);
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -1232,6 +1237,34 @@ function clearGatewayRestartTimer() {
   if (!gatewayRestartTimer) return;
   clearTimeout(gatewayRestartTimer);
   gatewayRestartTimer = null;
+}
+
+async function terminateGatewayProcess(proc, signal = "SIGTERM") {
+  if (!proc?.pid) return;
+
+  if (process.platform === "win32") {
+    try {
+      childProcess.spawnSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
+      return;
+    } catch {
+      // Fall back to a direct kill below.
+    }
+  } else if (proc.pid > 0) {
+    try {
+      process.kill(-proc.pid, signal);
+      return;
+    } catch {
+      // Fall back to the launcher PID below.
+    }
+  }
+
+  try {
+    proc.kill(signal);
+  } catch {
+    // ignore
+  }
 }
 
 function scheduleGatewayRestart(reason) {
@@ -1301,6 +1334,7 @@ async function startGateway() {
   ];
 
   gatewayProc = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
+    detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
@@ -1329,24 +1363,45 @@ async function startGateway() {
   });
 
   gatewayProc.on("error", (err) => {
-    const msg = `[gateway] spawn error: ${String(err)}`;
-    console.error(msg);
-    lastGatewayError = msg;
-    gatewayProc = null;
-    scheduleGatewayRestart("spawn error");
+    void (async () => {
+      const msg = `[gateway] spawn error: ${String(err)}`;
+      console.error(msg);
+      lastGatewayError = msg;
+      gatewayProc = null;
+
+      const reachable = await probeGateway().catch(() => false);
+      if (reachable) {
+        gatewayRestartAttempts = 0;
+        lastGatewayError = null;
+        return;
+      }
+
+      scheduleGatewayRestart("spawn error");
+    })();
   });
 
   gatewayProc.on("exit", (code, signal) => {
-    const msg = `[gateway] exited code=${code} signal=${signal}`;
-    console.error(msg);
-    lastGatewayExit = { code, signal, at: new Date().toISOString() };
-    gatewayProc = null;
-    if (code === 0 || signal === "SIGTERM") {
-      gatewayRestartAttempts = 0;
-      return;
-    }
-    runDoctorBestEffort().catch(() => {});
-    scheduleGatewayRestart(`exit code=${code} signal=${signal}`);
+    void (async () => {
+      const msg = `[gateway] exited code=${code} signal=${signal}`;
+      console.error(msg);
+      lastGatewayExit = { code, signal, at: new Date().toISOString() };
+      gatewayProc = null;
+      if (code === 0 || signal === "SIGTERM") {
+        gatewayRestartAttempts = 0;
+        return;
+      }
+
+      const combined = [msg, lastGatewayError, lastGatewayOutput].filter(Boolean).join("\n");
+      const reachable = await probeGateway().catch(() => false);
+      if (reachable || isGatewayProcessConflict(combined)) {
+        gatewayRestartAttempts = 0;
+        lastGatewayError = null;
+        return;
+      }
+
+      runDoctorBestEffort().catch(() => {});
+      scheduleGatewayRestart(`exit code=${code} signal=${signal}`);
+    })();
   });
 }
 
@@ -1354,13 +1409,11 @@ async function stopGateway({ disableDesired = true } = {}) {
   if (disableDesired) gatewayDesired = false;
   clearGatewayRestartTimer();
 
-  if (!gatewayProc) return;
-  try {
-    gatewayProc.kill("SIGTERM");
-  } catch {
-    // ignore
-  }
+  const proc = gatewayProc;
+  if (!proc) return;
+  await terminateGatewayProcess(proc, "SIGTERM");
   await sleep(750);
+  await terminateGatewayProcess(proc, "SIGKILL");
   gatewayProc = null;
 }
 
@@ -1405,8 +1458,12 @@ async function ensureGatewayRunning() {
       } catch (err) {
         const msg = `[gateway] start failure: ${String(err)}`;
         lastGatewayError = msg;
-        // Collect extra diagnostics to help users file issues.
-        await runDoctorBestEffort();
+        const combined = [msg, lastGatewayOutput].filter(Boolean).join("\n");
+        const reachable = await probeGateway().catch(() => false);
+        if (!reachable && !isGatewayProcessConflict(combined)) {
+          // Collect extra diagnostics to help users file issues.
+          await runDoctorBestEffort();
+        }
         throw err;
       }
     })().finally(() => {

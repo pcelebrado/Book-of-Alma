@@ -14,6 +14,7 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   assert.match(src, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH/);
   assert.match(src, /gateway\.controlUi\.allowInsecureAuth/);
   assert.match(src, /"gateway",\s*"run",\s*"--force"/);
+  assert.match(src, /detached:\s*process\.platform !== "win32"/);
   assert.match(src, /"memory\.qmd\.scope\.default",\s*"allow"/);
   assert.match(src, /"commands\.native",\s*true/);
   assert.match(src, /"commands\.restart",\s*true/);
@@ -24,6 +25,9 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   assert.match(src, /"tools\.message\.crossContext\.allowAcrossProviders",\s*true/);
   assert.match(src, /"tools\.agentToAgent\.enabled",\s*true/);
   assert.match(src, /OPENCLAW_GATEWAY_READY_TIMEOUT_MS/);
+  assert.match(src, /isGatewayProcessConflict/);
+  assert.match(src, /process\.kill\(-proc\.pid,\s*signal\)/);
+  assert.match(src, /reachable \|\| isGatewayProcessConflict/);
 });
 
 test("template env does not expose unsupported qmd searchMode on the pinned release", () => {
