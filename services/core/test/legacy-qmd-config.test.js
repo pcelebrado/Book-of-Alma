@@ -69,14 +69,14 @@ test("runtime image and entrypoint pin the direct qmd command path", () => {
   );
 });
 
-test("workspace qmd file entries index from workspace root with a file pattern", () => {
+test("workspace qmd indexes the whole working directory as one collection", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(
     src,
-    /name: `workspace-file-\$\{slug\}`,[\s\S]*path: WORKSPACE_DIR,[\s\S]*pattern: entry\.name,/,
+    /return \[\s*\{\s*name: "workspace",[\s\S]*path: WORKSPACE_DIR,[\s\S]*pattern: OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN,/,
   );
   assert.doesNotMatch(
     src,
-    /name: `workspace-file-\$\{slug\}`,[\s\S]*path: entryPath,[\s\S]*\}/,
+    /name: `workspace-file-\$\{slug\}`/,
   );
 });

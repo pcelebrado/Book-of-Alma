@@ -176,79 +176,19 @@ const OPENCLAW_MEMORY_WARMUP_BACKOFF_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_WARMUP_BACKOFF_MS,
   10_000,
 );
-const WORKSPACE_QMD_IGNORED_NAMES = new Set([
-  ".git",
-  ".hg",
-  ".svn",
-  ".openclaw",
-  ".cache",
-  ".next",
-  ".turbo",
-  ".yarn",
-  ".pnpm",
-  ".pnpm-store",
-  ".npm",
-  ".venv",
-  "__pycache__",
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "memory",
-  "tmp",
-  "temp",
-]);
-
-function slugifyQmdCollectionName(value, fallback = "item") {
-  const slug = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || fallback;
-}
-
-function shouldIndexWorkspaceEntry(name) {
-  const normalized = String(name || "").trim().toLowerCase();
-  if (!normalized) return false;
-  return !WORKSPACE_QMD_IGNORED_NAMES.has(normalized);
-}
-
 function resolveWorkspaceQmdPaths() {
   if (!OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE) {
     return [];
   }
 
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
-  const entries = fs
-    .readdirSync(WORKSPACE_DIR, { withFileTypes: true })
-    .filter((entry) => shouldIndexWorkspaceEntry(entry.name))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const paths = [];
-
-  for (const entry of entries) {
-    const entryPath = path.join(WORKSPACE_DIR, entry.name);
-    const slug = slugifyQmdCollectionName(entry.name);
-
-    if (entry.isDirectory()) {
-      paths.push({
-        name: `workspace-${slug}`,
-        path: entryPath,
-        pattern: OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN,
-      });
-      continue;
-    }
-
-    if (entry.isFile() && !["memory.md", "MEMORY.md"].includes(entry.name)) {
-      paths.push({
-        name: `workspace-file-${slug}`,
-        path: WORKSPACE_DIR,
-        pattern: entry.name,
-      });
-    }
-  }
-
-  return paths;
+  return [
+    {
+      name: "workspace",
+      path: WORKSPACE_DIR,
+      pattern: OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN,
+    },
+  ];
 }
 
 function resolveMemorySearchStrategy() {
