@@ -68,6 +68,12 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   assert.match(envRailway, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
+  assert.match(envExample, /OPENCLAW_CLAUDE_STATE_DIR=\/data\/\.claude/);
+  assert.match(envRailway, /OPENCLAW_CLAUDE_STATE_DIR=\/data\/\.claude/);
+  assert.match(envExample, /OPENCLAW_CLAUDE_MAX_PROXY_COMMAND=claude-max-api/);
+  assert.match(envRailway, /OPENCLAW_CLAUDE_MAX_PROXY_COMMAND=claude-max-api/);
+  assert.match(envExample, /OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL=http:\/\/127\.0\.0\.1:3456\/v1/);
+  assert.match(envRailway, /OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL=http:\/\/127\.0\.0\.1:3456\/v1/);
 });
 
 test("runtime defaults workspace qmd indexing to markdown globs", () => {
@@ -79,6 +85,9 @@ test("runtime defaults workspace qmd indexing to markdown globs", () => {
 test("runtime bootstrap removes the legacy Alma verification note and keeps generic workspace memory seeds", () => {
   const bootstrap = fs.readFileSync(new URL("../scripts/runtime-bootstrap.sh", import.meta.url), "utf8");
   assert.match(bootstrap, /LEGACY_ALMA_MEMORY_FILE/);
+  assert.match(bootstrap, /CLAUDE_STATE_DIR/);
+  assert.match(bootstrap, /CLAUDE_COMPAT_DIR/);
+  assert.match(bootstrap, /Linked \$\{CLAUDE_COMPAT_DIR\} -> \$\{CLAUDE_STATE_DIR\}/);
   assert.match(bootstrap, /Removed legacy Alma verification seed/);
   assert.match(bootstrap, /QMD_WARMUP_QUERY/);
   assert.match(bootstrap, /Skipping direct qmd update\/embed warmup/);
@@ -98,6 +107,10 @@ test("runtime image and entrypoint pin the direct qmd command path", () => {
     entrypoint,
     /OPENCLAW_MEMORY_QMD_COMMAND:\-\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
   );
+  assert.match(dockerfile, /npm install -g @anthropic-ai\/claude-code claude-max-api-proxy/);
+  assert.match(dockerfile, /ENV OPENCLAW_CLAUDE_STATE_DIR=\/data\/\.claude/);
+  assert.match(entrypoint, /OPENCLAW_CLAUDE_STATE_DIR:\-\$\{OPENCLAW_DATA_ROOT\}\/\.claude/);
+  assert.match(entrypoint, /CLAUDE_CONFIG_DIR:\-\$\{OPENCLAW_CLAUDE_STATE_DIR\}/);
 });
 
 test("workspace qmd indexes the whole working directory as one collection", () => {
@@ -130,4 +143,14 @@ test("runtime warmup uses memory search without forcing a full memory index", ()
   assert.match(src, /!OPENCLAW_MEMORY_WARMUP_ENABLED/);
   assert.doesNotMatch(src, /clawArgs\(\["memory", "index", "--agent", "main"\]\)/);
   assert.match(src, /writeHead\(booting \? 503 : 502/);
+});
+
+test("core exposes Claude Max proxy as an Anthropic admin preset and supervises the local proxy", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /claude-max-proxy/);
+  assert.match(src, /Claude Max API Proxy \(Claude Code login\)/);
+  assert.match(src, /buildClaudeMaxProxyProviderConfig/);
+  assert.match(src, /syncClaudeMaxProxyState/);
+  assert.match(src, /models\.providers\.\$\{CLAUDE_MAX_PROXY_PROVIDER_ID\}/);
+  assert.match(src, /agents\.defaults\.model\.primary/);
 });

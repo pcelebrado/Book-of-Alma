@@ -10,7 +10,7 @@ with a browser-based setup wizard for zero-CLI deployment.
 - **Persistent state** via Railway Volume — config, credentials, and memory survive redeploys
 - **Backup / restore** — export and import from `/setup`
 - **Debug console** — allowlisted safe commands for troubleshooting without SSH
-- **Multi-provider model support** — OpenAI, Anthropic, Google, OpenRouter, Moonshot, and more
+- **Multi-provider model support** — OpenAI, Anthropic, Claude Max API Proxy, Google, OpenRouter, Moonshot, and more
 - **Channel support** — Telegram, Discord, Slack configured via wizard
 
 ## Architecture
@@ -90,11 +90,30 @@ On every boot the service:
 - maps legacy `/workspace -> /data/workspace`
 - enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
 - seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing
+- persists Claude Code CLI auth under `/data/.claude` and re-links `/root/.claude` there on boot
 - configures QMD to index `/data/workspace` via `memory.qmd.paths`
 - disables OpenClaw's derived default-memory roots so QMD does not try to bind `/data/workspace/MEMORY.md` as a collection root
 - forces the hosted Railway command/tool profile expected by the live service (`commands.restart=true`, `tools.profile=full`, gateway exec host, cross-context messaging, and agent-to-agent enabled)
 - scrubs unsupported `memory.qmd.searchMode` keys on boot for the pinned OpenClaw `v2026.2.9` release
 - removes the legacy `memory/railway-alma-verification.md` seed if present
+- auto-starts `claude-max-api` when `models.providers.claude-max` is configured, using the persisted Claude CLI login state on the Railway volume
+
+### Claude Max API Proxy
+
+The admin flow now exposes **Anthropic → Claude Max API Proxy (Claude Code login)**.
+This is not native Anthropic OAuth. The supported contract from OpenClaw is:
+
+- core launches `claude-max-api` locally on `http://127.0.0.1:3456/v1`
+- OpenClaw is configured with `models.providers.claude-max`
+- the default model becomes `claude-max/claude-opus-4`
+- Claude Code CLI auth is persisted at `/data/.claude`
+
+If the proxy is configured but not usable yet, log into Claude Code once on the
+core host:
+
+```bash
+claude
+```
 
 ### Bootstrap hook
 
@@ -113,6 +132,7 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | `memory search disabled` | QMD or local embedding warmup is still running, or the provider override is wrong | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index` and `openclaw config get memory.qmd.paths --json`; Railway defaults to explicit local embeddings with the GGUF cached under `/data/.openclaw/models/node-llama-cpp` unless you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` |
 | `qmd ... ENOTDIR: not a directory, scandir '/data/workspace/MEMORY.md'` | OpenClaw derived a file-root default-memory collection and QMD `2.0.x` rejected it | Set `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false`, keep `memory.qmd.paths` pointed at `/data/workspace`, then redeploy or restart so the gateway reloads the config |
 | `memory.qmd: Unrecognized key: "searchMode"` | The current pinned OpenClaw release (`v2026.2.9`) does not support that config key | Remove it with `openclaw doctor --fix`, or redeploy the template so the wrapper scrubs it automatically |
+| Claude Max proxy selected but model calls fail | `claude-max-api` is running without a valid Claude Code CLI login, or `claude`/`claude-max-api` is missing | Verify `claude --version`, complete `claude` login once, then check `curl http://127.0.0.1:3456/health` inside core |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
 
 ## Migration and verification

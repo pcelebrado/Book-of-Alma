@@ -104,6 +104,11 @@ RUN curl -fsSL https://bun.sh/install | bash \
   && printf '%s\n' '#!/usr/bin/env bash' 'exec /root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd "$@"' > /usr/local/bin/qmd \
   && chmod +x /usr/local/bin/qmd
 
+# Claude Max API Proxy support:
+# - Claude Code CLI provides the user-authenticated Claude subscription session
+# - claude-max-api-proxy exposes that session as a local OpenAI-compatible endpoint
+RUN npm install -g @anthropic-ai/claude-code claude-max-api-proxy
+
 # Persist user-installed tool binaries on the Railway volume, but keep caches
 # ephemeral so cache churn does not consume persistent storage.
 # - npm global installs -> /data/npm
@@ -116,10 +121,12 @@ ENV PNPM_STORE_DIR=/tmp/pnpm-store
 ENV PATH="/data/npm/bin:/data/pnpm:${PATH}"
 ENV OPENCLAW_DATA_ROOT=/data
 ENV OPENCLAW_STATE_DIR=/data/.openclaw
+ENV OPENCLAW_CLAUDE_STATE_DIR=/data/.claude
 ENV OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace
 ENV OPENCLAW_WORKSPACE_DIR=/data/workspace
 ENV OPENCLAW_MEMORY_BACKEND=qmd
 ENV OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd
+ENV DISABLE_AUTOUPDATER=1
 ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf
 ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp
 ENV SFTPGO_PORTABLE_DIRECTORY=/data/workspace

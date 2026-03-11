@@ -177,7 +177,7 @@ Core now enforces one durable workspace layout on every boot:
 1. Wait for both services to build and deploy (core first, then web)
 2. Visit `https://your-app.railway.app` — this is your learning platform
 3. Open `/onboarding` to create the first admin account, then sign in
-4. Open the Core service `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
+4. Open the Core service `/setup` endpoint or the hosted `/admin` page to configure your AI provider (OpenAI, Anthropic, Claude Max API Proxy, Google, etc.)
 5. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
 6. Run `bash /app/scripts/post-deploy-verify.sh` in the core container
 
@@ -188,6 +188,23 @@ Core now enforces one durable workspace layout on every boot:
 - `https://<web-domain>/admin` = Book app admin page (if `services/web` is deployed)
 
 If your core domain opens OpenClaw pages at `/setup` and `/admin`, that is expected behavior.
+
+### Claude Max API Proxy in Admin
+
+The hosted admin page now includes **Anthropic → Claude Max API Proxy (Claude Code login)**.
+That path follows the OpenClaw docs contract:
+
+- core starts `claude-max-api` locally on `http://127.0.0.1:3456/v1`
+- OpenClaw is configured with provider `claude-max`
+- the default model is `claude-max/claude-opus-4`
+- Claude Code CLI auth is persisted on the Railway volume at `/data/.claude`
+
+The first login is still a Claude Code CLI login, not a native Anthropic OAuth callback.
+If the admin page shows the proxy as not ready after deploy, open a Railway SSH session to core and run:
+
+```bash
+claude
+```
 
 ---
 

@@ -68,6 +68,21 @@ interface AuthGroup {
   options: AuthOption[];
 }
 
+interface ClaudeMaxProxyStatus {
+  configured: boolean;
+  providerId: string;
+  defaultModel: string;
+  baseUrl: string;
+  reachable: boolean;
+  running: boolean;
+  cliStateDir: string;
+  commands?: {
+    claude?: { present: boolean; output?: string };
+    proxy?: { present: boolean; output?: string };
+  };
+  lastError?: string | null;
+}
+
 interface SetupStatusPayload {
   ok: boolean;
   configured: boolean;
@@ -75,6 +90,7 @@ interface SetupStatusPayload {
   openclawVersion: string;
   channelsAddHelp?: string;
   authGroups?: AuthGroup[];
+  claudeMaxProxy?: ClaudeMaxProxyStatus;
 }
 
 interface OnboardingPayload {
@@ -111,10 +127,11 @@ const FALLBACK_AUTH_GROUPS: AuthGroup[] = [
     { value: 'openai-codex', label: 'OpenAI Codex (ChatGPT OAuth)' },
     { value: 'openai-api-key', label: 'OpenAI API key' },
   ]},
-  { value: 'anthropic', label: 'Anthropic', hint: 'Claude Code CLI + API key', options: [
+  { value: 'anthropic', label: 'Anthropic', hint: 'API key, setup-token, or Claude Max proxy', options: [
     { value: 'claude-cli', label: 'Anthropic token (Claude Code CLI)' },
     { value: 'token', label: 'Anthropic token (paste setup-token)' },
     { value: 'apiKey', label: 'Anthropic API key' },
+    { value: 'claude-max-proxy', label: 'Claude Max API Proxy (Claude Code login)' },
   ]},
   { value: 'google', label: 'Google', hint: 'Gemini API key + OAuth', options: [
     { value: 'gemini-api-key', label: 'Google Gemini API key' },
@@ -178,6 +195,11 @@ const SECRET_REQUIRED_CHOICES = new Set([
   'synthetic-api-key',
   'opencode-zen',
 ]);
+
+const CLAUDE_MAX_PROXY_AUTH_CHOICE = 'claude-max-proxy';
+const CLAUDE_MAX_PROXY_PROVIDER_ID = 'claude-max';
+const CLAUDE_MAX_PROXY_BASE_URL = 'http://127.0.0.1:3456/v1';
+const CLAUDE_MAX_PROXY_DEFAULT_MODEL = 'claude-opus-4';
 
 function isInteractiveAuthOption(option: AuthOption): boolean {
   return INTERACTIVE_AUTH_CHOICES.has(option.value);
@@ -479,6 +501,7 @@ export default function AdminPage() {
   const normalizedSelectedAuth = normalizeAuthChoice(selectedAuth);
   const requiresAuthSecret = SECRET_REQUIRED_CHOICES.has(normalizedSelectedAuth);
   const isOpenAICodexOAuth = normalizedSelectedAuth === 'openai-codex';
+  const isClaudeMaxProxy = normalizedSelectedAuth === CLAUDE_MAX_PROXY_AUTH_CHOICE;
   const oauthCompletionPending = isOpenAICodexOAuth && Boolean(oauthFlowState);
   const onboardingBlocked =
     onboarding ||
@@ -495,17 +518,27 @@ export default function AdminPage() {
   const buildOnboardingPayload = (): OnboardingPayload => ({
     flow: onboardFlow,
     authChoice: normalizedSelectedAuth,
-    authSecret,
-    customProviderId,
-    customProviderBaseUrl,
-    customProviderApi,
-    customProviderApiKeyEnv,
-    customProviderModelId,
+    authSecret: isClaudeMaxProxy ? '' : authSecret,
+    customProviderId: isClaudeMaxProxy ? CLAUDE_MAX_PROXY_PROVIDER_ID : customProviderId,
+    customProviderBaseUrl: isClaudeMaxProxy ? CLAUDE_MAX_PROXY_BASE_URL : customProviderBaseUrl,
+    customProviderApi: isClaudeMaxProxy ? 'openai-completions' : customProviderApi,
+    customProviderApiKeyEnv: isClaudeMaxProxy ? '' : customProviderApiKeyEnv,
+    customProviderModelId: isClaudeMaxProxy ? (customProviderModelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL) : customProviderModelId,
     telegramToken,
     discordToken,
     slackBotToken,
     slackAppToken,
   });
+
+  useEffect(() => {
+    if (!isClaudeMaxProxy) return;
+    setCustomProviderId(CLAUDE_MAX_PROXY_PROVIDER_ID);
+    setCustomProviderBaseUrl(CLAUDE_MAX_PROXY_BASE_URL);
+    setCustomProviderApi('openai-completions');
+    setCustomProviderApiKeyEnv('');
+    setCustomProviderModelId((prev) => prev || CLAUDE_MAX_PROXY_DEFAULT_MODEL);
+    setAuthSecret('');
+  }, [isClaudeMaxProxy]);
 
   const runStandardOnboarding = async (payload: OnboardingPayload) => {
     setOnboarding(true);
@@ -1086,7 +1119,7 @@ export default function AdminPage() {
                 <CardTitle>Onboarding Wizard</CardTitle>
                 <CardDescription>
                   Run initial OpenClaw setup. Select an auth provider, enter your API key, and optionally
-                  configure channel tokens.
+                  configure channel tokens. Claude Max Proxy is available as a local OpenAI-compatible preset.
                 </CardDescription>
               </CardHeader>
             <CardContent className="space-y-6 text-sm">
@@ -1195,6 +1228,53 @@ export default function AdminPage() {
                   <p className="text-xs text-muted-foreground">Optional for OAuth/interactive auth choices.</p>
                 )}
               </div>
+
+              {isClaudeMaxProxy ? (
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">Claude Max API Proxy</p>
+                    <p className="text-xs text-muted-foreground">
+                      This is a local OpenAI-compatible proxy, not native Anthropic OAuth. Core will launch
+                      <code> claude-max-api </code>
+                      and register provider
+                      <code> {CLAUDE_MAX_PROXY_PROVIDER_ID} </code>
+                      at
+                      <code> {CLAUDE_MAX_PROXY_BASE_URL} </code>
+                      with default model
+                      <code> {CLAUDE_MAX_PROXY_PROVIDER_ID}/{customProviderModelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL} </code>.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      First use still requires a Claude Code CLI login on the core host. The login state is persisted
+                      on the Railway volume so you should only need to do it once.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Badge variant={setupStatus?.claudeMaxProxy?.commands?.claude?.present ? 'default' : 'secondary'}>
+                      Claude CLI {setupStatus?.claudeMaxProxy?.commands?.claude?.present ? 'installed' : 'missing'}
+                    </Badge>
+                    <Badge variant={setupStatus?.claudeMaxProxy?.commands?.proxy?.present ? 'default' : 'secondary'}>
+                      Proxy CLI {setupStatus?.claudeMaxProxy?.commands?.proxy?.present ? 'installed' : 'missing'}
+                    </Badge>
+                    <Badge variant={setupStatus?.claudeMaxProxy?.reachable ? 'default' : 'secondary'}>
+                      Proxy {setupStatus?.claudeMaxProxy?.reachable ? 'reachable' : 'not ready'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>
+                      Persistent Claude state:
+                      <code> {setupStatus?.claudeMaxProxy?.cliStateDir || '/data/.claude'} </code>
+                    </p>
+                    <p>
+                      If Claude login is still missing after deploy, use Railway SSH once and run
+                      <code> claude </code>
+                      to complete the browser sign-in, then return here.
+                    </p>
+                    {setupStatus?.claudeMaxProxy?.lastError ? (
+                      <p className="text-amber-600">{setupStatus.claudeMaxProxy.lastError}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               {isOpenAICodexOAuth ? (
                 <div className="space-y-3 rounded-md border p-3">

@@ -192,6 +192,91 @@ const OPENCLAW_GATEWAY_READY_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_GATEWAY_READY_TIMEOUT_MS,
   45_000,
 );
+const CLAUDE_CLI_COMMAND = process.env.OPENCLAW_CLAUDE_CLI_COMMAND?.trim() || "claude";
+const CLAUDE_MAX_PROXY_COMMAND =
+  process.env.OPENCLAW_CLAUDE_MAX_PROXY_COMMAND?.trim() || "claude-max-api";
+const CLAUDE_MAX_PROXY_HOST = process.env.OPENCLAW_CLAUDE_MAX_PROXY_HOST?.trim() || "127.0.0.1";
+const CLAUDE_MAX_PROXY_PORT = parsePositiveIntEnv(
+  process.env.OPENCLAW_CLAUDE_MAX_PROXY_PORT,
+  3456,
+);
+const CLAUDE_MAX_PROXY_BASE_URL =
+  process.env.OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL?.trim() ||
+  `http://${CLAUDE_MAX_PROXY_HOST}:${CLAUDE_MAX_PROXY_PORT}/v1`;
+const CLAUDE_MAX_PROXY_HEALTH_URL = `${CLAUDE_MAX_PROXY_BASE_URL.replace(/\/v1\/?$/, "")}/health`;
+const CLAUDE_MAX_PROXY_PROVIDER_ID =
+  process.env.OPENCLAW_CLAUDE_MAX_PROXY_PROVIDER_ID?.trim() || "claude-max";
+const CLAUDE_MAX_PROXY_DEFAULT_MODEL =
+  process.env.OPENCLAW_CLAUDE_MAX_PROXY_DEFAULT_MODEL?.trim() || "claude-opus-4";
+const CLAUDE_MAX_PROXY_CLI_STATE_DIR =
+  process.env.OPENCLAW_CLAUDE_STATE_DIR?.trim() || path.join(DATA_ROOT, ".claude");
+
+const CLAUDE_MAX_PROXY_MODELS = [
+  { id: "claude-opus-4", name: "Claude Opus 4" },
+  { id: "claude-sonnet-4", name: "Claude Sonnet 4" },
+  { id: "claude-haiku-4", name: "Claude Haiku 4" },
+];
+
+function isClaudeMaxProxyAuthChoice(value) {
+  return String(value || "").trim() === "claude-max-proxy";
+}
+
+function buildClaudeMaxProxyProviderConfig() {
+  return {
+    baseUrl: CLAUDE_MAX_PROXY_BASE_URL,
+    api: "openai-completions",
+    models: CLAUDE_MAX_PROXY_MODELS.map((entry) => ({ ...entry })),
+  };
+}
+
+function buildClaudeMaxProxyModelRef(modelId = CLAUDE_MAX_PROXY_DEFAULT_MODEL) {
+  return `${CLAUDE_MAX_PROXY_PROVIDER_ID}/${modelId}`;
+}
+
+function normalizeSetupPayload(payload = {}) {
+  if (!isClaudeMaxProxyAuthChoice(payload.authChoice)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    authChoice: "skip",
+    authSecret: "",
+    customProviderId: CLAUDE_MAX_PROXY_PROVIDER_ID,
+    customProviderBaseUrl: CLAUDE_MAX_PROXY_BASE_URL,
+    customProviderApi: "openai-completions",
+    customProviderApiKeyEnv: "",
+    customProviderModelId: payload.customProviderModelId?.trim() || CLAUDE_MAX_PROXY_DEFAULT_MODEL,
+  };
+}
+
+function runSyncCommand(command, args = []) {
+  try {
+    const result = childProcess.spawnSync(command, args, {
+      encoding: "utf8",
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        HOME: os.homedir(),
+        CLAUDE_CONFIG_DIR: CLAUDE_MAX_PROXY_CLI_STATE_DIR,
+        DISABLE_AUTOUPDATER: "1",
+      },
+    });
+    const stdout = String(result.stdout || "");
+    const stderr = String(result.stderr || "");
+    return {
+      ok: result.status === 0,
+      code: result.status ?? 127,
+      output: `${stdout}${stderr}`.trim(),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      code: 127,
+      output: String(err),
+    };
+  }
+}
 function resolveWorkspaceQmdPaths() {
   if (!OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE) {
     return [];
@@ -1205,6 +1290,12 @@ let gatewayDesired = false;
 let gatewayRestartTimer = null;
 let gatewayRestartAttempts = 0;
 let lastGatewayOutput = "";
+let claudeMaxProxyProc = null;
+let claudeMaxProxyStarting = null;
+let claudeMaxProxyDesired = false;
+let lastClaudeMaxProxyError = null;
+let lastClaudeMaxProxyExit = null;
+let lastClaudeMaxProxyOutput = "";
 
 // Debug breadcrumbs for common Railway failures (502 / "Application failed to respond").
 let lastGatewayError = null;
@@ -1231,6 +1322,224 @@ function appendGatewayOutput(stream, chunk) {
   if (lastGatewayOutput.length > 80_000) {
     lastGatewayOutput = lastGatewayOutput.slice(-80_000);
   }
+}
+
+function appendClaudeMaxProxyOutput(stream, chunk) {
+  const text = String(chunk || "");
+  if (!text) return;
+  const stamped = `[${new Date().toISOString()}][claude-max:${stream}] ${text}`;
+  lastClaudeMaxProxyOutput += stamped;
+  if (lastClaudeMaxProxyOutput.length > 80_000) {
+    lastClaudeMaxProxyOutput = lastClaudeMaxProxyOutput.slice(-80_000);
+  }
+}
+
+async function probeClaudeMaxProxy() {
+  try {
+    const res = await fetch(CLAUDE_MAX_PROXY_HEALTH_URL, { method: "GET" });
+    return Boolean(res && res.ok);
+  } catch {
+    return false;
+  }
+}
+
+async function waitForClaudeMaxProxyReady(timeoutMs = 30_000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await probeClaudeMaxProxy()) {
+      return true;
+    }
+    await sleep(250);
+  }
+  return false;
+}
+
+function resolveConfiguredClaudeMaxProxyState() {
+  const result = {
+    configured: false,
+    providerId: CLAUDE_MAX_PROXY_PROVIDER_ID,
+    defaultModel: buildClaudeMaxProxyModelRef(),
+    baseUrl: CLAUDE_MAX_PROXY_BASE_URL,
+  };
+
+  if (!isConfigured()) {
+    return result;
+  }
+
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const providerCfg = getJsonValue(snapshot.config, `models.providers.${CLAUDE_MAX_PROXY_PROVIDER_ID}`);
+    const modelPrimary = String(getJsonValue(snapshot.config, "agents.defaults.model.primary") || "").trim();
+    const configuredBaseUrl = String(providerCfg?.baseUrl || "").trim();
+    const configuredModel = modelPrimary.startsWith(`${CLAUDE_MAX_PROXY_PROVIDER_ID}/`)
+      ? modelPrimary
+      : buildClaudeMaxProxyModelRef();
+
+    return {
+      configured:
+        Boolean(providerCfg && typeof providerCfg === "object") ||
+        modelPrimary.startsWith(`${CLAUDE_MAX_PROXY_PROVIDER_ID}/`),
+      providerId: CLAUDE_MAX_PROXY_PROVIDER_ID,
+      defaultModel: configuredModel,
+      baseUrl: configuredBaseUrl || CLAUDE_MAX_PROXY_BASE_URL,
+    };
+  } catch {
+    return result;
+  }
+}
+
+async function inspectClaudeMaxProxyStatus() {
+  const configState = resolveConfiguredClaudeMaxProxyState();
+  const proxyReachable = await probeClaudeMaxProxy();
+  const claudeCli = runSyncCommand(CLAUDE_CLI_COMMAND, ["--version"]);
+  const proxyCli = runSyncCommand(CLAUDE_MAX_PROXY_COMMAND, ["--help"]);
+
+  return {
+    ...configState,
+    command: CLAUDE_MAX_PROXY_COMMAND,
+    claudeCommand: CLAUDE_CLI_COMMAND,
+    cliStateDir: CLAUDE_MAX_PROXY_CLI_STATE_DIR,
+    reachable: proxyReachable,
+    running: Boolean(claudeMaxProxyProc) || proxyReachable,
+    commands: {
+      claude: {
+        present: claudeCli.ok,
+        output: redactSecrets(claudeCli.output),
+      },
+      proxy: {
+        present: proxyCli.ok,
+        output: redactSecrets(proxyCli.output),
+      },
+    },
+    lastError: lastClaudeMaxProxyError,
+    lastExit: lastClaudeMaxProxyExit,
+    lastOutput: redactSecrets(lastClaudeMaxProxyOutput),
+  };
+}
+
+async function startClaudeMaxProxy() {
+  if (claudeMaxProxyProc) return;
+
+  const desired = resolveConfiguredClaudeMaxProxyState();
+  if (!desired.configured) {
+    claudeMaxProxyDesired = false;
+    return;
+  }
+
+  const claudeCli = runSyncCommand(CLAUDE_CLI_COMMAND, ["--version"]);
+  if (!claudeCli.ok) {
+    throw new Error(
+      `Claude Max proxy requires ${CLAUDE_CLI_COMMAND}. Install Claude Code CLI and complete login before enabling ${CLAUDE_MAX_PROXY_PROVIDER_ID}.`,
+    );
+  }
+
+  const proxyCli = runSyncCommand(CLAUDE_MAX_PROXY_COMMAND, ["--help"]);
+  if (!proxyCli.ok) {
+    throw new Error(
+      `Claude Max proxy requires ${CLAUDE_MAX_PROXY_COMMAND}. Install claude-max-api-proxy in the core image before enabling ${CLAUDE_MAX_PROXY_PROVIDER_ID}.`,
+    );
+  }
+
+  fs.mkdirSync(CLAUDE_MAX_PROXY_CLI_STATE_DIR, { recursive: true });
+
+  claudeMaxProxyProc = childProcess.spawn(CLAUDE_MAX_PROXY_COMMAND, [], {
+    detached: process.platform !== "win32",
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      HOME: os.homedir(),
+      CLAUDE_CONFIG_DIR: CLAUDE_MAX_PROXY_CLI_STATE_DIR,
+      DISABLE_AUTOUPDATER: "1",
+    },
+  });
+
+  claudeMaxProxyProc.stdout?.on("data", (chunk) => {
+    appendClaudeMaxProxyOutput("stdout", chunk);
+    try {
+      process.stdout.write(chunk);
+    } catch {
+      // ignore
+    }
+  });
+
+  claudeMaxProxyProc.stderr?.on("data", (chunk) => {
+    appendClaudeMaxProxyOutput("stderr", chunk);
+    try {
+      process.stderr.write(chunk);
+    } catch {
+      // ignore
+    }
+  });
+
+  claudeMaxProxyProc.on("error", (err) => {
+    void (async () => {
+      const msg = `[claude-max] spawn error: ${String(err)}`;
+      console.error(msg);
+      lastClaudeMaxProxyError = msg;
+      claudeMaxProxyProc = null;
+      if (await probeClaudeMaxProxy()) {
+        lastClaudeMaxProxyError = null;
+      }
+    })();
+  });
+
+  claudeMaxProxyProc.on("exit", (code, signal) => {
+    const msg = `[claude-max] exited code=${code} signal=${signal}`;
+    console.error(msg);
+    lastClaudeMaxProxyExit = { code, signal, at: new Date().toISOString() };
+    lastClaudeMaxProxyError = msg;
+    claudeMaxProxyProc = null;
+  });
+}
+
+async function stopClaudeMaxProxy({ disableDesired = true } = {}) {
+  if (disableDesired) claudeMaxProxyDesired = false;
+  const proc = claudeMaxProxyProc;
+  if (!proc) return;
+  await terminateGatewayProcess(proc, "SIGTERM");
+  await sleep(750);
+  await terminateGatewayProcess(proc, "SIGKILL");
+  claudeMaxProxyProc = null;
+}
+
+async function syncClaudeMaxProxyState() {
+  const desired = resolveConfiguredClaudeMaxProxyState();
+  claudeMaxProxyDesired = desired.configured;
+
+  if (!desired.configured) {
+    await stopClaudeMaxProxy();
+    lastClaudeMaxProxyError = null;
+    return { ok: true, configured: false, output: "[claude-max] disabled (not configured)" };
+  }
+
+  if (await probeClaudeMaxProxy()) {
+    lastClaudeMaxProxyError = null;
+    return { ok: true, configured: true, output: "[claude-max] already reachable" };
+  }
+
+  if (!claudeMaxProxyStarting) {
+    claudeMaxProxyStarting = (async () => {
+      try {
+        await startClaudeMaxProxy();
+        const ready = await waitForClaudeMaxProxyReady();
+        if (!ready) {
+          throw new Error(
+            `Claude Max proxy did not become ready in time at ${CLAUDE_MAX_PROXY_HEALTH_URL}. Log in with ${CLAUDE_CLI_COMMAND} and retry.`,
+          );
+        }
+        lastClaudeMaxProxyError = null;
+        return { ok: true, configured: true, output: "[claude-max] reachable" };
+      } catch (err) {
+        const msg = `[claude-max] start failure: ${String(err)}`;
+        lastClaudeMaxProxyError = msg;
+        return { ok: false, configured: true, output: msg };
+      } finally {
+        claudeMaxProxyStarting = null;
+      }
+    })();
+  }
+
+  return claudeMaxProxyStarting;
 }
 
 function clearGatewayRestartTimer() {
@@ -1613,6 +1922,7 @@ async function probeGateway() {
 // Keep this free of secrets.
 app.get("/healthz", async (_req, res) => {
   let gatewayReachable = false;
+  const claudeMaxProxy = await inspectClaudeMaxProxyStatus();
   if (isConfigured()) {
     try {
       gatewayReachable = await probeGateway();
@@ -1652,11 +1962,20 @@ app.get("/healthz", async (_req, res) => {
       lastExit: lastGatewayExit,
       lastDoctorAt,
     },
+    claudeMaxProxy: {
+      configured: claudeMaxProxy.configured,
+      baseUrl: claudeMaxProxy.baseUrl,
+      reachable: claudeMaxProxy.reachable,
+      running: claudeMaxProxy.running,
+      cliStateDir: claudeMaxProxy.cliStateDir,
+      lastError: claudeMaxProxy.lastError,
+    },
   });
 });
 
 app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
   let gatewayReachable = false;
+  const claudeMaxProxy = await inspectClaudeMaxProxyStatus();
   try {
     gatewayReachable = await probeGateway();
     if (gatewayReachable && lastGatewayError?.includes("Gateway did not become ready in time")) {
@@ -1708,6 +2027,16 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
         chatCompletions: "/v1/chat/completions",
         responses: "/v1/responses",
         toolsInvoke: "/tools/invoke",
+      },
+      claudeMaxProxy: {
+        providerId: claudeMaxProxy.providerId,
+        configured: claudeMaxProxy.configured,
+        defaultModel: claudeMaxProxy.defaultModel,
+        baseUrl: claudeMaxProxy.baseUrl,
+        reachable: claudeMaxProxy.reachable,
+        running: claudeMaxProxy.running,
+        cliStateDir: claudeMaxProxy.cliStateDir,
+        lastError: claudeMaxProxy.lastError,
       },
     },
   });
@@ -2851,6 +3180,7 @@ app.get("/internal/openclaw/setup/status", requireInternalApiAuth, async (_req, 
   try {
     const version = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
     const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
+    const claudeMaxProxy = await inspectClaudeMaxProxyStatus();
 
     res.json({
       ok: true,
@@ -2859,6 +3189,7 @@ app.get("/internal/openclaw/setup/status", requireInternalApiAuth, async (_req, 
       openclawVersion: version.output.trim(),
       channelsAddHelp: channelsHelp.output,
       authGroups: AUTH_GROUPS,
+      claudeMaxProxy,
     });
   } catch (error) {
     res.status(500).json({ ok: false, error: { code: "status_failed", message: String(error) } });
@@ -2886,7 +3217,7 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
-    const payload = req.body || {};
+    const payload = normalizeSetupPayload(req.body || {});
 
     let onboardArgs;
     try {
@@ -3091,6 +3422,9 @@ app.post("/internal/openclaw/setup/reset", requireInternalApiAuth, async (_req, 
     try {
       await stopGateway();
     } catch { /* ignore */ }
+    try {
+      await stopClaudeMaxProxy();
+    } catch { /* ignore */ }
 
     const candidates = typeof resolveConfigCandidates === "function" ? resolveConfigCandidates() : [configPath()];
     for (const p of candidates) {
@@ -3128,6 +3462,7 @@ app.post("/internal/openclaw/setup/config/raw", requireInternalApiAuth, async (r
       fs.copyFileSync(p, backupPath);
     }
     fs.writeFileSync(p, content, { encoding: "utf8", mode: 0o600 });
+    await syncClaudeMaxProxyState();
 
     if (isConfigured()) {
       await restartGateway();
@@ -3156,6 +3491,7 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
       OPENCLAW_NODE,
       clawArgs(["config", "get", "memory.qmd.command"]),
     );
+    const claudeMaxProxy = await inspectClaudeMaxProxyStatus();
 
     res.json({
       ok: true,
@@ -3182,6 +3518,7 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
       },
       openclaw: {
         version: v.output.trim(),
+        claudeMaxProxy,
         qmd: {
           command: OPENCLAW_MEMORY_QMD_COMMAND,
           binaryPresent: qmd.code === 0,
@@ -3422,10 +3759,11 @@ const AUTH_GROUPS = [
     { value: "openai-codex", label: "OpenAI Codex (ChatGPT OAuth)" },
     { value: "openai-api-key", label: "OpenAI API key" }
   ]},
-  { value: "anthropic", label: "Anthropic", hint: "Claude Code CLI + API key", options: [
+  { value: "anthropic", label: "Anthropic", hint: "API key, setup-token, or Claude Max proxy", options: [
     { value: "claude-cli", label: "Anthropic token (Claude Code CLI)" },
     { value: "token", label: "Anthropic token (paste setup-token)" },
-    { value: "apiKey", label: "Anthropic API key" }
+    { value: "apiKey", label: "Anthropic API key" },
+    { value: "claude-max-proxy", label: "Claude Max API Proxy (Claude Code login)" }
   ]},
   { value: "google", label: "Google", hint: "Gemini API key + OAuth", options: [
     { value: "gemini-api-key", label: "Google Gemini API key" },
@@ -3514,6 +3852,10 @@ async function resolveAuthChoiceCompatibility(authChoice) {
   const help = (await getOnboardHelpText()).toLowerCase();
   const normalized = String(authChoice).trim();
 
+  if (normalized === "claude-max-proxy") {
+    return help.includes("--auth-choice") && help.includes("skip") ? "skip" : "skip";
+  }
+
   if (normalized === "codex-cli") {
     return "openai-codex";
   }
@@ -3528,6 +3870,7 @@ async function resolveAuthChoiceCompatibility(authChoice) {
 }
 
 async function buildOnboardArgs(payload) {
+  const normalizedPayload = normalizeSetupPayload(payload);
   const args = [
     "onboard",
     "--non-interactive",
@@ -3548,15 +3891,15 @@ async function buildOnboardArgs(payload) {
     "--gateway-token",
     OPENCLAW_GATEWAY_TOKEN,
     "--flow",
-    payload.flow || "quickstart",
+    normalizedPayload.flow || "quickstart",
   ];
 
-  if (payload.authChoice) {
-    const resolvedAuthChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
+  if (normalizedPayload.authChoice) {
+    const resolvedAuthChoice = await resolveAuthChoiceCompatibility(normalizedPayload.authChoice);
     args.push("--auth-choice", resolvedAuthChoice);
 
     // Map secret to correct flag for common choices.
-    const secret = (payload.authSecret || "").trim();
+    const secret = (normalizedPayload.authSecret || "").trim();
     const map = {
       "openai-api-key": "--openai-api-key",
       "apiKey": "--anthropic-api-key",
@@ -3593,6 +3936,96 @@ async function buildOnboardArgs(payload) {
   }
 
   return args;
+}
+
+function applyCustomProviderConfig(payload) {
+  const normalizedPayload = normalizeSetupPayload(payload);
+  if (!normalizedPayload.customProviderId?.trim() || !normalizedPayload.customProviderBaseUrl?.trim()) {
+    return {
+      ok: true,
+      changed: false,
+      output: "",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+
+  const providerId = normalizedPayload.customProviderId.trim();
+  const baseUrl = normalizedPayload.customProviderBaseUrl.trim();
+  const api = (normalizedPayload.customProviderApi || "openai-completions").trim();
+  const apiKeyEnv = (normalizedPayload.customProviderApiKeyEnv || "").trim();
+  const modelId = (normalizedPayload.customProviderModelId || "").trim();
+
+  if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
+    return {
+      ok: false,
+      changed: false,
+      output: "[custom provider] skipped: invalid provider id (use letters/numbers/_/-)",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+  if (!/^https?:\/\//.test(baseUrl)) {
+    return {
+      ok: false,
+      changed: false,
+      output: "[custom provider] skipped: baseUrl must start with http(s)://",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+  if (api !== "openai-completions" && api !== "openai-responses") {
+    return {
+      ok: false,
+      changed: false,
+      output: "[custom provider] skipped: api must be openai-completions or openai-responses",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+  if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
+    return {
+      ok: false,
+      changed: false,
+      output: "[custom provider] skipped: invalid api key env var name",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+
+  const isClaudeMaxPreset = isClaudeMaxProxyAuthChoice(payload.authChoice);
+  const providerCfg = isClaudeMaxPreset
+    ? buildClaudeMaxProxyProviderConfig()
+    : {
+        baseUrl,
+        api,
+        apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
+        models: modelId ? [{ id: modelId, name: modelId }] : undefined,
+      };
+
+  const entries = [
+    ["models.mode", "merge"],
+    [`models.providers.${providerId}`, providerCfg],
+  ];
+
+  if (isClaudeMaxPreset) {
+    const modelRef = buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL);
+    entries.push(["agents.defaults.model.primary", modelRef]);
+    entries.push([`agents.defaults.models.${modelRef}`, { alias: "Claude Max" }]);
+  }
+
+  const patch = applyConfigPatch(entries);
+  const lines = [
+    `[custom provider] ${patch.ok ? "configured" : "failed"}`,
+    patch.output || "",
+  ];
+  if (isClaudeMaxPreset) {
+    lines.push(
+      `[claude-max] provider=${CLAUDE_MAX_PROXY_PROVIDER_ID} model=${buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL)} baseUrl=${CLAUDE_MAX_PROXY_BASE_URL}`,
+    );
+  }
+
+  return {
+    ok: patch.ok,
+    changed: patch.changed,
+    output: lines.filter(Boolean).join("\n"),
+    selectedAuthChoice: normalizedPayload.authChoice || "",
+  };
 }
 
 function runCmd(cmd, args, opts = {}) {
@@ -3925,6 +4358,7 @@ async function persistOpenAICodexOAuth(creds) {
 }
 
 async function applyConfiguredSetupPayload(payload) {
+  const normalizedPayload = normalizeSetupPayload(payload);
   let extra = "";
 
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.mode", "local"]));
@@ -3955,43 +4389,20 @@ async function applyConfiguredSetupPayload(payload) {
     startMemoryIndexWarmup("configured-setup");
   }
 
-  if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
-    const providerId = payload.customProviderId.trim();
-    const baseUrl = payload.customProviderBaseUrl.trim();
-    const api = (payload.customProviderApi || "openai-completions").trim();
-    const apiKeyEnv = (payload.customProviderApiKeyEnv || "").trim();
-    const modelId = (payload.customProviderModelId || "").trim();
-
-    if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
-      extra += `\n[custom provider] skipped: invalid provider id`;
-    } else if (!/^https?:\/\//.test(baseUrl)) {
-      extra += `\n[custom provider] skipped: baseUrl must start with http(s)://`;
-    } else if (api !== "openai-completions" && api !== "openai-responses") {
-      extra += `\n[custom provider] skipped: api must be openai-completions or openai-responses`;
-    } else if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
-      extra += `\n[custom provider] skipped: invalid api key env var name`;
-    } else {
-      const providerCfg = {
-        baseUrl,
-        api,
-        apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
-        models: modelId ? [{ id: modelId, name: modelId }] : undefined,
-      };
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "models.mode", "merge"]));
-      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", `models.providers.${providerId}`, JSON.stringify(providerCfg)]));
-      extra += `\n[custom provider] exit=${set.code}\n${set.output || "(no output)"}`;
-    }
+  const providerPatch = applyCustomProviderConfig(normalizedPayload);
+  if (providerPatch.output) {
+    extra += `\n${providerPatch.output}`;
   }
 
   const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
   const helpText = channelsHelp.output || "";
   const supports = (name) => helpText.includes(name);
 
-  if (payload.telegramToken?.trim()) {
+  if (normalizedPayload.telegramToken?.trim()) {
     if (!supports("telegram")) {
       extra += "\n[telegram] skipped (unsupported build)\n";
     } else {
-      const token = payload.telegramToken.trim();
+      const token = normalizedPayload.telegramToken.trim();
       const cfgObj = { enabled: true, dmPolicy: "pairing", botToken: token, groupPolicy: "allowlist", streamMode: "partial" };
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
       const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
@@ -4000,11 +4411,11 @@ async function applyConfiguredSetupPayload(payload) {
     }
   }
 
-  if (payload.discordToken?.trim()) {
+  if (normalizedPayload.discordToken?.trim()) {
     if (!supports("discord")) {
       extra += "\n[discord] skipped (unsupported build)\n";
     } else {
-      const token = payload.discordToken.trim();
+      const token = normalizedPayload.discordToken.trim();
       const cfgObj = { enabled: true, token, groupPolicy: "allowlist", dm: { policy: "pairing" } };
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
       const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
@@ -4012,14 +4423,14 @@ async function applyConfiguredSetupPayload(payload) {
     }
   }
 
-  if (payload.slackBotToken?.trim() || payload.slackAppToken?.trim()) {
+  if (normalizedPayload.slackBotToken?.trim() || normalizedPayload.slackAppToken?.trim()) {
     if (!supports("slack")) {
       extra += "\n[slack] skipped (unsupported build)\n";
     } else {
       const cfgObj = {
         enabled: true,
-        botToken: payload.slackBotToken?.trim() || undefined,
-        appToken: payload.slackAppToken?.trim() || undefined,
+        botToken: normalizedPayload.slackBotToken?.trim() || undefined,
+        appToken: normalizedPayload.slackAppToken?.trim() || undefined,
       };
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.slack", JSON.stringify(cfgObj)]));
       const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
@@ -4028,6 +4439,10 @@ async function applyConfiguredSetupPayload(payload) {
   }
 
   await restartGateway();
+  const claudeMaxSync = await syncClaudeMaxProxyState();
+  if (claudeMaxSync?.output) {
+    extra += `\n${claudeMaxSync.output}`;
+  }
   const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
   extra += `\n[doctor --fix] exit=${fix.code}`;
   await restartGateway();
@@ -4220,7 +4635,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
-    const payload = req.body || {};
+    const payload = normalizeSetupPayload(req.body || {});
     const authChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
     if (authChoice === "openai-codex") {
       return respondJson(400, {
@@ -4290,37 +4705,9 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     }
 
     // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
-    if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
-      const providerId = payload.customProviderId.trim();
-      const baseUrl = payload.customProviderBaseUrl.trim();
-      const api = (payload.customProviderApi || "openai-completions").trim();
-      const apiKeyEnv = (payload.customProviderApiKeyEnv || "").trim();
-      const modelId = (payload.customProviderModelId || "").trim();
-
-      if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
-        extra += `\n[custom provider] skipped: invalid provider id (use letters/numbers/_/-)`;
-      } else if (!/^https?:\/\//.test(baseUrl)) {
-        extra += `\n[custom provider] skipped: baseUrl must start with http(s)://`;
-      } else if (api !== "openai-completions" && api !== "openai-responses") {
-        extra += `\n[custom provider] skipped: api must be openai-completions or openai-responses`;
-      } else if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
-        extra += `\n[custom provider] skipped: invalid api key env var name`;
-      } else {
-        const providerCfg = {
-          baseUrl,
-          api,
-          apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
-          models: modelId ? [{ id: modelId, name: modelId }] : undefined,
-        };
-
-        // Ensure we merge in this provider rather than replacing other providers.
-        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "models.mode", "merge"]));
-        const set = await runCmd(
-          OPENCLAW_NODE,
-          clawArgs(["config", "set", "--json", `models.providers.${providerId}`, JSON.stringify(providerCfg)]),
-        );
-        extra += `\n[custom provider] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
-      }
+    const providerPatch = applyCustomProviderConfig(payload);
+    if (providerPatch.output) {
+      extra += `\n${providerPatch.output}`;
     }
 
     const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
@@ -4400,6 +4787,10 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     // Apply changes immediately.
     await restartGateway();
+    const claudeMaxSync = await syncClaudeMaxProxyState();
+    if (claudeMaxSync?.output) {
+      extra += `\n${claudeMaxSync.output}`;
+    }
 
     // Ensure OpenClaw applies any "configured but not enabled" channel/plugin changes.
     // This makes Telegram/Discord pairing issues much less "silent".
@@ -4432,6 +4823,7 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
   const dc = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
   const memoryBackend = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.backend"]));
   const memoryQmdCommand = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.command"]));
+  const claudeMaxProxy = await inspectClaudeMaxProxyStatus();
 
   const tgOut = redactSecrets(tg.output || "");
   const dcOut = redactSecrets(dc.output || "");
@@ -4465,6 +4857,7 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
       entry: OPENCLAW_ENTRY,
       node: OPENCLAW_NODE,
       version: v.output.trim(),
+      claudeMaxProxy,
       qmd: {
         command: OPENCLAW_MEMORY_QMD_COMMAND,
         binaryPresent: qmd.code === 0,
@@ -4664,6 +5057,7 @@ app.post("/setup/api/config/raw", requireSetupAuth, async (req, res) => {
     }
 
     fs.writeFileSync(p, content, { encoding: "utf8", mode: 0o600 });
+    await syncClaudeMaxProxyState();
 
     // Apply immediately.
     if (isConfigured()) {
@@ -4708,6 +5102,11 @@ app.post("/setup/api/reset", requireSetupAuth, async (_req, res) => {
     // Stop gateway to avoid running gateway + onboard concurrently on small Railway instances.
     try {
       await stopGateway();
+    } catch {
+      // ignore
+    }
+    try {
+      await stopClaudeMaxProxy();
     } catch {
       // ignore
     }
@@ -5095,6 +5494,10 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       if (memoryDefaults.ok) {
         startMemoryIndexWarmup("boot-sync");
       }
+      const claudeMaxSync = await syncClaudeMaxProxyState();
+      if (claudeMaxSync?.output) {
+        console.log(claudeMaxSync.output);
+      }
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
@@ -5107,6 +5510,10 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log("[wrapper] config detected; starting gateway...");
     startMemoryIndexWarmup("boot-config-detected");
     try {
+      const claudeMaxSync = await syncClaudeMaxProxyState();
+      if (claudeMaxSync?.output) {
+        console.log(claudeMaxSync.output);
+      }
       await ensureGatewayRunning();
       console.log("[wrapper] gateway ready");
     } catch (err) {
@@ -5140,6 +5547,7 @@ server.on("upgrade", async (req, socket, head) => {
 process.on("SIGTERM", () => {
   // Best-effort shutdown
   stopGateway().catch(() => {});
+  stopClaudeMaxProxy().catch(() => {});
 
   // Stop accepting new connections; allow in-flight requests to complete briefly.
   try {

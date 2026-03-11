@@ -15,6 +15,10 @@
     "value": "/data/.openclaw",
     "description": "Persistent directory for OpenClaw state, credentials, and runtime config."
   },
+  "OPENCLAW_CLAUDE_STATE_DIR": {
+    "value": "/data/.claude",
+    "description": "Persistent Claude Code CLI state directory. The wrapper links /root/.claude here so Claude Max API Proxy logins survive Railway restarts."
+  },
   "OPENCLAW_WORKSPACE_DIR": {
     "value": "/data/workspace",
     "description": "Configured OpenClaw workspace path inside the container. Template defaults this to the persistent Railway volume so SFTP lands in the same directory OpenClaw uses."
@@ -82,6 +86,34 @@
   "OPENCLAW_NODE": {
     "value": "node",
     "description": "Node.js executable used to launch OpenClaw runtime."
+  },
+  "OPENCLAW_CLAUDE_CLI_COMMAND": {
+    "value": "claude",
+    "description": "Claude Code CLI executable used for Claude Max subscription login and proxy-backed requests."
+  },
+  "OPENCLAW_CLAUDE_MAX_PROXY_COMMAND": {
+    "value": "claude-max-api",
+    "description": "Claude Max API Proxy executable. Core launches it automatically when models.providers.claude-max is configured."
+  },
+  "OPENCLAW_CLAUDE_MAX_PROXY_HOST": {
+    "value": "127.0.0.1",
+    "description": "Loopback host where Claude Max API Proxy listens inside the core container."
+  },
+  "OPENCLAW_CLAUDE_MAX_PROXY_PORT": {
+    "value": "3456",
+    "description": "Loopback port where Claude Max API Proxy listens inside the core container."
+  },
+  "OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL": {
+    "value": "http://127.0.0.1:3456/v1",
+    "description": "OpenAI-compatible base URL written to models.providers.claude-max when the Claude Max preset is selected in Admin."
+  },
+  "OPENCLAW_CLAUDE_MAX_PROXY_PROVIDER_ID": {
+    "value": "claude-max",
+    "description": "OpenClaw provider id used for the local Claude Max API Proxy preset."
+  },
+  "OPENCLAW_CLAUDE_MAX_PROXY_DEFAULT_MODEL": {
+    "value": "claude-opus-4",
+    "description": "Default Claude Max proxy model id selected by the Admin preset."
   },
   "OPENCLAW_MEMORY_BACKEND": {
     "value": "qmd",

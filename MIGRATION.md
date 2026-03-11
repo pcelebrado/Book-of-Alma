@@ -20,8 +20,16 @@ tar -czf /tmp/openclaw-pre-migration.tgz -C /data .openclaw workspace 2>/dev/nul
 
 ```text
 OPENCLAW_STATE_DIR=/data/.openclaw
+OPENCLAW_CLAUDE_STATE_DIR=/data/.claude
 OPENCLAW_WORKSPACE_DIR=/data/workspace
 OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace
+OPENCLAW_CLAUDE_CLI_COMMAND=claude
+OPENCLAW_CLAUDE_MAX_PROXY_COMMAND=claude-max-api
+OPENCLAW_CLAUDE_MAX_PROXY_HOST=127.0.0.1
+OPENCLAW_CLAUDE_MAX_PROXY_PORT=3456
+OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL=http://127.0.0.1:3456/v1
+OPENCLAW_CLAUDE_MAX_PROXY_PROVIDER_ID=claude-max
+OPENCLAW_CLAUDE_MAX_PROXY_DEFAULT_MODEL=claude-opus-4
 SFTPGO_PORTABLE_DIRECTORY=/data/workspace
 OPENCLAW_MEMORY_BACKEND=qmd
 OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd
@@ -64,12 +72,14 @@ Default Railway memory-search strategy:
 4. On first boot the startup script will:
 
 - create `/data/workspace` and `/data/.openclaw`
+- create `/data/.claude` and re-link `/root/.claude` there for Claude Code CLI persistence
 - migrate or back up any non-symlink `/root/.openclaw/workspace`
 - migrate or back up any transient `/workspace`
 - ensure `/root/.openclaw/workspace -> /data/workspace`
 - seed `MEMORY.md` and `memory/YYYY-MM-DD.md` if missing
 - keep `memory.qmd.includeDefaultMemory=false` so QMD binds `/data/workspace` as the collection root instead of `/data/workspace/MEMORY.md`
 - remove the legacy `memory/railway-alma-verification.md` seed if it exists on an older volume
+- auto-start `claude-max-api` whenever `models.providers.claude-max` is configured
 
 5. Run the verifier:
 

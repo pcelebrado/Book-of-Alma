@@ -10,6 +10,8 @@ WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${WORKSPACE_VOLUME_DIR}}"
 WORKSPACE_COMPAT_DIR="${OPENCLAW_WORKSPACE_COMPAT_DIR:-/root/.openclaw/workspace}"
 ROOT_HOME_OPENCLAW_DIR="$(dirname "${WORKSPACE_COMPAT_DIR}")"
 CREDENTIALS_DIR="${STATE_DIR}/credentials"
+CLAUDE_STATE_DIR="${OPENCLAW_CLAUDE_STATE_DIR:-${DATA_ROOT}/.claude}"
+CLAUDE_COMPAT_DIR="${OPENCLAW_CLAUDE_COMPAT_DIR:-/root/.claude}"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-${DATA_ROOT}/sftpgo}"
 SFTPGO_SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
@@ -187,10 +189,12 @@ ensure_legacy_workspace_mapping() {
 fix_permissions() {
   ensure_dir "${STATE_DIR}"
   ensure_dir "${CREDENTIALS_DIR}"
+  ensure_dir "${CLAUDE_STATE_DIR}"
 
   ensure_mode "${DATA_ROOT}" 755
   ensure_mode "${STATE_DIR}" 700
   ensure_mode "${CREDENTIALS_DIR}" 700
+  ensure_mode "${CLAUDE_STATE_DIR}" 700
   ensure_mode "${ROOT_HOME_OPENCLAW_DIR}" 700
 
   while IFS= read -r -d '' file; do
@@ -203,6 +207,25 @@ fix_permissions() {
     -name '*.token' -o \
     -name '.env' \
   \) -print0 2>/dev/null)
+}
+
+ensure_claude_cli_state() {
+  ensure_dir "${CLAUDE_STATE_DIR}"
+
+  if [ -L "${CLAUDE_COMPAT_DIR}" ]; then
+    local target
+    target="$(readlink -f "${CLAUDE_COMPAT_DIR}" || true)"
+    if [ "${target}" = "$(readlink -f "${CLAUDE_STATE_DIR}")" ]; then
+      return 0
+    fi
+    backup_path "${CLAUDE_COMPAT_DIR}" "root-claude-link"
+  elif [ -e "${CLAUDE_COMPAT_DIR}" ]; then
+    sync_if_target_empty "${CLAUDE_COMPAT_DIR}" "${CLAUDE_STATE_DIR}"
+    backup_path "${CLAUDE_COMPAT_DIR}" "root-claude"
+  fi
+
+  ln -sfn "${CLAUDE_STATE_DIR}" "${CLAUDE_COMPAT_DIR}"
+  log "Linked ${CLAUDE_COMPAT_DIR} -> ${CLAUDE_STATE_DIR}"
 }
 
 seed_memory_corpus() {
@@ -289,6 +312,7 @@ prepare_runtime() {
   ensure_workspace_compat_link
   ensure_legacy_workspace_mapping
   fix_permissions
+  ensure_claude_cli_state
   seed_memory_corpus
   expose_workspace_for_sftpgo
   prepare_qmd_dirs
@@ -303,6 +327,7 @@ prepare_runtime() {
   log "Active workspace configured at ${WORKSPACE_DIR}"
   log "Active workspace resolves to $(readlink -f "${WORKSPACE_DIR}" || echo unresolved)"
   log "Compatibility workspace resolves to $(readlink -f "${WORKSPACE_COMPAT_DIR}" || echo unresolved)"
+  log "Claude CLI state resolves to $(readlink -f "${CLAUDE_COMPAT_DIR}" || echo unresolved)"
   log "Memory search cache dir prepared at ${MEMORY_SEARCH_CACHE_DIR}"
   log "Memory search store template prepared at ${MEMORY_SEARCH_STORE_PATH}"
 }

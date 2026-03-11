@@ -37,6 +37,24 @@ key on boot.
 Template defaults now leave custom QMD warmup disabled so the deployment does
 not inject book-specific probe queries into runtime logs.
 
+If you enable Claude Max API Proxy from Admin, also verify the local proxy path:
+
+```bash
+claude --version
+claude-max-api --help
+curl http://127.0.0.1:3456/health
+openclaw config get models.providers.claude-max --json
+openclaw config get agents.defaults.model.primary
+```
+
+Expected output:
+
+- `claude --version` prints the Claude Code CLI version
+- `claude-max-api --help` exits successfully
+- `/health` returns an HTTP 200 after the wrapper starts the proxy
+- `models.providers.claude-max.baseUrl` is `http://127.0.0.1:3456/v1`
+- the default model is `claude-max/claude-opus-4` unless you intentionally changed it
+
 ## Manual checks
 
 1. Active workspace and compatibility path resolve to the same persistent volume:
