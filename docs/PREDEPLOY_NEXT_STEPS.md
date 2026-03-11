@@ -72,6 +72,11 @@ Set these values in Railway Variables (service-level), not in git.
   - `SFTPGO_HTTPD__BINDINGS__0__PORT=2080`
   - `SFTPGO_PORTABLE_DIRECTORY=/data/workspace`
   - `SFTPGO_PORTABLE_USERNAME` / `SFTPGO_PORTABLE_PASSWORD` — optional overrides; if blank, portable mode reuses the admin credentials
+- Memory search (auto-configured):
+  - `OPENAI_API_KEY` — preferred remote embedding provider when present
+  - `OPENCLAW_MEMORY_SEARCH_PROVIDER` — optional explicit override (`openai`, `gemini`, `voyage`, `local`)
+  - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
+  - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
 
 ## Deterministic next steps before deployment
 

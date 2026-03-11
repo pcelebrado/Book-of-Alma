@@ -434,14 +434,23 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m`
 - `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
 - `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
+- `OPENCLAW_MEMORY_SEARCH_PROVIDER=` (blank = auto)
+- `OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL=text-embedding-3-small`
+- `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
+- `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
 
 The template also seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` and warms QMD on
 boot using the same XDG directories that OpenClaw uses at runtime.
 
-Fresh deployments can have a slow first memory query while QMD downloads its
-local model assets. If memory search still reports disabled after warmup, set
-`OPENAI_API_KEY` or `GEMINI_API_KEY`, or configure a local
-`memorySearch.local.modelPath` in the raw OpenClaw config.
+Fresh deployments can have a slow first memory query while QMD or the local
+embedding model downloads assets. Runtime now auto-configures
+`agents.defaults.memorySearch` like this:
+
+- `OPENAI_API_KEY` present -> provider `openai`
+- otherwise if `GEMINI_API_KEY` or `VOYAGE_API_KEY` is present -> provider matches that key
+- otherwise -> provider `local` with the bundled default GGUF model path
+
+If you want to force a specific provider, set `OPENCLAW_MEMORY_SEARCH_PROVIDER`.
 
 See `docs/PREDEPLOY_NEXT_STEPS.md`, [MIGRATION.md](./MIGRATION.md), and
 [VERIFY.md](./VERIFY.md) for the full deployment, migration, and verification flow.

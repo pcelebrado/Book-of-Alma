@@ -107,13 +107,37 @@
     "value": "true",
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
   },
+  "OPENCLAW_MEMORY_SEARCH_PROVIDER": {
+    "value": "",
+    "description": "Optional override for agents.defaults.memorySearch.provider (`openai`, `gemini`, `voyage`, or `local`). If blank, runtime prefers OpenAI when OPENAI_API_KEY is set and otherwise falls back to local embeddings."
+  },
+  "OPENCLAW_MEMORY_SEARCH_FALLBACK": {
+    "value": "none",
+    "description": "Fallback provider for agents.defaults.memorySearch.fallback. Keep `none` for deterministic Railway boot unless you intentionally chain providers."
+  },
+  "OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL": {
+    "value": "text-embedding-3-small",
+    "description": "Embedding model used when memory search resolves to the OpenAI provider."
+  },
+  "OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH": {
+    "value": "hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf",
+    "description": "Local embedding model URI/path used when memory search resolves to the local provider."
+  },
+  "OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR": {
+    "value": "/data/.openclaw/models/node-llama-cpp",
+    "description": "Persistent cache directory for local node-llama-cpp embedding models."
+  },
   "OPENAI_API_KEY": {
     "value": "",
-    "description": "Optional. If set, OpenClaw can use OpenAI embeddings for memory search fallbacks and non-QMD memory tooling."
+    "description": "Optional. If set, runtime auto-selects the OpenAI embedding provider for agents.defaults.memorySearch unless OPENCLAW_MEMORY_SEARCH_PROVIDER overrides it."
   },
   "GEMINI_API_KEY": {
     "value": "",
-    "description": "Optional. If set, OpenClaw can use Gemini embeddings for memory search fallbacks."
+    "description": "Optional. If set and OPENAI_API_KEY is blank, runtime can select Gemini embeddings for agents.defaults.memorySearch unless OPENCLAW_MEMORY_SEARCH_PROVIDER overrides it."
+  },
+  "VOYAGE_API_KEY": {
+    "value": "",
+    "description": "Optional. If set and neither OPENAI_API_KEY nor GEMINI_API_KEY is present, runtime can select Voyage embeddings for agents.defaults.memorySearch unless OPENCLAW_MEMORY_SEARCH_PROVIDER overrides it."
   },
   "BOOK_SOURCE_MODE": {
     "value": "external",

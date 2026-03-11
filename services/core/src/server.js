@@ -93,6 +93,25 @@ const OPENCLAW_MEMORY_QMD_COMMAND = process.env.OPENCLAW_MEMORY_QMD_COMMAND?.tri
 const OPENCLAW_MEMORY_QMD_SEARCH_MODE = process.env.OPENCLAW_MEMORY_QMD_SEARCH_MODE?.trim() || "search";
 const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || "";
+const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY?.trim() || "";
+const OPENCLAW_MEMORY_SEARCH_PROVIDER =
+  process.env.OPENCLAW_MEMORY_SEARCH_PROVIDER?.trim().toLowerCase() || "";
+const OPENCLAW_MEMORY_SEARCH_FALLBACK =
+  process.env.OPENCLAW_MEMORY_SEARCH_FALLBACK?.trim() || "none";
+const OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL =
+  process.env.OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL?.trim() || "text-embedding-3-small";
+const OPENCLAW_MEMORY_SEARCH_GEMINI_MODEL =
+  process.env.OPENCLAW_MEMORY_SEARCH_GEMINI_MODEL?.trim() || "gemini-embedding-001";
+const OPENCLAW_MEMORY_SEARCH_VOYAGE_MODEL =
+  process.env.OPENCLAW_MEMORY_SEARCH_VOYAGE_MODEL?.trim() || "voyage-3-lite";
+const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH =
+  process.env.OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH?.trim() ||
+  "hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf";
+const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR =
+  process.env.OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR?.trim() ||
+  path.join(STATE_DIR, "models", "node-llama-cpp");
 
 function parseBoolEnv(value, fallback) {
   if (value == null) return fallback;
@@ -110,6 +129,58 @@ const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
   true,
 );
+
+function resolveMemorySearchStrategy() {
+  const explicit = OPENCLAW_MEMORY_SEARCH_PROVIDER;
+  const normalizedExplicit =
+    explicit && ["openai", "gemini", "voyage", "local"].includes(explicit) ? explicit : "";
+  const provider =
+    normalizedExplicit ||
+    (OPENAI_API_KEY
+      ? "openai"
+      : GEMINI_API_KEY
+        ? "gemini"
+        : VOYAGE_API_KEY
+          ? "voyage"
+          : "local");
+
+  if (provider === "openai") {
+    return {
+      provider,
+      source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "env:OPENAI_API_KEY",
+      fallback: OPENCLAW_MEMORY_SEARCH_FALLBACK,
+      model: OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL,
+    };
+  }
+
+  if (provider === "gemini") {
+    return {
+      provider,
+      source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "env:GEMINI_API_KEY",
+      fallback: OPENCLAW_MEMORY_SEARCH_FALLBACK,
+      model: OPENCLAW_MEMORY_SEARCH_GEMINI_MODEL,
+    };
+  }
+
+  if (provider === "voyage") {
+    return {
+      provider,
+      source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "env:VOYAGE_API_KEY",
+      fallback: OPENCLAW_MEMORY_SEARCH_FALLBACK,
+      model: OPENCLAW_MEMORY_SEARCH_VOYAGE_MODEL,
+    };
+  }
+
+  return {
+    provider: "local",
+    source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "default:local",
+    fallback: "none",
+    local: {
+      modelPath: OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH,
+      modelCacheDir: OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR,
+    },
+  };
+}
 
 function resolveRealPathOrSelf(targetPath) {
   try {
@@ -1064,6 +1135,7 @@ app.get("/healthz", async (_req, res) => {
 
   const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
   const memoryStats = collectWorkspaceMemoryStats();
+  const memorySearchStrategy = resolveMemorySearchStrategy();
 
   res.json({
     ok: true,
@@ -1077,6 +1149,8 @@ app.get("/healthz", async (_req, res) => {
       stateDirMode: safeMode(STATE_DIR),
       credentialsDirMode: safeMode(CREDENTIALS_DIR),
       memoryFiles: memoryStats.totalFiles,
+      memorySearchProvider: memorySearchStrategy.provider,
+      memorySearchSource: memorySearchStrategy.source,
     },
     gateway: {
       target: GATEWAY_TARGET,
@@ -1098,6 +1172,7 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
 
   const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
   const memoryStats = collectWorkspaceMemoryStats();
+  const memorySearchStrategy = resolveMemorySearchStrategy();
 
   return res.json({
     ok: true,
@@ -1123,6 +1198,8 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
       memory: {
         files: memoryStats.totalFiles,
         dailyFiles: memoryStats.dailyFiles,
+        searchProvider: memorySearchStrategy.provider,
+        searchSource: memorySearchStrategy.source,
       },
       httpApi: {
         chatCompletions: "/v1/chat/completions",
@@ -3471,15 +3548,93 @@ async function applyMemoryBackendDefaults() {
   }
 
   const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
+  const applyMemorySearchDefaults = async () => {
+    const strategy = resolveMemorySearchStrategy();
+    const steps = [];
+
+    steps.push(
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "agents.defaults.memorySearch.provider", strategy.provider]),
+      ),
+    );
+    steps.push(
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "agents.defaults.memorySearch.fallback", strategy.fallback]),
+      ),
+    );
+
+    if (strategy.model) {
+      steps.push(
+        await runCmd(
+          OPENCLAW_NODE,
+          clawArgs(["config", "set", "agents.defaults.memorySearch.model", strategy.model]),
+        ),
+      );
+    }
+
+    if (strategy.local) {
+      steps.push(
+        await runCmd(
+          OPENCLAW_NODE,
+          clawArgs([
+            "config",
+            "set",
+            "agents.defaults.memorySearch.local.modelPath",
+            strategy.local.modelPath,
+          ]),
+        ),
+      );
+      steps.push(
+        await runCmd(
+          OPENCLAW_NODE,
+          clawArgs([
+            "config",
+            "set",
+            "agents.defaults.memorySearch.local.modelCacheDir",
+            strategy.local.modelCacheDir,
+          ]),
+        ),
+      );
+    }
+
+    const failed = steps.find((step) => step.code !== 0);
+    const output = [
+      `[memory-search] provider=${strategy.provider} source=${strategy.source} fallback=${strategy.fallback}`,
+      ...steps.map(
+        (step, index) => `[memory-search-step-${index + 1}] exit=${step.code}\n${step.output || ""}`,
+      ),
+    ].join("\n");
+
+    return {
+      ok: !failed,
+      reason: failed ? "memory_search_set_failed" : "memory_search_configured",
+      output,
+    };
+  };
+
   if (backend !== "qmd") {
     const setBackend = await runCmd(
       OPENCLAW_NODE,
       clawArgs(["config", "set", "memory.backend", backend]),
     );
+    const memorySearch = await applyMemorySearchDefaults();
     return {
-      ok: setBackend.code === 0,
-      reason: setBackend.code === 0 ? "configured" : "set_failed",
-      output: `[memory] backend=${backend} exit=${setBackend.code}\n${setBackend.output || ""}`,
+      ok: setBackend.code === 0 && memorySearch.ok,
+      reason:
+        setBackend.code === 0 && memorySearch.ok
+          ? "configured"
+          : setBackend.code !== 0
+            ? "set_failed"
+            : memorySearch.reason,
+      output: [
+        `[memory] backend=${backend} exit=${setBackend.code}`,
+        setBackend.output || "",
+        memorySearch.output || "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
     };
   }
 
@@ -3547,12 +3702,14 @@ async function applyMemoryBackendDefaults() {
   );
 
   const failed = steps.find((step) => step.code !== 0);
+  const memorySearch = await applyMemorySearchDefaults();
   const output = steps
     .map((step, index) => `[memory-step-${index + 1}] exit=${step.code}\n${step.output || ""}`)
+    .concat(memorySearch.output || [])
     .join("\n");
   return {
-    ok: !failed,
-    reason: failed ? "set_failed" : "configured",
+    ok: !failed && memorySearch.ok,
+    reason: failed ? "set_failed" : memorySearch.ok ? "configured" : memorySearch.reason,
     output,
   };
 }
@@ -4401,6 +4558,9 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       );
       const memoryDefaults = await applyMemoryBackendDefaults();
       console.log(`[wrapper] memory backend: ${memoryDefaults.reason}`);
+      if (memoryDefaults.output) {
+        console.log(memoryDefaults.output);
+      }
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
