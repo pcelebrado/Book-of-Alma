@@ -34,7 +34,9 @@ OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000
 OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000
 OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000
 OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000
-OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note
+OPENCLAW_QMD_WARM_ON_BOOT=false
+OPENCLAW_MEMORY_WARMUP_ENABLED=false
+OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test
 OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000
 OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true
 OPENCLAW_MEMORY_SEARCH_PROVIDER=local
@@ -63,8 +65,8 @@ Default Railway memory-search strategy:
 - migrate or back up any non-symlink `/root/.openclaw/workspace`
 - migrate or back up any transient `/workspace`
 - ensure `/root/.openclaw/workspace -> /data/workspace`
-- seed `MEMORY.md`, `memory/YYYY-MM-DD.md`, and `memory/railway-alma-verification.md` if missing
-- best-effort warm QMD against the seeded memory corpus
+- seed `MEMORY.md` and `memory/YYYY-MM-DD.md` if missing
+- remove the legacy `memory/railway-alma-verification.md` seed if it exists on an older volume
 
 5. Run the verifier:
 
@@ -78,7 +80,7 @@ That verifier runs the operator commands required for go-live:
 openclaw status
 openclaw memory status
 openclaw memory index
-openclaw memory search "Alma"
+openclaw memory search "Railway workspace"
 ```
 
 ## Recovery and restore

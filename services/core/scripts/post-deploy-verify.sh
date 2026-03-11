@@ -14,7 +14,7 @@ WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR}"
 WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR}"
 WORKSPACE_COMPAT_DIR="${OPENCLAW_WORKSPACE_COMPAT_DIR:-/root/.openclaw/workspace}"
 CREDENTIALS_DIR="${STATE_DIR}/credentials"
-QUERY="${1:-Alma}"
+QUERY="${1:-Railway workspace}"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
 VERIFY_TIMEOUT_SECONDS="${OPENCLAW_VERIFY_TIMEOUT_SECONDS:-240}"
 VERIFY_RETRIES="${OPENCLAW_VERIFY_RETRIES:-4}"
@@ -117,7 +117,7 @@ retry_capture \
   /tmp/openclaw-memory-qmd-paths.json \
   openclaw config get memory.qmd.paths --json
 
-node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-qmd-paths.json','utf8')); const paths=Array.isArray(data)?data:Array.isArray(data?.value)?data.value:[]; if(!paths.some((entry)=>entry&&typeof entry==='object'&&String(entry.name||'').startsWith('workspace-'))){process.exit(1)}" \
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-qmd-paths.json','utf8')); const paths=Array.isArray(data)?data:Array.isArray(data?.value)?data.value:[]; if(!paths.some((entry)=>entry&&typeof entry==='object'&&/^workspace(?:-|$)/.test(String(entry.name||'')))){process.exit(1)}" \
   || fail "memory.qmd.paths is missing workspace-wide QMD entries"
 pass "memory.qmd.paths contains workspace-wide QMD entries"
 

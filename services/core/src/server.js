@@ -170,8 +170,12 @@ const OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS,
   300_000,
 );
+const OPENCLAW_MEMORY_WARMUP_ENABLED = parseBoolEnv(
+  process.env.OPENCLAW_MEMORY_WARMUP_ENABLED,
+  false,
+);
 const OPENCLAW_MEMORY_QMD_WARMUP_QUERY =
-  process.env.OPENCLAW_MEMORY_QMD_WARMUP_QUERY?.trim() || "Alma verification note";
+  process.env.OPENCLAW_MEMORY_QMD_WARMUP_QUERY?.trim() || "test";
 const OPENCLAW_MEMORY_WARMUP_RETRIES = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_WARMUP_RETRIES,
   3,
@@ -4099,7 +4103,7 @@ function trimCommandOutput(output, limit = 4000) {
 }
 
 function startMemoryIndexWarmup(reason = "boot") {
-  if (!isConfigured() || memoryIndexWarmup) {
+  if (!isConfigured() || memoryIndexWarmup || !OPENCLAW_MEMORY_WARMUP_ENABLED) {
     return;
   }
 

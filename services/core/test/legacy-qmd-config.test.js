@@ -45,8 +45,12 @@ test("template env surfaces no longer expose the removed qmd searchMode setting"
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000/);
-  assert.match(envExample, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note/);
-  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note/);
+  assert.match(envExample, /OPENCLAW_QMD_WARM_ON_BOOT=false/);
+  assert.match(envRailway, /OPENCLAW_QMD_WARM_ON_BOOT=false/);
+  assert.match(envExample, /OPENCLAW_MEMORY_WARMUP_ENABLED=false/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_WARMUP_ENABLED=false/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test/);
   assert.match(envExample, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
@@ -58,10 +62,10 @@ test("runtime defaults workspace qmd indexing to markdown globs", () => {
   assert.match(src, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN\?\.trim\(\) \|\| "\*\*\/\*\.md"/);
 });
 
-test("runtime bootstrap seeds the Alma verification note for fresh Railway volumes", () => {
+test("runtime bootstrap removes the legacy Alma verification note and keeps generic workspace memory seeds", () => {
   const bootstrap = fs.readFileSync(new URL("../scripts/runtime-bootstrap.sh", import.meta.url), "utf8");
-  assert.match(bootstrap, /railway-alma-verification\.md/);
-  assert.match(bootstrap, /Verification query: Alma/);
+  assert.match(bootstrap, /LEGACY_ALMA_MEMORY_FILE/);
+  assert.match(bootstrap, /Removed legacy Alma verification seed/);
   assert.match(bootstrap, /QMD_WARMUP_QUERY/);
   assert.match(bootstrap, /Skipping direct qmd update\/embed warmup/);
   assert.doesNotMatch(bootstrap, /collection add/);
@@ -103,10 +107,13 @@ test("runtime scrubs stale qmd workspace collections from persisted agent state"
 
 test("runtime warmup uses memory search without forcing a full memory index", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /OPENCLAW_MEMORY_WARMUP_ENABLED = parseBoolEnv/);
   assert.match(src, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
   assert.match(src, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS/);
+  assert.match(src, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY\?\.trim\(\) \|\| "test"/);
   assert.match(src, /"memory\.qmd\.update\.commandTimeoutMs", OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
   assert.match(src, /clawArgs\(\["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY\]\)/);
+  assert.match(src, /!OPENCLAW_MEMORY_WARMUP_ENABLED/);
   assert.doesNotMatch(src, /clawArgs\(\["memory", "index", "--agent", "main"\]\)/);
   assert.match(src, /writeHead\(booting \? 503 : 502/);
 });

@@ -16,7 +16,7 @@ The verifier fails if any of these commands reports disabled memory search or re
 openclaw status
 openclaw memory status
 openclaw memory index
-openclaw memory search "Alma"
+openclaw memory search "Railway workspace"
 ```
 
 The template explicitly sets `memory.qmd.scope.default=allow` so the CLI search
@@ -25,11 +25,11 @@ It also sets `memory.qmd.paths` for the active workspace so QMD can recall
 general workspace files instead of only the default memory Markdown files.
 It also raises the QMD timeouts used during search and bootstrap so first-run
 local model downloads have longer to complete on Railway.
-The runtime also issues a best-effort warmup query at boot so query-time QMD
-models are more likely to be cached before user traffic.
 QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
 with `BUN_INSTALL` cleared so the verification shell matches the wrapper's
 runtime behavior.
+Template defaults now leave custom QMD warmup disabled so the deployment does
+not inject book-specific probe queries into runtime logs.
 
 ## Manual checks
 
@@ -96,7 +96,6 @@ Expected output:
 
 - at least one `MEMORY.md`
 - at least one dated file under `memory/`
-- `memory/railway-alma-verification.md` exists on fresh Railway volumes
 - `openclaw memory status` does not report `disabled:true`
 - `openclaw memory index` does not report `Memory search disabled`
 - `memory.qmd.paths` contains at least one non-memory workspace entry
@@ -106,8 +105,8 @@ Expected output:
 6. Runtime memory search returns snippets:
 
 ```bash
-openclaw memory search "Alma"
-openclaw memory search --agent main --json "Alma"
+openclaw memory search "Railway workspace"
+openclaw memory search --agent main --json "Railway workspace"
 ```
 
 Expected output:

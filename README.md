@@ -439,7 +439,9 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000`
 - `OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000`
 - `OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000`
-- `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=Alma verification note`
+- `OPENCLAW_QMD_WARM_ON_BOOT=false`
+- `OPENCLAW_MEMORY_WARMUP_ENABLED=false`
+- `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test`
 - `OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000`
 - `OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true`
 - `OPENCLAW_MEMORY_SEARCH_PROVIDER=local`
@@ -448,21 +450,22 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
 - `OPENCLAW_MEMORY_SEARCH_STORE_PATH=/data/.openclaw/memory/{agentId}.sqlite`
 
-The template also seeds `MEMORY.md`, `memory/YYYY-MM-DD.md`, and
-`memory/railway-alma-verification.md`, then warms QMD on boot using the same
-XDG directories that OpenClaw uses at runtime.
+The template seeds `MEMORY.md` and `memory/YYYY-MM-DD.md`, and removes the old
+`memory/railway-alma-verification.md` seed on boot if it exists from an older
+deployment.
 It also writes `memory.qmd.paths` so QMD indexes the rest of the workspace by
 default instead of limiting retrieval to `MEMORY.md` and `memory/*.md`.
 
 The wrapper also sets `memory.qmd.scope.default=allow` so operator-side CLI
-checks like `openclaw memory search "Alma"` work from Railway shells without a
+checks like `openclaw memory search "Railway workspace"` work from Railway shells without a
 chat session key.
 It also raises the QMD query/update/embed timeouts for Railway cold starts so
 first-run model downloads do not fail memory verification prematurely.
 It also raises the supported OpenClaw QMD command timeout so `qmd collection add`
 has enough time to bind the workspace on first boot.
-It runs a best-effort boot query warmup as well, so QMD can cache its query-time
-models before the first live `memory_search` request.
+Custom wrapper-side warmups are disabled by default so Railway logs are not
+polluted by template-specific probe queries; OpenClaw's own QMD boot refresh
+remains enabled.
 The wrapper and helper scripts clear `BUN_INSTALL` before calling QMD and pin
 the command to the direct `@tobilu/qmd` entrypoint so Railway shells do not
 depend on the ambient `qmd` launcher state.

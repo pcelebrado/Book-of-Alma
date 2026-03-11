@@ -91,7 +91,7 @@ On every boot the service:
 - enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
 - seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing
 - configures QMD to index the rest of `/data/workspace` via `memory.qmd.paths`
-- runs best-effort `qmd update` and `qmd embed`
+- removes the legacy `memory/railway-alma-verification.md` seed if present
 
 ### Bootstrap hook
 

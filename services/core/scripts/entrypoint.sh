@@ -22,7 +22,7 @@ mkdir -p "${SFTPGO_LOG_DIR}"
 echo "[entrypoint] Preparing persistent runtime layout"
 bash /app/scripts/runtime-bootstrap.sh prepare
 
-if [ "${OPENCLAW_QMD_WARM_ON_BOOT:-true}" = "true" ]; then
+if [ "${OPENCLAW_QMD_WARM_ON_BOOT:-false}" = "true" ]; then
   echo "[entrypoint] Starting best-effort QMD warmup in background"
   bash /app/scripts/runtime-bootstrap.sh warm-qmd > "${SFTPGO_LOG_DIR}/qmd-warmup.log" 2>&1 &
 fi

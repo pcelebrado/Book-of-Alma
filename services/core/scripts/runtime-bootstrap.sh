@@ -20,10 +20,10 @@ QMD_XDG_CACHE_HOME="${QMD_STATE_DIR}/xdg-cache"
 BOOTSTRAP_DATE="$(date -u +%F)"
 BOOTSTRAP_MEMORY_FILE="${WORKSPACE_DIR}/MEMORY.md"
 BOOTSTRAP_DAILY_MEMORY_FILE="${WORKSPACE_DIR}/memory/${BOOTSTRAP_DATE}.md"
-BOOTSTRAP_ALMA_MEMORY_FILE="${WORKSPACE_DIR}/memory/railway-alma-verification.md"
+LEGACY_ALMA_MEMORY_FILE="${WORKSPACE_DIR}/memory/railway-alma-verification.md"
 MEMORY_SEARCH_CACHE_DIR="${OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR:-${STATE_DIR}/models/node-llama-cpp}"
 MEMORY_SEARCH_STORE_PATH="${OPENCLAW_MEMORY_SEARCH_STORE_PATH:-${STATE_DIR}/memory/{agentId}.sqlite}"
-QMD_WARMUP_QUERY="${OPENCLAW_MEMORY_QMD_WARMUP_QUERY:-Alma verification note}"
+QMD_WARMUP_QUERY="${OPENCLAW_MEMORY_QMD_WARMUP_QUERY:-test}"
 
 log() {
   printf '[runtime-bootstrap] %s\n' "$*"
@@ -233,16 +233,9 @@ EOF
     log "Seeded ${BOOTSTRAP_DAILY_MEMORY_FILE}"
   fi
 
-  if [ ! -f "${BOOTSTRAP_ALMA_MEMORY_FILE}" ]; then
-    cat > "${BOOTSTRAP_ALMA_MEMORY_FILE}" <<EOF
-# Book of Alma Verification Seed
-
-This Railway workspace keeps OpenClaw memory search ready for the Book of Alma.
-Verification query: Alma
-Expected outcome: \`openclaw memory search "Alma"\` returns at least one snippet on a fresh deploy.
-EOF
-    chmod 600 "${BOOTSTRAP_ALMA_MEMORY_FILE}" 2>/dev/null || true
-    log "Seeded ${BOOTSTRAP_ALMA_MEMORY_FILE}"
+  if [ -f "${LEGACY_ALMA_MEMORY_FILE}" ]; then
+    rm -f "${LEGACY_ALMA_MEMORY_FILE}" 2>/dev/null || true
+    log "Removed legacy Alma verification seed ${LEGACY_ALMA_MEMORY_FILE}"
   fi
 }
 

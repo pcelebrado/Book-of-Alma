@@ -127,9 +127,17 @@
     "value": "300000",
     "description": "QMD embed timeout in milliseconds so first-run local model warmups can finish on Railway."
   },
+  "OPENCLAW_QMD_WARM_ON_BOOT": {
+    "value": "false",
+    "description": "Optional shell-level QMD warmup hook. Leave disabled by default so Railway boot does not issue template-specific probe queries."
+  },
+  "OPENCLAW_MEMORY_WARMUP_ENABLED": {
+    "value": "false",
+    "description": "Optional wrapper-level OpenClaw memory warmup. Leave disabled by default and rely on OpenClaw's own background QMD boot refresh."
+  },
   "OPENCLAW_MEMORY_QMD_WARMUP_QUERY": {
-    "value": "Alma verification note",
-    "description": "Best-effort boot query used to pull QMD query-time models into cache before live traffic."
+    "value": "test",
+    "description": "Neutral query string for optional warmup flows. Keep generic so the template does not inject book-specific probes into runtime logs."
   },
   "OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS": {
     "value": "300000",

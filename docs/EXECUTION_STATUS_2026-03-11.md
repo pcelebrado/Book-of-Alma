@@ -28,18 +28,19 @@ All timestamps below are America/Denver (`-06:00`).
 | `631ce9ef-fb0d-43fe-b16f-0b1abe29efaf` | removed | 2026-03-10 23:34:46 | Explicit local memory search defaults, store/cache path prep, Alma verifier seed, docs/verifier tightening. |
 | `eff2227c-6764-4b2b-984a-13f103993c28` | removed | 2026-03-10 23:41:25 | QMD CLI scope widened with `memory.qmd.scope.default=allow`. |
 | `dbba54c6-dac4-4d81-8413-31cdfdb60c2e` | removed | 2026-03-10 23:52:46 | QMD query/update/embed timeout increases and verifier retry exit-code fix. |
-| `bcab78d7-ad77-403f-8e3f-aed8e95406ac` | success | 2026-03-11 00:11:33 | Bun env cleanup pass. Current live deployment. |
+| `bcab78d7-ad77-403f-8e3f-aed8e95406ac` | removed | 2026-03-11 00:11:33 | Bun env cleanup pass. |
+| `db3a7bba-38be-4540-a35f-2de5ddfc1290` | success | 2026-03-11 03:14:55 | OpenClaw-supported QMD command-timeout fix for Railway cold starts. |
 
 ## Implemented during this pass
 
 - Explicit Railway default for `agents.defaults.memorySearch.provider=local`
 - Persistent memory search store path under `/data/.openclaw/memory/{agentId}.sqlite`
-- Alma verification seed under `memory/railway-alma-verification.md`
 - QMD CLI scope default forced to `allow` for operator-side verification
 - Railway QMD timeout increases for cold starts
 - `BUN_INSTALL` clearing in wrapper and scripts to avoid Bun-selected QMD launcher
 - Deployment verifier retry exit-code fix
 - Docs/env/schema updates reflecting the real Railway runtime contract
+- Later correction: Alma-specific verification seed/query were template drift and are being removed in the next deploy
 
 ## Current live findings
 
@@ -91,6 +92,6 @@ Operational interpretation:
 
 1. Fix the wrapper gateway readiness false-negative so `/healthz` reflects the
    healthy post-boot state.
-2. Re-run the live in-container verifier after the QMD model/cache path fully
-   settles on the current volume and capture the final `openclaw memory status`
-   and `openclaw memory search "Alma"` outputs into this repo.
+2. Re-run the live in-container verifier after the current generic-workspace
+   cleanup deploy and capture the final `openclaw memory status` and
+   `openclaw memory search "Railway workspace"` outputs into this repo.
