@@ -1372,6 +1372,12 @@ async function ensureGatewayRunning() {
         await startGateway();
         const ready = await waitForGatewayReady({ timeoutMs: 20_000 });
         if (!ready) {
+          const reachableAfterTimeout = await probeGateway().catch(() => false);
+          if (reachableAfterTimeout) {
+            gatewayRestartAttempts = 0;
+            lastGatewayError = null;
+            return;
+          }
           throw new Error("Gateway did not become ready in time");
         }
         gatewayRestartAttempts = 0;
@@ -1532,6 +1538,9 @@ app.get("/healthz", async (_req, res) => {
   if (isConfigured()) {
     try {
       gatewayReachable = await probeGateway();
+      if (gatewayReachable && lastGatewayError?.includes("Gateway did not become ready in time")) {
+        lastGatewayError = null;
+      }
     } catch {
       gatewayReachable = false;
     }
@@ -1572,6 +1581,9 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
   let gatewayReachable = false;
   try {
     gatewayReachable = await probeGateway();
+    if (gatewayReachable && lastGatewayError?.includes("Gateway did not become ready in time")) {
+      lastGatewayError = null;
+    }
   } catch {
     gatewayReachable = false;
   }
