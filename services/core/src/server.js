@@ -754,6 +754,82 @@ function isConfigured() {
   }
 }
 
+function cloneJsonValue(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function readConfigJsonFromDisk() {
+  const targetPath = configPath();
+  const raw = fs.readFileSync(targetPath, "utf8");
+  const parsed = raw.trim() ? JSON.parse(raw) : {};
+  return {
+    path: targetPath,
+    config: parsed && typeof parsed === "object" ? parsed : {},
+  };
+}
+
+function setConfigValue(target, dottedPath, value) {
+  const parts = String(dottedPath || "")
+    .split(".")
+    .filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error(`Invalid config path: ${dottedPath}`);
+  }
+
+  let cursor = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const current = cursor[key];
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key];
+  }
+
+  cursor[parts[parts.length - 1]] = cloneJsonValue(value);
+}
+
+function applyConfigPatch(entries) {
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const nextConfig = cloneJsonValue(snapshot.config) || {};
+
+    for (const [dottedPath, value] of entries) {
+      setConfigValue(nextConfig, dottedPath, value);
+    }
+
+    const nextRaw = `${JSON.stringify(nextConfig, null, 2)}\n`;
+    const currentRaw = `${JSON.stringify(snapshot.config, null, 2)}\n`;
+    if (nextRaw === currentRaw) {
+      return {
+        ok: true,
+        changed: false,
+        path: snapshot.path,
+        output: `[config] unchanged ${snapshot.path}`,
+      };
+    }
+
+    fs.mkdirSync(path.dirname(snapshot.path), { recursive: true });
+    const tempPath = `${snapshot.path}.tmp`;
+    fs.writeFileSync(tempPath, nextRaw, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tempPath, snapshot.path);
+
+    return {
+      ok: true,
+      changed: true,
+      path: snapshot.path,
+      output: `[config] updated ${snapshot.path}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      path: configPath(),
+      output: `[config] patch failed: ${String(err)}`,
+    };
+  }
+}
+
 // One-time migration: rename legacy config files to openclaw.json so existing
 // deployments that still have the old filename on their volume keep working.
 (function migrateLegacyConfigFile() {
@@ -3550,86 +3626,49 @@ async function applyMemoryBackendDefaults() {
   const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
   const applyMemorySearchDefaults = async () => {
     const strategy = resolveMemorySearchStrategy();
-    const steps = [];
-
-    steps.push(
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "agents.defaults.memorySearch.provider", strategy.provider]),
-      ),
-    );
-    steps.push(
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "agents.defaults.memorySearch.fallback", strategy.fallback]),
-      ),
-    );
+    const entries = [
+      ["agents.defaults.memorySearch.provider", strategy.provider],
+      ["agents.defaults.memorySearch.fallback", strategy.fallback],
+    ];
 
     if (strategy.model) {
-      steps.push(
-        await runCmd(
-          OPENCLAW_NODE,
-          clawArgs(["config", "set", "agents.defaults.memorySearch.model", strategy.model]),
-        ),
-      );
+      entries.push(["agents.defaults.memorySearch.model", strategy.model]);
     }
 
     if (strategy.local) {
-      steps.push(
-        await runCmd(
-          OPENCLAW_NODE,
-          clawArgs([
-            "config",
-            "set",
-            "agents.defaults.memorySearch.local.modelPath",
-            strategy.local.modelPath,
-          ]),
-        ),
-      );
-      steps.push(
-        await runCmd(
-          OPENCLAW_NODE,
-          clawArgs([
-            "config",
-            "set",
-            "agents.defaults.memorySearch.local.modelCacheDir",
-            strategy.local.modelCacheDir,
-          ]),
-        ),
-      );
+      entries.push(["agents.defaults.memorySearch.local.modelPath", strategy.local.modelPath]);
+      entries.push([
+        "agents.defaults.memorySearch.local.modelCacheDir",
+        strategy.local.modelCacheDir,
+      ]);
     }
 
-    const failed = steps.find((step) => step.code !== 0);
+    const patch = applyConfigPatch(entries);
     const output = [
       `[memory-search] provider=${strategy.provider} source=${strategy.source} fallback=${strategy.fallback}`,
-      ...steps.map(
-        (step, index) => `[memory-search-step-${index + 1}] exit=${step.code}\n${step.output || ""}`,
-      ),
+      patch.output || "",
     ].join("\n");
 
     return {
-      ok: !failed,
-      reason: failed ? "memory_search_set_failed" : "memory_search_configured",
+      ok: patch.ok,
+      reason: patch.ok ? "memory_search_configured" : "memory_search_set_failed",
       output,
     };
   };
 
   if (backend !== "qmd") {
-    const setBackend = await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "memory.backend", backend]),
-    );
+    const setBackend = applyConfigPatch([["memory.backend", backend]]);
     const memorySearch = await applyMemorySearchDefaults();
     return {
-      ok: setBackend.code === 0 && memorySearch.ok,
+      ok: setBackend.ok && memorySearch.ok,
       reason:
-        setBackend.code === 0 && memorySearch.ok
+        setBackend.ok && memorySearch.ok
           ? "configured"
-          : setBackend.code !== 0
+          : !setBackend.ok
             ? "set_failed"
             : memorySearch.reason,
       output: [
-        `[memory] backend=${backend} exit=${setBackend.code}`,
+        `[memory] backend=${backend}`,
         setBackend.output || "",
         memorySearch.output || "",
       ]
@@ -3649,67 +3688,19 @@ async function applyMemoryBackendDefaults() {
     };
   }
 
-  const steps = [];
-  steps.push(
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "memory.backend", "qmd"])),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "memory.qmd.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs([
-        "config",
-        "set",
-        "memory.qmd.update.interval",
-        OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL,
-      ]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs([
-        "config",
-        "set",
-        "--json",
-        "memory.qmd.update.waitForBootSync",
-        JSON.stringify(OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC),
-      ]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs([
-        "config",
-        "set",
-        "--json",
-        "memory.qmd.includeDefaultMemory",
-        JSON.stringify(OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY),
-      ]),
-    ),
-  );
-
-  const failed = steps.find((step) => step.code !== 0);
+  const patch = applyConfigPatch([
+    ["memory.backend", "qmd"],
+    ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
+    ["memory.qmd.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE],
+    ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
+    ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
+    ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
+  ]);
   const memorySearch = await applyMemorySearchDefaults();
-  const output = steps
-    .map((step, index) => `[memory-step-${index + 1}] exit=${step.code}\n${step.output || ""}`)
-    .concat(memorySearch.output || [])
-    .join("\n");
+  const output = [patch.output || "", memorySearch.output || ""].filter(Boolean).join("\n");
   return {
-    ok: !failed && memorySearch.ok,
-    reason: failed ? "set_failed" : memorySearch.ok ? "configured" : memorySearch.reason,
+    ok: patch.ok && memorySearch.ok,
+    reason: !patch.ok ? "set_failed" : memorySearch.ok ? "configured" : memorySearch.reason,
     output,
   };
 }
@@ -3760,27 +3751,17 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   // Optional setup (only after successful onboarding).
   if (ok) {
-    // Keep gateway in token mode and sync both auth + remote tokens for UI compatibility.
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]),
-    );
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
-    );
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
-
-    // Railway runs behind a reverse proxy. Trust loopback as a proxy hop so local client detection
-    // remains correct when X-Forwarded-* headers are present.
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"]) ]),
-    );
+    const runtimePatch = applyConfigPatch([
+      ["gateway.auth.mode", "token"],
+      ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
+      ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
+      ["gateway.http.endpoints.chatCompletions.enabled", true],
+      ["gateway.http.endpoints.responses.enabled", true],
+      ["gateway.bind", "loopback"],
+      ["gateway.port", INTERNAL_GATEWAY_PORT],
+      ["gateway.trustedProxies", ["127.0.0.1"]],
+    ]);
+    extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}\n${runtimePatch.output || ""}`;
 
     const memoryDefaults = await applyMemoryBackendDefaults();
     extra += `\n[memory backend] ${memoryDefaults.reason}`;
@@ -4545,17 +4526,20 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
     console.log("[wrapper] syncing gateway tokens in config...");
     try {
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]),
-      );
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
-      );
+      const runtimePatch = applyConfigPatch([
+        ["gateway.auth.mode", "token"],
+        ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
+        ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
+        ["gateway.http.endpoints.chatCompletions.enabled", true],
+        ["gateway.http.endpoints.responses.enabled", true],
+        ["gateway.bind", "loopback"],
+        ["gateway.port", INTERNAL_GATEWAY_PORT],
+        ["gateway.trustedProxies", ["127.0.0.1"]],
+      ]);
+      console.log(`[wrapper] runtime config: ${runtimePatch.ok ? "configured" : "failed"}`);
+      if (runtimePatch.output) {
+        console.log(runtimePatch.output);
+      }
       const memoryDefaults = await applyMemoryBackendDefaults();
       console.log(`[wrapper] memory backend: ${memoryDefaults.reason}`);
       if (memoryDefaults.output) {
