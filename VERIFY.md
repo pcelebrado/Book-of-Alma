@@ -23,6 +23,9 @@ The template explicitly sets `memory.qmd.scope.default=allow` so the CLI search
 path above is valid even without an active chat session.
 It also sets `memory.qmd.paths` for the active workspace so QMD can recall
 general workspace files instead of only the default memory Markdown files.
+It also pins `memory.qmd.searchMode=search`, matching OpenClaw's upstream
+default so Railway does not fall into expensive `qmd query` cold starts for
+interactive memory lookups.
 It also raises the QMD timeouts used during search and bootstrap so first-run
 local model downloads have longer to complete on Railway.
 QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`

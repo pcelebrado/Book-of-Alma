@@ -433,6 +433,7 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m`
 - `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
 - `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
+- `OPENCLAW_MEMORY_QMD_SEARCH_MODE=search`
 - `OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true`
 - `OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=**/*.md`
 - `OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000`
@@ -448,6 +449,10 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_SEARCH_FALLBACK=none`
 - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
 - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
+
+`OPENCLAW_MEMORY_QMD_SEARCH_MODE=search` is intentional. It matches OpenClaw's
+upstream default and keeps Railway on QMD's fast BM25 path instead of the
+heavier `qmd query` reranker/query-expansion mode.
 - `OPENCLAW_MEMORY_SEARCH_STORE_PATH=/data/.openclaw/memory/{agentId}.sqlite`
 
 The template seeds `MEMORY.md` and `memory/YYYY-MM-DD.md`, and removes the old

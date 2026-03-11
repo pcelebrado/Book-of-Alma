@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-test("core runtime no longer writes or queries the removed qmd searchMode key", () => {
+test("core runtime pins qmd searchMode to the upstream fast default", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
-  assert.doesNotMatch(src, /OPENCLAW_MEMORY_QMD_SEARCH_MODE/);
-  assert.doesNotMatch(src, /config", "get", "memory\.qmd\.searchMode"/);
-  assert.match(src, /removeConfigKeys\(\["memory\.qmd\.searchMode"\]\)/);
+  assert.match(src, /const OPENCLAW_MEMORY_QMD_SEARCH_MODE = parseQmdSearchModeEnv/);
+  assert.match(src, /\["memory\.qmd\.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE\]/);
+  assert.match(src, /searchMode=\$\{OPENCLAW_MEMORY_QMD_SEARCH_MODE\}/);
   assert.match(src, /delete process\.env\.BUN_INSTALL/);
 });
 
@@ -19,12 +19,12 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   assert.match(src, /OPENCLAW_GATEWAY_READY_TIMEOUT_MS/);
 });
 
-test("template env surfaces no longer expose the removed qmd searchMode setting", () => {
+test("template env surfaces qmd searchMode explicitly for Railway", () => {
   const envExample = fs.readFileSync(new URL("../.env.example", import.meta.url), "utf8");
   const envRailway = fs.readFileSync(new URL("../.env.railway", import.meta.url), "utf8");
 
-  assert.doesNotMatch(envExample, /OPENCLAW_MEMORY_QMD_SEARCH_MODE/);
-  assert.doesNotMatch(envRailway, /OPENCLAW_MEMORY_QMD_SEARCH_MODE/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_SEARCH_MODE=search/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_SEARCH_MODE=search/);
   assert.match(envExample, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true/);
   assert.match(envRailway, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true/);
   assert.match(
@@ -108,6 +108,7 @@ test("runtime scrubs stale qmd workspace collections from persisted agent state"
 test("runtime warmup uses memory search without forcing a full memory index", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(src, /OPENCLAW_MEMORY_WARMUP_ENABLED = parseBoolEnv/);
+  assert.match(src, /OPENCLAW_MEMORY_QMD_SEARCH_MODE = parseQmdSearchModeEnv/);
   assert.match(src, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
   assert.match(src, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS/);
   assert.match(src, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY\?\.trim\(\) \|\| "test"/);

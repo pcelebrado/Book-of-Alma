@@ -138,6 +138,14 @@ function parsePositiveIntEnv(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseQmdSearchModeEnv(value, fallback) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["search", "vsearch", "query"].includes(normalized)) {
+    return normalized;
+  }
+  return fallback;
+}
+
 const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC,
   false,
@@ -145,6 +153,10 @@ const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
 const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
   true,
+);
+const OPENCLAW_MEMORY_QMD_SEARCH_MODE = parseQmdSearchModeEnv(
+  process.env.OPENCLAW_MEMORY_QMD_SEARCH_MODE,
+  "search",
 );
 const OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE,
@@ -1120,19 +1132,6 @@ function removeConfigKeys(dottedPaths) {
     } catch (err) {
       console.warn(`[migration] Failed to rename ${legacy}: ${err}`);
     }
-  }
-})();
-
-(function scrubLegacyConfigKeys() {
-  if (!isConfigured()) return;
-
-  const cleanup = removeConfigKeys(["memory.qmd.searchMode"]);
-  if (!cleanup.ok) {
-    console.warn(`[migration] Failed to scrub legacy config keys: ${cleanup.output}`);
-    return;
-  }
-  if (cleanup.changed) {
-    console.log(`[migration] Scrubbed legacy config keys: ${cleanup.removed.join(", ")}`);
   }
 })();
 
@@ -4071,6 +4070,7 @@ async function applyMemoryBackendDefaults() {
   const patch = applyConfigPatch([
     ["memory.backend", "qmd"],
     ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
+    ["memory.qmd.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE],
     ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
     ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
     ["memory.qmd.update.commandTimeoutMs", OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS],
@@ -4084,7 +4084,7 @@ async function applyMemoryBackendDefaults() {
   const memorySearch = await applyMemorySearchDefaults();
   const workspaceQmdPaths = resolveWorkspaceQmdPaths();
   const output = [
-    `[memory-qmd] workspaceIndex=${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE} paths=${workspaceQmdPaths.length} pattern=${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN}`,
+    `[memory-qmd] searchMode=${OPENCLAW_MEMORY_QMD_SEARCH_MODE} workspaceIndex=${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE} paths=${workspaceQmdPaths.length} pattern=${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN}`,
     patch.output || "",
     memorySearch.output || "",
   ]

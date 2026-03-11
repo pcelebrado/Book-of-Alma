@@ -24,7 +24,7 @@ All timestamps below are America/Denver (`-06:00`).
 
 | Deployment | Status | Time | Purpose |
 |-----------|--------|------|---------|
-| `3c5c01c2-ddff-4bec-a3a8-d41a8cb3b937` | removed | 2026-03-10 22:49:38 | Baseline after stale `memory.qmd.searchMode` removal, insecure auth enablement, and gateway `--force`. |
+| `3c5c01c2-ddff-4bec-a3a8-d41a8cb3b937` | removed | 2026-03-10 22:49:38 | Baseline after initial `memory.qmd.searchMode` removal workaround, insecure auth enablement, and gateway `--force`. |
 | `631ce9ef-fb0d-43fe-b16f-0b1abe29efaf` | removed | 2026-03-10 23:34:46 | Explicit local memory search defaults, store/cache path prep, Alma verifier seed, docs/verifier tightening. |
 | `eff2227c-6764-4b2b-984a-13f103993c28` | removed | 2026-03-10 23:41:25 | QMD CLI scope widened with `memory.qmd.scope.default=allow`. |
 | `dbba54c6-dac4-4d81-8413-31cdfdb60c2e` | removed | 2026-03-10 23:52:46 | QMD query/update/embed timeout increases and verifier retry exit-code fix. |
@@ -43,6 +43,7 @@ All timestamps below are America/Denver (`-06:00`).
 - Docs/env/schema updates reflecting the real Railway runtime contract
 - Later correction: Alma-specific verification seed/query were template drift and are being removed in the next deploy
 - Explicit Railway vars for the correction deploy: `OPENCLAW_QMD_WARM_ON_BOOT=false`, `OPENCLAW_MEMORY_WARMUP_ENABLED=false`, `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test`
+- Current correction: `memory.qmd.searchMode` is being restored to the supported upstream default `search`; removing it was a template regression because OpenClaw expects that key and documents `search` as the fast default.
 
 ## Current live findings
 
