@@ -30,7 +30,8 @@ All timestamps below are America/Denver (`-06:00`).
 | `dbba54c6-dac4-4d81-8413-31cdfdb60c2e` | removed | 2026-03-10 23:52:46 | QMD query/update/embed timeout increases and verifier retry exit-code fix. |
 | `bcab78d7-ad77-403f-8e3f-aed8e95406ac` | removed | 2026-03-11 00:11:33 | Bun env cleanup pass. |
 | `db3a7bba-38be-4540-a35f-2de5ddfc1290` | success | 2026-03-11 03:14:55 | OpenClaw-supported QMD command-timeout fix for Railway cold starts. |
-| `f774feca-0cff-4ee9-be11-0f4459f76e7e` | deploying | 2026-03-11 03:49:38 | Commit `b4838ac` removes Alma-specific QMD warmup drift, disables custom warmups by default, and scrubs the legacy Alma verification seed from persisted volumes. |
+| `f774feca-0cff-4ee9-be11-0f4459f76e7e` | success | 2026-03-11 03:49:38 | Commit `b4838ac` removes Alma-specific QMD warmup drift, disables custom warmups by default, and scrubs the legacy Alma verification seed from persisted volumes. |
+| `e05bc772-6db0-4277-a376-cf2b26a816bc` | building | 2026-03-11 06:22:51 | Commit `26a48cb` restores `memory.qmd.searchMode=search` so Railway follows the documented OpenClaw default instead of drifting into `qmd query` timeouts. |
 
 ## Implemented during this pass
 
@@ -44,6 +45,7 @@ All timestamps below are America/Denver (`-06:00`).
 - Later correction: Alma-specific verification seed/query were template drift and are being removed in the next deploy
 - Explicit Railway vars for the correction deploy: `OPENCLAW_QMD_WARM_ON_BOOT=false`, `OPENCLAW_MEMORY_WARMUP_ENABLED=false`, `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test`
 - Current correction: `memory.qmd.searchMode` is being restored to the supported upstream default `search`; removing it was a template regression because OpenClaw expects that key and documents `search` as the fast default.
+- Current in-flight deploy: `e05bc772-6db0-4277-a376-cf2b26a816bc` from local `services/core` checkout after `main` was updated to `26a48cb`.
 
 ## Current live findings
 
