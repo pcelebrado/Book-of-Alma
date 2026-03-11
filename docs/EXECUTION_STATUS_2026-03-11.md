@@ -51,6 +51,7 @@ All timestamps below are America/Denver (`-06:00`).
 | `b1ac0213-af1c-4219-bb15-4927a89babc2` | removed | 2026-03-11 06:49:44 | Commit `e2bdfc0` re-aligns the template with the pinned OpenClaw `v2026.2.9` release by scrubbing unsupported `memory.qmd.searchMode` instead of writing it. |
 | `7621eb81-6c00-4ccd-9d96-74f8cb2a93cd` | success | 2026-03-11 08:35:20 | Railway restart requested by the Alma bot so live config changes could apply. After restart, a direct live config hotfix set `memory.qmd.includeDefaultMemory=false` and the gateway reloaded cleanly. |
 | `1616726f-3d24-41b5-9ce2-03e5c4575b02` | success | 2026-03-11 13:28:09 | Commit `7c1e450` deployed via repo-root `railway up` and shipped Claude Max API Proxy support into `openclaw-core`, including Claude CLI install, proxy supervision, persisted Claude state under `/data/.claude`, and setup-status reporting for the admin flow. |
+| `e8da3fac-dc4a-4a10-88dc-a64aaee7a6b5` | success | 2026-03-11 13:58:38 | Commit `9f82f4a` deployed via repo-root `railway up` and added the hosted `/claude-auth` portal on the core domain, plus internal start/storage handling for Anthropic setup-token onboarding through the admin UI. |
 
 ## Web deployment chain
 
@@ -58,6 +59,7 @@ All timestamps below are America/Denver (`-06:00`).
 |-----------|--------|------|---------|
 | `8dbd00e1-0f27-43c0-8912-3e78a21ffef5` | success | 2026-03-10 19:02:55 | Previous active hosted admin deployment before Claude Max onboarding support. |
 | `391d3ce0-be13-45b7-b16a-c352a30824be` | success | 2026-03-11 13:28:40 | Commit `7c1e450` deployed via repo-root `railway up` and shipped the hosted admin/onboarding UI updates for the Claude Max proxy preset. |
+| `56584d5b-9ffb-4c25-b2ef-fde06a79cdca` | success | 2026-03-11 13:58:38 | Commit `9f82f4a` deployed via repo-root `railway up` and shipped the hosted admin popup flow for Claude setup-token onboarding. |
 
 ## Implemented during this pass
 
@@ -79,6 +81,10 @@ All timestamps below are America/Denver (`-06:00`).
   - `openclaw-core` installs `@anthropic-ai/claude-code` and `claude-max-api-proxy`
   - runtime bootstrap persists Claude CLI auth state at `/data/.claude`
   - hosted admin setup now offers a `claude-max-proxy` Anthropic auth choice and pre-fills the custom OpenAI-compatible provider fields expected by OpenClaw
+- Hosted Claude subscription onboarding was added in commit `9f82f4a` using OpenClaw's documented Anthropic setup-token flow:
+  - `openclaw-web` starts a Claude auth popup from Admin
+  - `openclaw-core` exposes `https://openclaw-core-reality-check.up.railway.app/claude-auth`
+  - the portal stores a pasted `claude setup-token` into OpenClaw's Anthropic token profile for the main agent
 
 ## Current live findings
 
@@ -105,6 +111,8 @@ Operational interpretation:
 - Current live domains after the Claude Max rollout:
   - `https://openclaw-core-reality-check.up.railway.app/setup/healthz` -> `{"ok":true}`
   - `https://openclaw-web-reality-check.up.railway.app/api/health` -> `{"status":"ok","service":"web",...}`
+- Public Claude auth probe after deploy `e8da3fac-dc4a-4a10-88dc-a64aaee7a6b5`:
+  - `https://openclaw-core-reality-check.up.railway.app/claude-auth` returns `404 Claude auth expired` without flow credentials, which confirms the new hosted route is live and enforcing short-lived flow tokens
 - Live SSH verification on `openclaw-core` after deploy `1616726f-3d24-41b5-9ce2-03e5c4575b02` confirmed:
   - `/usr/local/bin/claude`
   - `/usr/local/bin/claude-max-api`
@@ -122,6 +130,7 @@ Operational interpretation:
 - `services/core/.env.railway`
 - `services/core/README.md`
 - `services/core/test/legacy-qmd-config.test.js`
+- `services/web/src/app/api/admin/openclaw/setup/claude-auth/start/route.ts`
 - `services/web/src/app/admin/page.tsx`
 - `README.md`
 - `MIGRATION.md`
