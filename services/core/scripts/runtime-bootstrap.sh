@@ -13,7 +13,7 @@ CREDENTIALS_DIR="${STATE_DIR}/credentials"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-${DATA_ROOT}/sftpgo}"
 SFTPGO_SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
-QMD_WORKSPACE_PATTERN="${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN:-**/*}"
+QMD_WORKSPACE_PATTERN="${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN:-**/*.md}"
 QMD_STATE_DIR="${STATE_DIR}/agents/main/qmd"
 QMD_XDG_CONFIG_HOME="${QMD_STATE_DIR}/xdg-config"
 QMD_XDG_CACHE_HOME="${QMD_STATE_DIR}/xdg-cache"
@@ -271,22 +271,6 @@ prepare_memory_search_dirs() {
   ensure_writable_dir "$(dirname "${concrete_store_path}")" || true
 }
 
-qmd_collection_exists() {
-  local name="$1"
-  "${QMD_COMMAND}" collection list --json 2>/dev/null | grep -q "\"name\"[[:space:]]*:[[:space:]]*\"${name}\""
-}
-
-ensure_qmd_collection() {
-  local name="$1"
-  local root="$2"
-  local pattern="$3"
-  ensure_dir "$root"
-  if qmd_collection_exists "$name"; then
-    return 0
-  fi
-  "${QMD_COMMAND}" collection add "$name" "$root" --pattern "$pattern" >/dev/null
-}
-
 warm_qmd() {
   if ! command -v "${QMD_COMMAND}" >/dev/null 2>&1; then
     log "Skipping QMD warmup: ${QMD_COMMAND} not found"
@@ -300,17 +284,7 @@ warm_qmd() {
   export NO_COLOR=1
 
   log "QMD version: $(${QMD_COMMAND} --version 2>/dev/null || echo unavailable)"
-
-  ensure_qmd_collection "memory-root" "${WORKSPACE_DIR}" "MEMORY.md" || true
-  ensure_qmd_collection "memory-alt" "${WORKSPACE_DIR}" "memory.md" || true
-  ensure_qmd_collection "memory-dir" "${WORKSPACE_DIR}/memory" "**/*.md" || true
-  if bool_env_true "${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE:-true}"; then
-    log "QMD workspace warmup collection enabled (root=${WORKSPACE_DIR}, pattern=${QMD_WORKSPACE_PATTERN})"
-    ensure_qmd_collection "workspace-all" "${WORKSPACE_DIR}" "${QMD_WORKSPACE_PATTERN}" || true
-  fi
-
-  "${QMD_COMMAND}" update || true
-  "${QMD_COMMAND}" embed || true
+  log "Skipping direct qmd update/embed warmup; OpenClaw manages QMD collections and boot refresh"
   "${QMD_COMMAND}" query "${QMD_WARMUP_QUERY}" --json -n 1 >/dev/null 2>&1 || true
 }
 

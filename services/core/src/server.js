@@ -176,6 +176,10 @@ const OPENCLAW_MEMORY_WARMUP_BACKOFF_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_WARMUP_BACKOFF_MS,
   10_000,
 );
+const OPENCLAW_GATEWAY_READY_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_GATEWAY_READY_TIMEOUT_MS,
+  45_000,
+);
 function resolveWorkspaceQmdPaths() {
   if (!OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE) {
     return [];
@@ -1196,6 +1200,7 @@ let lastGatewayExit = null;
 let lastDoctorOutput = null;
 let lastDoctorAt = null;
 let memoryIndexWarmup = null;
+let lastProxyUnavailableLogAt = 0;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -1237,7 +1242,7 @@ function scheduleGatewayRestart(reason) {
 }
 
 async function waitForGatewayReady(opts = {}) {
-  const timeoutMs = opts.timeoutMs ?? 20_000;
+  const timeoutMs = opts.timeoutMs ?? OPENCLAW_GATEWAY_READY_TIMEOUT_MS;
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -1374,7 +1379,7 @@ async function ensureGatewayRunning() {
       try {
         lastGatewayError = null;
         await startGateway();
-        const ready = await waitForGatewayReady({ timeoutMs: 20_000 });
+        const ready = await waitForGatewayReady({ timeoutMs: OPENCLAW_GATEWAY_READY_TIMEOUT_MS });
         if (!ready) {
           const reachableAfterTimeout = await probeGateway().catch(() => false);
           if (reachableAfterTimeout) {
@@ -4095,33 +4100,21 @@ function startMemoryIndexWarmup(reason = "boot") {
     console.log(`[memory-search] warmup starting reason=${reason}`);
     for (let attempt = 1; attempt <= OPENCLAW_MEMORY_WARMUP_RETRIES; attempt += 1) {
       ensureMemorySearchRuntimeLayout(runtime);
-      const index = await runCmd(OPENCLAW_NODE, clawArgs(["memory", "index", "--agent", "main"]), {
-        timeoutMs: 300_000,
-      });
-      if (index.code === 0) {
-        const search = await runCmd(
-          OPENCLAW_NODE,
-          clawArgs(["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY]),
-          {
-            timeoutMs: 300_000,
-          },
-        );
-        if (search.code === 0) {
-          console.log(`[memory-search] warmup complete reason=${reason} attempt=${attempt}`);
-          return;
-        }
+      const search = await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY]),
+        {
+          timeoutMs: OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
+        },
+      );
+      if (search.code === 0) {
+        console.log(`[memory-search] warmup complete reason=${reason} attempt=${attempt}`);
+        return;
+      }
 
-        console.warn(
-          `[memory-search] warmup query warning: openclaw memory search exited ${search.code} attempt=${attempt}`,
-        );
-        if (search.output) {
-          console.warn(trimCommandOutput(search.output));
-        }
-      } else {
-        console.warn(`[memory-search] warmup warning: openclaw memory index exited ${index.code} attempt=${attempt}`);
-        if (index.output) {
-          console.warn(trimCommandOutput(index.output));
-        }
+      console.warn(`[memory-search] warmup query warning: openclaw memory search exited ${search.code} attempt=${attempt}`);
+      if (search.output) {
+        console.warn(trimCommandOutput(search.output));
       }
 
       if (attempt < OPENCLAW_MEMORY_WARMUP_RETRIES) {
@@ -4785,10 +4778,19 @@ const proxy = httpProxy.createProxyServer({
 });
 
 proxy.on("error", (err, _req, res) => {
-  console.error("[proxy]", err);
+  const booting = Boolean(gatewayStarting);
+  if (err?.code === "ECONNREFUSED" && booting) {
+    const now = Date.now();
+    if (now - lastProxyUnavailableLogAt > 10_000) {
+      lastProxyUnavailableLogAt = now;
+      console.warn("[proxy] gateway not ready yet; returning temporary unavailable");
+    }
+  } else {
+    console.error("[proxy]", err);
+  }
   try {
     if (res && typeof res.writeHead === "function" && !res.headersSent) {
-      res.writeHead(502, { "Content-Type": "text/plain" });
+      res.writeHead(booting ? 503 : 502, { "Content-Type": "text/plain" });
       res.end("Gateway unavailable\n");
     }
   } catch {

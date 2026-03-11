@@ -16,6 +16,7 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   assert.match(src, /gateway\.controlUi\.allowInsecureAuth/);
   assert.match(src, /"gateway",\s*"run",\s*"--force"/);
   assert.match(src, /"memory\.qmd\.scope\.default",\s*"allow"/);
+  assert.match(src, /OPENCLAW_GATEWAY_READY_TIMEOUT_MS/);
 });
 
 test("template env surfaces no longer expose the removed qmd searchMode setting", () => {
@@ -58,7 +59,10 @@ test("runtime bootstrap seeds the Alma verification note for fresh Railway volum
   assert.match(bootstrap, /railway-alma-verification\.md/);
   assert.match(bootstrap, /Verification query: Alma/);
   assert.match(bootstrap, /QMD_WARMUP_QUERY/);
-  assert.match(bootstrap, /workspace-all/);
+  assert.match(bootstrap, /Skipping direct qmd update\/embed warmup/);
+  assert.doesNotMatch(bootstrap, /collection add/);
+  assert.doesNotMatch(bootstrap, /"\$\{QMD_COMMAND\}" update/);
+  assert.doesNotMatch(bootstrap, /"\$\{QMD_COMMAND\}" embed/);
 });
 
 test("runtime image and entrypoint pin the direct qmd command path", () => {
@@ -91,4 +95,11 @@ test("runtime scrubs stale qmd workspace collections from persisted agent state"
   assert.match(src, /Reset stale QMD workspace state for agent/);
   assert.match(src, /workspace-\[\^:\\r\\n\]\+:/);
   assert.match(src, /index\.sqlite-wal/);
+});
+
+test("runtime warmup uses memory search without forcing a full memory index", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /clawArgs\(\["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY\]\)/);
+  assert.doesNotMatch(src, /clawArgs\(\["memory", "index", "--agent", "main"\]\)/);
+  assert.match(src, /writeHead\(booting \? 503 : 502/);
 });
