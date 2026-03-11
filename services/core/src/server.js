@@ -2811,6 +2811,13 @@ const AUTH_GROUPS = [
   ]}
 ];
 
+function resolveLegacySetupAuthGroups() {
+  return AUTH_GROUPS.map((group) => ({
+    ...group,
+    options: (group.options || []).filter((option) => option.value !== "openai-codex" && option.value !== "codex-cli"),
+  })).filter((group) => (group.options || []).length > 0);
+}
+
 app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
   const version = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
   const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
@@ -2820,12 +2827,12 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     gatewayTarget: GATEWAY_TARGET,
     openclawVersion: version.output.trim(),
     channelsAddHelp: channelsHelp.output,
-    authGroups: AUTH_GROUPS,
+    authGroups: resolveLegacySetupAuthGroups(),
   });
 });
 
 app.get("/setup/api/auth-groups", requireSetupAuth, (_req, res) => {
-  res.json({ ok: true, authGroups: AUTH_GROUPS });
+  res.json({ ok: true, authGroups: resolveLegacySetupAuthGroups() });
 });
 
 let cachedOnboardHelp = { text: "", at: 0 };
@@ -3490,6 +3497,17 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
     const payload = req.body || {};
+    const authChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
+    if (authChoice === "openai-codex") {
+      return respondJson(400, {
+        ok: false,
+        output: [
+          "Setup input error: OpenAI Codex OAuth is only supported from the web admin UI.",
+          "Open this URL and continue there:",
+          "https://openclaw-web-reality-check.up.railway.app/admin",
+        ].join("\n"),
+      });
+    }
 
     let onboardArgs;
     try {
