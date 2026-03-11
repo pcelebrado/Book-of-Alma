@@ -25,6 +25,11 @@ for (const suffix of ["PUBLIC_PORT", "STATE_DIR", "WORKSPACE_DIR", "GATEWAY_TOKE
   delete process.env[oldKey];
 }
 
+// Railway images can export BUN_INSTALL, which makes the packaged qmd launcher
+// prefer `bun` over `node`. In this container the bun-side qmd path is broken,
+// so force node-backed qmd/OpenClaw subprocesses by clearing the hint.
+delete process.env.BUN_INSTALL;
+
 // Railway injects PORT at runtime and routes traffic to that port.
 // Do not force a different public port in the container image, or the service may
 // boot but the Railway domain will be routed to a different port.
@@ -35,13 +40,19 @@ const PORT = Number.parseInt(process.env.PORT ?? process.env.OPENCLAW_PUBLIC_POR
 // State/workspace
 // OpenClaw defaults to ~/.openclaw.
 const IS_RAILWAY = Boolean(process.env.RAILWAY_ENVIRONMENT);
+const DATA_ROOT = process.env.OPENCLAW_DATA_ROOT?.trim() || "/data";
 const STATE_DIR =
   process.env.OPENCLAW_STATE_DIR?.trim() ||
-  (IS_RAILWAY ? "/data/.openclaw" : path.join(os.homedir(), ".openclaw"));
+  (IS_RAILWAY ? path.join(DATA_ROOT, ".openclaw") : path.join(os.homedir(), ".openclaw"));
+
+const WORKSPACE_VOLUME_DIR =
+  process.env.OPENCLAW_WORKSPACE_VOLUME_DIR?.trim() ||
+  (IS_RAILWAY ? path.join(DATA_ROOT, "workspace") : path.join(STATE_DIR, "workspace"));
 
 const WORKSPACE_DIR =
   process.env.OPENCLAW_WORKSPACE_DIR?.trim() ||
-  (IS_RAILWAY ? "/data/workspace" : path.join(STATE_DIR, "workspace"));
+  (IS_RAILWAY ? WORKSPACE_VOLUME_DIR : path.join(os.homedir(), ".openclaw", "workspace"));
+const CREDENTIALS_DIR = path.join(STATE_DIR, "credentials");
 
 // Protect /setup with a user-provided password.
 const SETUP_PASSWORD = process.env.SETUP_PASSWORD?.trim();
@@ -83,10 +94,33 @@ const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
 const OPENCLAW_MEMORY_BACKEND = process.env.OPENCLAW_MEMORY_BACKEND?.trim() || "qmd";
-const OPENCLAW_MEMORY_QMD_COMMAND = process.env.OPENCLAW_MEMORY_QMD_COMMAND?.trim() || "qmd";
-const OPENCLAW_MEMORY_QMD_SEARCH_MODE = process.env.OPENCLAW_MEMORY_QMD_SEARCH_MODE?.trim() || "search";
+const OPENCLAW_MEMORY_QMD_COMMAND =
+  process.env.OPENCLAW_MEMORY_QMD_COMMAND?.trim() ||
+  "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd";
 const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || "";
+const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY?.trim() || "";
+const OPENCLAW_MEMORY_SEARCH_PROVIDER =
+  process.env.OPENCLAW_MEMORY_SEARCH_PROVIDER?.trim().toLowerCase() || "local";
+const OPENCLAW_MEMORY_SEARCH_FALLBACK =
+  process.env.OPENCLAW_MEMORY_SEARCH_FALLBACK?.trim() || "none";
+const OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL =
+  process.env.OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL?.trim() || "text-embedding-3-small";
+const OPENCLAW_MEMORY_SEARCH_GEMINI_MODEL =
+  process.env.OPENCLAW_MEMORY_SEARCH_GEMINI_MODEL?.trim() || "gemini-embedding-001";
+const OPENCLAW_MEMORY_SEARCH_VOYAGE_MODEL =
+  process.env.OPENCLAW_MEMORY_SEARCH_VOYAGE_MODEL?.trim() || "voyage-3-lite";
+const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH =
+  process.env.OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH?.trim() ||
+  "hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf";
+const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR =
+  process.env.OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR?.trim() ||
+  path.join(STATE_DIR, "models", "node-llama-cpp");
+const OPENCLAW_MEMORY_SEARCH_STORE_PATH =
+  process.env.OPENCLAW_MEMORY_SEARCH_STORE_PATH?.trim() ||
+  path.join(STATE_DIR, "memory", "{agentId}.sqlite");
 
 function parseBoolEnv(value, fallback) {
   if (value == null) return fallback;
@@ -94,6 +128,12 @@ function parseBoolEnv(value, fallback) {
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
+}
+
+function parsePositiveIntEnv(value, fallback) {
+  if (value == null) return fallback;
+  const parsed = Number.parseInt(String(value).trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
@@ -104,6 +144,217 @@ const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
   true,
 );
+const OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH = parseBoolEnv(
+  process.env.OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH,
+  IS_RAILWAY,
+);
+const OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
+  15_000,
+);
+const OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS,
+  60_000,
+);
+const OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS,
+  300_000,
+);
+
+function resolveMemorySearchStrategy() {
+  const explicit = OPENCLAW_MEMORY_SEARCH_PROVIDER;
+  const normalizedExplicit =
+    explicit && ["openai", "gemini", "voyage", "local"].includes(explicit) ? explicit : "";
+  const provider = normalizedExplicit || "local";
+
+  if (provider === "openai") {
+    return {
+      provider,
+      source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "env:OPENAI_API_KEY",
+      fallback: OPENCLAW_MEMORY_SEARCH_FALLBACK,
+      model: OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL,
+    };
+  }
+
+  if (provider === "gemini") {
+    return {
+      provider,
+      source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "env:GEMINI_API_KEY",
+      fallback: OPENCLAW_MEMORY_SEARCH_FALLBACK,
+      model: OPENCLAW_MEMORY_SEARCH_GEMINI_MODEL,
+    };
+  }
+
+  if (provider === "voyage") {
+    return {
+      provider,
+      source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "env:VOYAGE_API_KEY",
+      fallback: OPENCLAW_MEMORY_SEARCH_FALLBACK,
+      model: OPENCLAW_MEMORY_SEARCH_VOYAGE_MODEL,
+    };
+  }
+
+  return {
+    provider: "local",
+    source: normalizedExplicit ? "env:OPENCLAW_MEMORY_SEARCH_PROVIDER" : "default:local",
+    fallback: "none",
+    local: {
+      modelPath: OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH,
+      modelCacheDir: OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR,
+    },
+  };
+}
+
+function getJsonValue(target, dottedPath) {
+  return String(dottedPath || "")
+    .split(".")
+    .filter(Boolean)
+    .reduce((cursor, key) => (cursor && typeof cursor === "object" ? cursor[key] : undefined), target);
+}
+
+function remoteMemorySearchEnvVar(provider) {
+  switch (provider) {
+    case "openai":
+      return "OPENAI_API_KEY";
+    case "gemini":
+      return "GEMINI_API_KEY";
+    case "voyage":
+      return "VOYAGE_API_KEY";
+    default:
+      return "";
+  }
+}
+
+function materializeAgentToken(templatePath, agentId = "main") {
+  return String(templatePath || "").replaceAll("{agentId}", agentId);
+}
+
+function readConfiguredProviderApiKey(provider) {
+  if (!provider || !isConfigured()) return "";
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const configuredApiKey = getJsonValue(snapshot.config, `models.providers.${provider}.apiKey`);
+    return typeof configuredApiKey === "string" ? configuredApiKey.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function resolveMemorySearchRuntime() {
+  const strategy = resolveMemorySearchStrategy();
+  const runtime = {
+    ...strategy,
+    storePath: OPENCLAW_MEMORY_SEARCH_STORE_PATH,
+    warnings: [],
+    hints: [],
+  };
+
+  if (strategy.provider === "local") {
+    const modelPath = strategy.local?.modelPath?.trim() || "";
+    const modelCacheDir = strategy.local?.modelCacheDir?.trim() || "";
+
+    if (!modelPath) {
+      runtime.warnings.push("Local memory search is configured but OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH is blank.");
+      runtime.hints.push(
+        "Set OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH to a GGUF file path or hf: URI before running openclaw memory search.",
+      );
+    } else if (!modelPath.startsWith("hf:") && !fs.existsSync(modelPath)) {
+      runtime.warnings.push(`Local memory search model path does not exist: ${modelPath}`);
+      runtime.hints.push(
+        "Mount the GGUF file into the image or switch OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH to the default hf: embeddinggemma URI.",
+      );
+    }
+
+    if (!modelCacheDir) {
+      runtime.warnings.push("Local memory search cache directory is blank.");
+      runtime.hints.push("Set OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR to a persistent directory under /data.");
+    }
+    return runtime;
+  }
+
+  const envVar = remoteMemorySearchEnvVar(strategy.provider);
+  const envApiKey = envVar ? process.env[envVar]?.trim() || "" : "";
+  const configuredApiKey = readConfiguredProviderApiKey(strategy.provider);
+  if (!envApiKey && !configuredApiKey) {
+    runtime.warnings.push(
+      `${strategy.provider} memory search is selected but neither ${envVar} nor models.providers.${strategy.provider}.apiKey is configured.`,
+    );
+    runtime.hints.push(
+      `Set ${envVar} in Railway Variables, or define models.providers.${strategy.provider}.apiKey before running openclaw memory search.`,
+    );
+  }
+
+  return runtime;
+}
+
+function ensureMemorySearchRuntimeLayout(runtime = resolveMemorySearchRuntime()) {
+  const dirs = [path.dirname(materializeAgentToken(runtime.storePath, "main"))];
+
+  if (runtime.provider === "local" && runtime.local?.modelCacheDir) {
+    dirs.push(runtime.local.modelCacheDir);
+  }
+
+  for (const dir of dirs.filter(Boolean)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  return runtime;
+}
+
+function describeMemorySearchRuntime(runtime = resolveMemorySearchRuntime()) {
+  const modelSummary =
+    runtime.provider === "local"
+      ? `modelPath=${runtime.local?.modelPath || "(unset)"} cacheDir=${runtime.local?.modelCacheDir || "(unset)"}`
+      : `model=${runtime.model || "(unset)"}`;
+  return `provider=${runtime.provider} source=${runtime.source} fallback=${runtime.fallback} ${modelSummary} store=${runtime.storePath}`;
+}
+
+function logMemorySearchRuntime(runtime = resolveMemorySearchRuntime(), context = "boot") {
+  console.log(`[memory-search] ${context} resolved ${describeMemorySearchRuntime(runtime)}`);
+  for (const warning of runtime.warnings) {
+    console.warn(`[memory-search] warning: ${warning}`);
+  }
+  for (const hint of runtime.hints) {
+    console.warn(`[memory-search] remediation: ${hint}`);
+  }
+}
+
+function resolveRealPathOrSelf(targetPath) {
+  try {
+    return fs.realpathSync(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
+function safeMode(targetPath) {
+  try {
+    return (fs.statSync(targetPath).mode & 0o777).toString(8).padStart(3, "0");
+  } catch {
+    return null;
+  }
+}
+
+function collectWorkspaceMemoryStats() {
+  const memoryDir = path.join(WORKSPACE_DIR, "memory");
+  let dailyFiles = 0;
+  try {
+    const entries = fs.readdirSync(memoryDir, { withFileTypes: true });
+    dailyFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).length;
+  } catch {
+    dailyFiles = 0;
+  }
+
+  return {
+    rootMemoryPresent: fs.existsSync(path.join(WORKSPACE_DIR, "MEMORY.md")),
+    altMemoryPresent: fs.existsSync(path.join(WORKSPACE_DIR, "memory.md")),
+    dailyFiles,
+    totalFiles:
+      (fs.existsSync(path.join(WORKSPACE_DIR, "MEMORY.md")) ? 1 : 0) +
+      (fs.existsSync(path.join(WORKSPACE_DIR, "memory.md")) ? 1 : 0) +
+      dailyFiles,
+  };
+}
 
 const QMD_INDEX_SQLITE_PATH = path.join(
   STATE_DIR,
@@ -640,6 +891,155 @@ function isConfigured() {
   }
 }
 
+function cloneJsonValue(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function readConfigJsonFromDisk() {
+  const targetPath = configPath();
+  const raw = fs.readFileSync(targetPath, "utf8");
+  const parsed = raw.trim() ? JSON.parse(raw) : {};
+  return {
+    path: targetPath,
+    config: parsed && typeof parsed === "object" ? parsed : {},
+  };
+}
+
+function setConfigValue(target, dottedPath, value) {
+  const parts = String(dottedPath || "")
+    .split(".")
+    .filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error(`Invalid config path: ${dottedPath}`);
+  }
+
+  let cursor = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const current = cursor[key];
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key];
+  }
+
+  cursor[parts[parts.length - 1]] = cloneJsonValue(value);
+}
+
+function deleteConfigValue(target, dottedPath) {
+  const parts = String(dottedPath || "")
+    .split(".")
+    .filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error(`Invalid config path: ${dottedPath}`);
+  }
+
+  let cursor = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const current = cursor?.[key];
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      return false;
+    }
+    cursor = current;
+  }
+
+  const leaf = parts[parts.length - 1];
+  if (!Object.prototype.hasOwnProperty.call(cursor, leaf)) {
+    return false;
+  }
+
+  delete cursor[leaf];
+  return true;
+}
+
+function applyConfigPatch(entries) {
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const nextConfig = cloneJsonValue(snapshot.config) || {};
+
+    for (const [dottedPath, value] of entries) {
+      setConfigValue(nextConfig, dottedPath, value);
+    }
+
+    const nextRaw = `${JSON.stringify(nextConfig, null, 2)}\n`;
+    const currentRaw = `${JSON.stringify(snapshot.config, null, 2)}\n`;
+    if (nextRaw === currentRaw) {
+      return {
+        ok: true,
+        changed: false,
+        path: snapshot.path,
+        output: `[config] unchanged ${snapshot.path}`,
+      };
+    }
+
+    fs.mkdirSync(path.dirname(snapshot.path), { recursive: true });
+    const tempPath = `${snapshot.path}.tmp`;
+    fs.writeFileSync(tempPath, nextRaw, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tempPath, snapshot.path);
+
+    return {
+      ok: true,
+      changed: true,
+      path: snapshot.path,
+      output: `[config] updated ${snapshot.path}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      path: configPath(),
+      output: `[config] patch failed: ${String(err)}`,
+    };
+  }
+}
+
+function removeConfigKeys(dottedPaths) {
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const nextConfig = cloneJsonValue(snapshot.config) || {};
+    const removed = [];
+
+    for (const dottedPath of dottedPaths) {
+      if (deleteConfigValue(nextConfig, dottedPath)) {
+        removed.push(dottedPath);
+      }
+    }
+
+    if (removed.length === 0) {
+      return {
+        ok: true,
+        changed: false,
+        removed,
+        path: snapshot.path,
+        output: `[config] unchanged ${snapshot.path}`,
+      };
+    }
+
+    const nextRaw = `${JSON.stringify(nextConfig, null, 2)}\n`;
+    fs.mkdirSync(path.dirname(snapshot.path), { recursive: true });
+    const tempPath = `${snapshot.path}.tmp`;
+    fs.writeFileSync(tempPath, nextRaw, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tempPath, snapshot.path);
+
+    return {
+      ok: true,
+      changed: true,
+      removed,
+      path: snapshot.path,
+      output: `[config] removed ${removed.join(", ")} from ${snapshot.path}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      removed: [],
+      path: configPath(),
+      output: `[config] cleanup failed: ${String(err)}`,
+    };
+  }
+}
+
 // One-time migration: rename legacy config files to openclaw.json so existing
 // deployments that still have the old filename on their volume keep working.
 (function migrateLegacyConfigFile() {
@@ -663,6 +1063,19 @@ function isConfigured() {
   }
 })();
 
+(function scrubLegacyConfigKeys() {
+  if (!isConfigured()) return;
+
+  const cleanup = removeConfigKeys(["memory.qmd.searchMode"]);
+  if (!cleanup.ok) {
+    console.warn(`[migration] Failed to scrub legacy config keys: ${cleanup.output}`);
+    return;
+  }
+  if (cleanup.changed) {
+    console.log(`[migration] Scrubbed legacy config keys: ${cleanup.removed.join(", ")}`);
+  }
+})();
+
 let gatewayProc = null;
 let gatewayStarting = null;
 let gatewayDesired = false;
@@ -675,6 +1088,7 @@ let lastGatewayError = null;
 let lastGatewayExit = null;
 let lastDoctorOutput = null;
 let lastDoctorAt = null;
+let memoryIndexWarmup = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -751,6 +1165,7 @@ async function startGateway() {
   const args = [
     "gateway",
     "run",
+    "--force",
     "--bind",
     "loopback",
     "--port",
@@ -1019,12 +1434,26 @@ app.get("/healthz", async (_req, res) => {
     }
   }
 
+  const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
+  const memoryStats = collectWorkspaceMemoryStats();
+  const memorySearch = resolveMemorySearchRuntime();
+
   res.json({
     ok: true,
     wrapper: {
       configured: isConfigured(),
       stateDir: STATE_DIR,
       workspaceDir: WORKSPACE_DIR,
+      workspaceRealDir,
+      workspaceVolumeDir: WORKSPACE_VOLUME_DIR,
+      workspaceUnified: workspaceRealDir === resolveRealPathOrSelf(WORKSPACE_VOLUME_DIR),
+      stateDirMode: safeMode(STATE_DIR),
+      credentialsDirMode: safeMode(CREDENTIALS_DIR),
+      memoryFiles: memoryStats.totalFiles,
+      memorySearchProvider: memorySearch.provider,
+      memorySearchSource: memorySearch.source,
+      memorySearchStorePath: memorySearch.storePath,
+      memorySearchWarnings: memorySearch.warnings,
     },
     gateway: {
       target: GATEWAY_TARGET,
@@ -1044,15 +1473,43 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
     gatewayReachable = false;
   }
 
+  const workspaceRealDir = resolveRealPathOrSelf(WORKSPACE_DIR);
+  const memoryStats = collectWorkspaceMemoryStats();
+  const memorySearch = resolveMemorySearchRuntime();
+
   return res.json({
     ok: true,
     components: {
       wrapper: {
         configured: isConfigured(),
+        stateDir: STATE_DIR,
+        workspaceDir: WORKSPACE_DIR,
+        workspaceRealDir,
+        workspaceUnified: workspaceRealDir === resolveRealPathOrSelf(WORKSPACE_VOLUME_DIR),
+        stateDirMode: safeMode(STATE_DIR),
+        credentialsDirMode: safeMode(CREDENTIALS_DIR),
       },
       gateway: {
         reachable: gatewayReachable,
         target: GATEWAY_TARGET,
+      },
+      qmd: {
+        command: OPENCLAW_MEMORY_QMD_COMMAND,
+        indexPath: QMD_INDEX_SQLITE_PATH,
+        indexPresent: fs.existsSync(QMD_INDEX_SQLITE_PATH),
+      },
+      memory: {
+        files: memoryStats.totalFiles,
+        dailyFiles: memoryStats.dailyFiles,
+        searchProvider: memorySearch.provider,
+        searchSource: memorySearch.source,
+        searchStorePath: memorySearch.storePath,
+        searchModel: memorySearch.provider === "local" ? null : memorySearch.model || null,
+        searchLocalModelPath:
+          memorySearch.provider === "local" ? memorySearch.local?.modelPath || null : null,
+        searchLocalModelCacheDir:
+          memorySearch.provider === "local" ? memorySearch.local?.modelCacheDir || null : null,
+        warnings: memorySearch.warnings,
       },
       httpApi: {
         chatCompletions: "/v1/chat/completions",
@@ -2506,10 +2963,6 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
       OPENCLAW_NODE,
       clawArgs(["config", "get", "memory.qmd.command"]),
     );
-    const memoryQmdSearchMode = await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "get", "memory.qmd.searchMode"]),
-    );
 
     res.json({
       ok: true,
@@ -2518,6 +2971,12 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
         port: PORT,
         stateDir: STATE_DIR,
         workspaceDir: WORKSPACE_DIR,
+        workspaceRealDir: resolveRealPathOrSelf(WORKSPACE_DIR),
+        workspaceVolumeDir: WORKSPACE_VOLUME_DIR,
+        workspaceUnified:
+          resolveRealPathOrSelf(WORKSPACE_DIR) === resolveRealPathOrSelf(WORKSPACE_VOLUME_DIR),
+        stateDirMode: safeMode(STATE_DIR),
+        credentialsDirMode: safeMode(CREDENTIALS_DIR),
         configured: isConfigured(),
         configPathResolved: configPath(),
         gatewayTarget: GATEWAY_TARGET,
@@ -2534,10 +2993,11 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
           command: OPENCLAW_MEMORY_QMD_COMMAND,
           binaryPresent: qmd.code === 0,
           version: redactSecrets(qmd.output),
+          indexPresent: fs.existsSync(QMD_INDEX_SQLITE_PATH),
           configuredBackend: redactSecrets(memoryBackend.output),
           configuredCommand: redactSecrets(memoryQmdCommand.output),
-          configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
         },
+        memoryCorpus: collectWorkspaceMemoryStats(),
         channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
         channels: {
           telegram: { exit: tg.code, output: redactSecrets(tg.output) },
@@ -3280,6 +3740,15 @@ async function applyConfiguredSetupPayload(payload) {
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]));
+  await runCmd(
+    OPENCLAW_NODE,
+    clawArgs([
+      "config",
+      "set",
+      "gateway.controlUi.allowInsecureAuth",
+      OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH ? "true" : "false",
+    ]),
+  );
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
   await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
@@ -3288,6 +3757,9 @@ async function applyConfiguredSetupPayload(payload) {
   extra += `\n[memory backend] ${memoryDefaults.reason}`;
   if (memoryDefaults.output) {
     extra += `\n${memoryDefaults.output}`;
+  }
+  if (memoryDefaults.ok) {
+    startMemoryIndexWarmup("configured-setup");
   }
 
   if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
@@ -3393,15 +3865,59 @@ async function applyMemoryBackendDefaults() {
   }
 
   const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
-  if (backend !== "qmd") {
-    const setBackend = await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "memory.backend", backend]),
-    );
+  const applyMemorySearchDefaults = async () => {
+    const runtime = ensureMemorySearchRuntimeLayout();
+    const entries = [
+      ["agents.defaults.memorySearch.provider", runtime.provider],
+      ["agents.defaults.memorySearch.fallback", runtime.fallback],
+      ["agents.defaults.memorySearch.store.path", runtime.storePath],
+    ];
+
+    if (runtime.model) {
+      entries.push(["agents.defaults.memorySearch.model", runtime.model]);
+    }
+
+    if (runtime.local) {
+      entries.push(["agents.defaults.memorySearch.local.modelPath", runtime.local.modelPath]);
+      entries.push([
+        "agents.defaults.memorySearch.local.modelCacheDir",
+        runtime.local.modelCacheDir,
+      ]);
+    }
+
+    const patch = applyConfigPatch(entries);
+    const output = [
+      `[memory-search] ${describeMemorySearchRuntime(runtime)}`,
+      ...runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`),
+      ...runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`),
+      patch.output || "",
+    ].join("\n");
+
     return {
-      ok: setBackend.code === 0,
-      reason: setBackend.code === 0 ? "configured" : "set_failed",
-      output: `[memory] backend=${backend} exit=${setBackend.code}\n${setBackend.output || ""}`,
+      ok: patch.ok,
+      reason: patch.ok ? "memory_search_configured" : "memory_search_set_failed",
+      output,
+    };
+  };
+
+  if (backend !== "qmd") {
+    const setBackend = applyConfigPatch([["memory.backend", backend]]);
+    const memorySearch = await applyMemorySearchDefaults();
+    return {
+      ok: setBackend.ok && memorySearch.ok,
+      reason:
+        setBackend.ok && memorySearch.ok
+          ? "configured"
+          : !setBackend.ok
+            ? "set_failed"
+            : memorySearch.reason,
+      output: [
+        `[memory] backend=${backend}`,
+        setBackend.output || "",
+        memorySearch.output || "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
     };
   }
 
@@ -3416,67 +3932,59 @@ async function applyMemoryBackendDefaults() {
     };
   }
 
-  const steps = [];
-  steps.push(
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "memory.backend", "qmd"])),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "memory.qmd.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs([
-        "config",
-        "set",
-        "memory.qmd.update.interval",
-        OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL,
-      ]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs([
-        "config",
-        "set",
-        "--json",
-        "memory.qmd.update.waitForBootSync",
-        JSON.stringify(OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC),
-      ]),
-    ),
-  );
-  steps.push(
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs([
-        "config",
-        "set",
-        "--json",
-        "memory.qmd.includeDefaultMemory",
-        JSON.stringify(OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY),
-      ]),
-    ),
-  );
-
-  const failed = steps.find((step) => step.code !== 0);
-  const output = steps
-    .map((step, index) => `[memory-step-${index + 1}] exit=${step.code}\n${step.output || ""}`)
-    .join("\n");
+  const patch = applyConfigPatch([
+    ["memory.backend", "qmd"],
+    ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
+    ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
+    ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
+    ["memory.qmd.update.updateTimeoutMs", OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS],
+    ["memory.qmd.update.embedTimeoutMs", OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS],
+    ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
+    ["memory.qmd.limits.timeoutMs", OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS],
+    ["memory.qmd.scope.default", "allow"],
+  ]);
+  const memorySearch = await applyMemorySearchDefaults();
+  const output = [patch.output || "", memorySearch.output || ""].filter(Boolean).join("\n");
   return {
-    ok: !failed,
-    reason: failed ? "set_failed" : "configured",
+    ok: patch.ok && memorySearch.ok,
+    reason: !patch.ok ? "set_failed" : memorySearch.ok ? "configured" : memorySearch.reason,
     output,
   };
+}
+
+function trimCommandOutput(output, limit = 4000) {
+  const text = redactSecrets(String(output || ""));
+  return text.length > limit ? `${text.slice(0, limit)}\n... (truncated)\n` : text;
+}
+
+function startMemoryIndexWarmup(reason = "boot") {
+  if (!isConfigured() || memoryIndexWarmup) {
+    return;
+  }
+
+  const runtime = ensureMemorySearchRuntimeLayout();
+  logMemorySearchRuntime(runtime, `warmup:${reason}`);
+  memoryIndexWarmup = (async () => {
+    console.log(`[memory-search] warmup starting reason=${reason}`);
+    const index = await runCmd(OPENCLAW_NODE, clawArgs(["memory", "index", "--agent", "main"]), {
+      timeoutMs: 300_000,
+    });
+    if (index.code === 0) {
+      console.log(`[memory-search] warmup complete reason=${reason}`);
+      return;
+    }
+
+    console.warn(`[memory-search] warmup warning: openclaw memory index exited ${index.code}`);
+    if (index.output) {
+      console.warn(trimCommandOutput(index.output));
+    }
+  })()
+    .catch((err) => {
+      console.warn(`[memory-search] warmup error: ${String(err)}`);
+    })
+    .finally(() => {
+      memoryIndexWarmup = null;
+    });
 }
 
 app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
@@ -3525,32 +4033,26 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   // Optional setup (only after successful onboarding).
   if (ok) {
-    // Keep gateway in token mode and sync both auth + remote tokens for UI compatibility.
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]),
-    );
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
-    );
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
-
-    // Railway runs behind a reverse proxy. Trust loopback as a proxy hop so local client detection
-    // remains correct when X-Forwarded-* headers are present.
-    await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"]) ]),
-    );
+    const runtimePatch = applyConfigPatch([
+      ["gateway.auth.mode", "token"],
+      ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
+      ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
+      ["gateway.http.endpoints.chatCompletions.enabled", true],
+      ["gateway.http.endpoints.responses.enabled", true],
+      ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
+      ["gateway.bind", "loopback"],
+      ["gateway.port", INTERNAL_GATEWAY_PORT],
+      ["gateway.trustedProxies", ["127.0.0.1"]],
+    ]);
+    extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}\n${runtimePatch.output || ""}`;
 
     const memoryDefaults = await applyMemoryBackendDefaults();
     extra += `\n[memory backend] ${memoryDefaults.reason}`;
     if (memoryDefaults.output) {
       extra += `\n${memoryDefaults.output}`;
+    }
+    if (memoryDefaults.ok) {
+      startMemoryIndexWarmup("setup-api-run");
     }
 
     // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
@@ -3696,7 +4198,6 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
   const dc = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
   const memoryBackend = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.backend"]));
   const memoryQmdCommand = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.command"]));
-  const memoryQmdSearchMode = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.searchMode"]));
 
   const tgOut = redactSecrets(tg.output || "");
   const dcOut = redactSecrets(dc.output || "");
@@ -3736,7 +4237,6 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
         version: redactSecrets(qmd.output),
         configuredBackend: redactSecrets(memoryBackend.output),
         configuredCommand: redactSecrets(memoryQmdCommand.output),
-        configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
       },
       channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
       channels: {
@@ -4001,10 +4501,10 @@ app.get("/setup/export", requireSetupAuth, async (_req, res) => {
 
   // Prefer exporting from a common /data root so archives are easy to inspect and restore.
   // This preserves dotfiles like /data/.openclaw/openclaw.json.
-  const stateAbs = path.resolve(STATE_DIR);
-  const workspaceAbs = path.resolve(WORKSPACE_DIR);
+  const stateAbs = resolveRealPathOrSelf(STATE_DIR);
+  const workspaceAbs = resolveRealPathOrSelf(WORKSPACE_DIR);
 
-  const dataRoot = "/data";
+  const dataRoot = DATA_ROOT;
   const underData = (p) => p === dataRoot || p.startsWith(dataRoot + path.sep);
 
   let cwd = "/";
@@ -4040,8 +4540,8 @@ app.get("/setup/export", requireSetupAuth, async (_req, res) => {
 });
 
 function isUnderDir(p, root) {
-  const abs = path.resolve(p);
-  const r = path.resolve(root);
+  const abs = resolveRealPathOrSelf(p);
+  const r = resolveRealPathOrSelf(root);
   return abs === r || abs.startsWith(r + path.sep);
 }
 
@@ -4078,7 +4578,7 @@ async function readBodyBuffer(req, maxBytes) {
 // This is intentionally limited to restoring into /data to avoid overwriting arbitrary host paths.
 app.post("/setup/import", requireSetupAuth, async (req, res) => {
   try {
-    const dataRoot = "/data";
+    const dataRoot = DATA_ROOT;
     if (!isUnderDir(STATE_DIR, dataRoot) || !isUnderDir(WORKSPACE_DIR, dataRoot)) {
       return res
         .status(400)
@@ -4256,13 +4756,18 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[wrapper] listening on :${PORT}`);
   console.log(`[wrapper] state dir: ${STATE_DIR}`);
   console.log(`[wrapper] workspace dir: ${WORKSPACE_DIR}`);
+  console.log(`[wrapper] workspace real dir: ${resolveRealPathOrSelf(WORKSPACE_DIR)}`);
+  logMemorySearchRuntime(ensureMemorySearchRuntimeLayout(), "boot");
 
   // Harden state dir for OpenClaw and avoid missing credentials dir on fresh volumes.
   try {
-    fs.mkdirSync(path.join(STATE_DIR, "credentials"), { recursive: true });
+    fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
   } catch {}
   try {
     fs.chmodSync(STATE_DIR, 0o700);
+  } catch {}
+  try {
+    fs.chmodSync(CREDENTIALS_DIR, 0o700);
   } catch {}
 
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);
@@ -4306,19 +4811,29 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
     console.log("[wrapper] syncing gateway tokens in config...");
     try {
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]),
-      );
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]),
-      );
+      const runtimePatch = applyConfigPatch([
+        ["gateway.auth.mode", "token"],
+        ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
+        ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
+        ["gateway.http.endpoints.chatCompletions.enabled", true],
+        ["gateway.http.endpoints.responses.enabled", true],
+        ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
+        ["gateway.bind", "loopback"],
+        ["gateway.port", INTERNAL_GATEWAY_PORT],
+        ["gateway.trustedProxies", ["127.0.0.1"]],
+      ]);
+      console.log(`[wrapper] runtime config: ${runtimePatch.ok ? "configured" : "failed"}`);
+      if (runtimePatch.output) {
+        console.log(runtimePatch.output);
+      }
       const memoryDefaults = await applyMemoryBackendDefaults();
       console.log(`[wrapper] memory backend: ${memoryDefaults.reason}`);
+      if (memoryDefaults.output) {
+        console.log(memoryDefaults.output);
+      }
+      if (memoryDefaults.ok) {
+        startMemoryIndexWarmup("boot-sync");
+      }
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
@@ -4329,6 +4844,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   // work even if nobody visits the web UI.
   if (isConfigured()) {
     console.log("[wrapper] config detected; starting gateway...");
+    startMemoryIndexWarmup("boot-config-detected");
     try {
       await ensureGatewayRunning();
       console.log("[wrapper] gateway ready");

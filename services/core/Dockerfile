@@ -37,6 +37,7 @@ RUN apt-get update \
     ca-certificates \
     curl \
     python3 \
+    cmake \
     make \
     g++ \
   && rm -rf /var/lib/apt/lists/*
@@ -61,6 +62,8 @@ RUN set -eux; \
     sed -i -E 's/"openclaw"[[:space:]]*:[[:space:]]*">=[^"]+"/"openclaw": "*"/g' "$f"; \
     sed -i -E 's/"openclaw"[[:space:]]*:[[:space:]]*"workspace:[^"]+"/"openclaw": "*"/g' "$f"; \
   done
+
+RUN node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); const existing=Array.isArray(pkg.pnpm?.onlyBuiltDependencies)?pkg.pnpm.onlyBuiltDependencies:[]; pkg.pnpm={...(pkg.pnpm||{}), onlyBuiltDependencies:[...new Set([...existing,'node-llama-cpp'])]}; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n');"
 
 RUN pnpm install --no-frozen-lockfile
 RUN pnpm build
@@ -111,6 +114,15 @@ ENV NPM_CONFIG_CACHE=/tmp/npm-cache
 ENV PNPM_HOME=/data/pnpm
 ENV PNPM_STORE_DIR=/tmp/pnpm-store
 ENV PATH="/data/npm/bin:/data/pnpm:${PATH}"
+ENV OPENCLAW_DATA_ROOT=/data
+ENV OPENCLAW_STATE_DIR=/data/.openclaw
+ENV OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace
+ENV OPENCLAW_WORKSPACE_DIR=/data/workspace
+ENV OPENCLAW_MEMORY_BACKEND=qmd
+ENV OPENCLAW_MEMORY_QMD_COMMAND=qmd
+ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf
+ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp
+ENV SFTPGO_PORTABLE_DIRECTORY=/data/workspace
 WORKDIR /app
 
 # Wrapper deps

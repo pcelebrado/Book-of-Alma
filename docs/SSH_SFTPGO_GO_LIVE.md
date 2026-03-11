@@ -18,6 +18,7 @@ service.
 - `SFTPGO_HTTPD__BINDINGS__0__PORT=8080`
 - `SFTPGO_SFTPD__BINDINGS__0__PORT=2022`
 - `SFTPGO_DATA_ROOT=/data/sftpgo`
+- `OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace`
 
 ## Deployment checks
 
@@ -31,7 +32,7 @@ curl -fsS "https://<sftpgo-domain>/healthz"
 
 `https://<sftpgo-domain>/web/admin`
 
-3. Create a protocol user in SFTPGo WebAdmin.
+3. Create a protocol user in SFTPGo WebAdmin with home directory `/data/workspace` (or `/srv/sftpgo/workspace`).
 
 4. Verify SFTP over SSH:
 
@@ -39,7 +40,7 @@ curl -fsS "https://<sftpgo-domain>/healthz"
 sftp -P 2022 <username>@<sftpgo-domain>
 ```
 
-5. Upload a probe file and confirm it appears in SFTPGo WebAdmin file browser.
+5. Upload a probe file and confirm it appears under `/data/workspace` and is visible through the compatibility path `/root/.openclaw/workspace`.
 
 ## Operational notes
 

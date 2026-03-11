@@ -17,7 +17,11 @@
   },
   "OPENCLAW_WORKSPACE_DIR": {
     "value": "/data/workspace",
-    "description": "Persistent workspace path for generated files, tools, and project artifacts."
+    "description": "Configured OpenClaw workspace path inside the container. Template defaults this to the persistent Railway volume so SFTP lands in the same directory OpenClaw uses."
+  },
+  "OPENCLAW_WORKSPACE_VOLUME_DIR": {
+    "value": "/data/workspace",
+    "description": "Physical Railway volume path that backs the active OpenClaw workspace."
   },
   "RAILWAY_RUN_UID": {
     "value": "0",
@@ -45,23 +49,23 @@
   },
   "SFTPGO_DEFAULT_ADMIN_USERNAME": {
     "value": "admin",
-    "description": "Username for default SFTPGo admin account."
+    "description": "Username for the default SFTPGo admin account. Portable SFTP mode reuses this username unless SFTPGO_PORTABLE_USERNAME is explicitly set."
   },
   "SFTPGO_DEFAULT_ADMIN_PASSWORD": {
     "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
-    "description": "Password for default SFTPGo admin account (auto-generated secret)."
+    "description": "Password for the default SFTPGo admin account (auto-generated secret). Portable SFTP mode reuses this password unless SFTPGO_PORTABLE_PASSWORD is explicitly set."
   },
   "SFTPGO_PORTABLE_USERNAME": {
-    "value": "book-uploader",
-    "description": "Fallback SFTP username used when full SFTPGo mode is unavailable and portable mode is activated."
+    "value": "",
+    "description": "Optional override for portable SFTP username. Leave blank to reuse SFTPGO_DEFAULT_ADMIN_USERNAME."
   },
   "SFTPGO_PORTABLE_PASSWORD": {
-    "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
-    "description": "Fallback SFTP password used in portable mode (set explicitly for deterministic testing)."
+    "value": "",
+    "description": "Optional override for portable SFTP password. Leave blank to reuse SFTPGO_DEFAULT_ADMIN_PASSWORD."
   },
   "SFTPGO_PORTABLE_DIRECTORY": {
-    "value": "/data",
-    "description": "Directory exposed via SFTP portable mode; /data grants access to uploaded content, OpenClaw state, and workspace paths."
+    "value": "/data/workspace",
+    "description": "Directory exposed via SFTP portable mode. Keep this aligned with OPENCLAW_WORKSPACE_DIR so SFTP sessions land in the active OpenClaw workspace."
   },
   "INTERNAL_GATEWAY_HOST": {
     "value": "127.0.0.1",
@@ -84,12 +88,8 @@
     "description": "OpenClaw memory backend (`qmd` to enable QMD sidecar retrieval, `sqlite` for builtin manager)."
   },
   "OPENCLAW_MEMORY_QMD_COMMAND": {
-    "value": "qmd",
-    "description": "QMD executable path used when `OPENCLAW_MEMORY_BACKEND=qmd`."
-  },
-  "OPENCLAW_MEMORY_QMD_SEARCH_MODE": {
-    "value": "search",
-    "description": "QMD search mode used by OpenClaw memory (`search`, `vsearch`, or `query`)."
+    "value": "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd",
+    "description": "QMD executable path used when `OPENCLAW_MEMORY_BACKEND=qmd`. Railway should use the direct @tobilu/qmd entrypoint."
   },
   "OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL": {
     "value": "5m",
@@ -102,6 +102,58 @@
   "OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY": {
     "value": "true",
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
+  },
+  "OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS": {
+    "value": "15000",
+    "description": "QMD search timeout in milliseconds for Railway runtime memory_search calls."
+  },
+  "OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS": {
+    "value": "60000",
+    "description": "QMD update timeout in milliseconds for Railway bootstrap and background sync."
+  },
+  "OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS": {
+    "value": "300000",
+    "description": "QMD embed timeout in milliseconds so first-run local model warmups can finish on Railway."
+  },
+  "OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH": {
+    "value": "true",
+    "description": "Compatibility toggle for Railway-hosted Control UI/WebChat so the wrapper's injected bearer auth can be used without device pairing."
+  },
+  "OPENCLAW_MEMORY_SEARCH_PROVIDER": {
+    "value": "local",
+    "description": "Default Railway memory-search provider. Keep `local` for deterministic no-secret embeddings, or intentionally override to `openai`, `gemini`, or `voyage`."
+  },
+  "OPENCLAW_MEMORY_SEARCH_FALLBACK": {
+    "value": "none",
+    "description": "Fallback provider for agents.defaults.memorySearch.fallback. Keep `none` for deterministic Railway boot unless you intentionally chain providers."
+  },
+  "OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL": {
+    "value": "text-embedding-3-small",
+    "description": "Embedding model used when memory search resolves to the OpenAI provider."
+  },
+  "OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH": {
+    "value": "hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf",
+    "description": "Local embedding model URI/path used when memory search resolves to the local provider."
+  },
+  "OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR": {
+    "value": "/data/.openclaw/models/node-llama-cpp",
+    "description": "Persistent cache directory for local node-llama-cpp embedding models."
+  },
+  "OPENCLAW_MEMORY_SEARCH_STORE_PATH": {
+    "value": "/data/.openclaw/memory/{agentId}.sqlite",
+    "description": "Persistent semantic memory store path template. `{agentId}` is materialized per OpenClaw agent."
+  },
+  "OPENAI_API_KEY": {
+    "value": "",
+    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=openai or models.providers.openai.apiKey is not defined elsewhere."
+  },
+  "GEMINI_API_KEY": {
+    "value": "",
+    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=gemini or models.providers.gemini.apiKey is not defined elsewhere."
+  },
+  "VOYAGE_API_KEY": {
+    "value": "",
+    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=voyage or models.providers.voyage.apiKey is not defined elsewhere."
   },
   "BOOK_SOURCE_MODE": {
     "value": "external",

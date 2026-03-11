@@ -50,6 +50,7 @@ Set these values in Railway Variables (service-level), not in git.
 - `OPENCLAW_GATEWAY_TOKEN` -> set from `OC_GATEWAY_TOKEN` (recommended)
 - `OPENCLAW_STATE_DIR=/data/.openclaw`
 - `OPENCLAW_WORKSPACE_DIR=/data/workspace`
+- `OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace`
 - Optional:
   - `INTERNAL_GATEWAY_HOST`
   - `INTERNAL_GATEWAY_PORT`
@@ -69,6 +70,13 @@ Set these values in Railway Variables (service-level), not in git.
   - `SFTPGO_DATA_ROOT=/data/sftpgo`
   - `SFTPGO_SFTPD__BINDINGS__0__PORT=2022`
   - `SFTPGO_HTTPD__BINDINGS__0__PORT=2080`
+  - `SFTPGO_PORTABLE_DIRECTORY=/data/workspace`
+  - `SFTPGO_PORTABLE_USERNAME` / `SFTPGO_PORTABLE_PASSWORD` — optional overrides; if blank, portable mode reuses the admin credentials
+- Memory search (auto-configured):
+  - `OPENAI_API_KEY` — preferred remote embedding provider when present
+  - `OPENCLAW_MEMORY_SEARCH_PROVIDER` — optional explicit override (`openai`, `gemini`, `voyage`, `local`)
+  - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
+  - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
 
 ## Deterministic next steps before deployment
 
@@ -134,8 +142,8 @@ SFTPGo runs inside the core container for book content upload via SFTP.
 2. In Railway dashboard: core service → Settings → Networking → TCP Proxy → port `2022`
 3. Railway gives you `roundhouse.proxy.rlwy.net:XXXXX` — that's your SFTP endpoint
 4. Connect: `sftp -P XXXXX your-admin-user@roundhouse.proxy.rlwy.net`
-5. Upload book content to the home directory (maps to `/data/sftpgo/srv/`)
-6. Create an SFTPGo user via web admin (port 2080 internally) with home dir `/data/book-source`
+5. Upload workspace content to `/data/workspace`
+6. Create an SFTPGo user via web admin (port 2080 internally) with home dir `/data/workspace`
 
 **Disable SFTPGo:** Set `SFTPGO_ENABLED=false` in Railway Variables.
 

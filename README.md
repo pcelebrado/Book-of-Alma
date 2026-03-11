@@ -163,6 +163,15 @@ Railway will create a project with the repo attached. Configure
 | **Data volumes** | Mounted at `/data` on both core and web services |
 | **Book content defaults** | Preconfigured for external upload workflow |
 
+### Persistence Model
+
+Core now enforces one durable workspace layout on every boot:
+
+- `/data/.openclaw` stores persistent OpenClaw state
+- `/data/workspace` is the configured OpenClaw workspace path
+- `/root/.openclaw/workspace` is recreated as a compatibility symlink to `/data/workspace`
+- SFTPGo transfers land directly in `/data/workspace`
+
 ### 3. After Deploy
 
 1. Wait for both services to build and deploy (core first, then web)
@@ -170,6 +179,7 @@ Railway will create a project with the repo attached. Configure
 3. Open `/onboarding` to create the first admin account, then sign in
 4. Open the Core service `/setup` endpoint to configure your AI provider (OpenAI, Anthropic, Google, etc.)
 5. Upload your book content via SFTP (enable TCP Proxy on port 2022 in Railway dashboard)
+6. Run `bash /app/scripts/post-deploy-verify.sh` in the core container
 
 ### URL Surfaces (Important)
 
@@ -187,19 +197,21 @@ If your core domain opens OpenClaw pages at `/setup` and `/admin`, that is expec
 
 1. Enable the SFTPGo service
 2. Connect via SFTP client (FileZilla, Cyberduck, etc.)
-3. Upload your Markdown files to `/data/book-source/`
+3. Upload your Markdown files and restored workspace assets to `/data/workspace/`
 4. Run reindex from Admin panel
 
 SFTP connection profile (core service):
 
 - Host: your core public domain (for example `openclaw-core-production.up.railway.app`)
 - Port: `2022` (requires Railway TCP Proxy enabled for core service)
-- Username: value of `SFTPGO_PORTABLE_USERNAME` (default: `book-uploader`)
-- Password: value of `SFTPGO_PORTABLE_PASSWORD`
-- Remote directory: `/`
+- Username: `SFTPGO_PORTABLE_USERNAME` if set, otherwise `SFTPGO_DEFAULT_ADMIN_USERNAME` (default: `admin`)
+- Password: `SFTPGO_PORTABLE_PASSWORD` if set, otherwise `SFTPGO_DEFAULT_ADMIN_PASSWORD`
+- Remote directory: `/data/workspace`
 
 If full SFTPGo mode cannot start in the runtime image, core automatically falls
-back to `sftpgo portable` so SFTP uploads remain available for testing.
+back to `sftpgo portable` so SFTP uploads remain available for testing. Portable
+mode is pinned to the configured `OPENCLAW_WORKSPACE_DIR`, which defaults to
+`/data/workspace`, so SFTP transfers land in the same directory OpenClaw uses.
 
 ### Option 2: Git-based Import
 
@@ -417,15 +429,49 @@ Probe → Snapshot → Mutate → Verify → Record → Learn
 Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept docs):
 
 - `OPENCLAW_MEMORY_BACKEND=qmd`
-- `OPENCLAW_MEMORY_QMD_COMMAND=qmd`
-- `OPENCLAW_MEMORY_QMD_SEARCH_MODE=search`
+- `OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
 - `OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m`
 - `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
 - `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
+- `OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=15000`
+- `OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000`
+- `OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000`
+- `OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true`
+- `OPENCLAW_MEMORY_SEARCH_PROVIDER=local`
+- `OPENCLAW_MEMORY_SEARCH_FALLBACK=none`
+- `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
+- `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
+- `OPENCLAW_MEMORY_SEARCH_STORE_PATH=/data/.openclaw/memory/{agentId}.sqlite`
 
-If QMD is unavailable at runtime, OpenClaw falls back to its builtin SQLite memory manager.
+The template also seeds `MEMORY.md`, `memory/YYYY-MM-DD.md`, and
+`memory/railway-alma-verification.md`, then warms QMD on boot using the same
+XDG directories that OpenClaw uses at runtime.
 
-See `docs/PREDEPLOY_NEXT_STEPS.md` for the full deployment checklist.
+The wrapper also sets `memory.qmd.scope.default=allow` so operator-side CLI
+checks like `openclaw memory search "Alma"` work from Railway shells without a
+chat session key.
+It also raises the QMD query/update/embed timeouts for Railway cold starts so
+first-run model downloads do not fail memory verification prematurely.
+The wrapper and helper scripts clear `BUN_INSTALL` before calling QMD and pin
+the command to the direct `@tobilu/qmd` entrypoint so Railway shells do not
+depend on the ambient `qmd` launcher state.
+
+Fresh deployments can have a slow first memory query while QMD or the local
+embedding model downloads assets. Railway now uses one deterministic memory
+search strategy by default:
+
+- provider `local`
+- fallback `none`
+- model `hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
+- cache dir `/data/.openclaw/models/node-llama-cpp`
+- store path `/data/.openclaw/memory/{agentId}.sqlite`
+
+`OPENAI_API_KEY`, `GEMINI_API_KEY`, and `VOYAGE_API_KEY` are optional and are
+only needed if you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` to a
+remote embedding provider.
+
+See `docs/PREDEPLOY_NEXT_STEPS.md`, [MIGRATION.md](./MIGRATION.md), and
+[VERIFY.md](./VERIFY.md) for the full deployment, migration, and verification flow.
 
 ---
 
@@ -434,6 +480,7 @@ See `docs/PREDEPLOY_NEXT_STEPS.md` for the full deployment checklist.
 | Document | Purpose |
 |----------|---------|
 | `docs/PREDEPLOY_NEXT_STEPS.md` | Deployment checklist and secrets wiring map |
+| `docs/EXECUTION_STATUS_2026-03-11.md` | Direct Railway deploy chain, deployment IDs, and current runtime status |
 | `docs/SSH_SFTPGO_GO_LIVE.md` | SFTP configuration and go-live checks |
 | `services/*/README.md` | Service-specific documentation |
 | `services/*/.env.example` | Environment variable templates |

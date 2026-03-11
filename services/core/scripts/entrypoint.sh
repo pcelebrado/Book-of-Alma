@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eu
+set -euo pipefail
 
 # =============================================================================
 # OpenClaw Core Entrypoint (MVP — Consolidated)
@@ -9,6 +9,23 @@ set -eu
 # =============================================================================
 
 echo "[entrypoint] Runtime UID:GID $(id -u):$(id -g)"
+
+export OPENCLAW_DATA_ROOT="${OPENCLAW_DATA_ROOT:-/data}"
+export OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-${OPENCLAW_DATA_ROOT}/.openclaw}"
+export OPENCLAW_WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR:-${OPENCLAW_DATA_ROOT}/workspace}"
+export OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${OPENCLAW_WORKSPACE_VOLUME_DIR}}"
+export OPENCLAW_MEMORY_QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-qmd}"
+
+SFTPGO_LOG_DIR="${SFTPGO_LOG_DIR:-${OPENCLAW_DATA_ROOT}/log}"
+mkdir -p "${SFTPGO_LOG_DIR}"
+
+echo "[entrypoint] Preparing persistent runtime layout"
+bash /app/scripts/runtime-bootstrap.sh prepare
+
+if [ "${OPENCLAW_QMD_WARM_ON_BOOT:-true}" = "true" ]; then
+  echo "[entrypoint] Starting best-effort QMD warmup in background"
+  bash /app/scripts/runtime-bootstrap.sh warm-qmd > "${SFTPGO_LOG_DIR}/qmd-warmup.log" 2>&1 &
+fi
 
 # ---------------------------------------------------------------------------
 # SFTPGo
@@ -20,7 +37,6 @@ SFTPGO_ENABLED="${SFTPGO_ENABLED:-true}"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-/data/sftpgo}"
 SFTPGO_SFTP_PORT="${SFTPGO_SFTPD__BINDINGS__0__PORT:-2022}"
 SFTPGO_HTTP_PORT="${SFTPGO_HTTPD__BINDINGS__0__PORT:-2080}"
-SFTPGO_LOG_DIR="${SFTPGO_LOG_DIR:-/data/log}"
 
 if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
@@ -52,14 +68,15 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   export SFTPGO_HTTPD__BINDINGS__0__PORT="${SFTPGO_HTTP_PORT}"
   export SFTPGO_HTTPD__BINDINGS__0__ADDRESS=""
   export SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN="${SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN:-true}"
+  export SFTPGO_PORTABLE_DIRECTORY="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_WORKSPACE_DIR}}"
 
   # Start SFTPGo in the background, logging to the shared log directory.
   # If full serve fails (for example missing embedded templates in slim image),
   # fall back to portable mode so SFTP upload remains operational.
   start_portable_sftpgo() {
-    PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-book-uploader}"
+    PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-${SFTPGO_DEFAULT_ADMIN_USERNAME:-book-uploader}}"
     PORTABLE_PASS="${SFTPGO_PORTABLE_PASSWORD:-${SFTPGO_DEFAULT_ADMIN_PASSWORD:-change-me-now}}"
-    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-/data}"
+    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_WORKSPACE_DIR}}"
     mkdir -p "$PORTABLE_DIR"
 
     sftpgo portable \
