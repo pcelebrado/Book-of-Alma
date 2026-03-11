@@ -68,3 +68,15 @@ test("runtime image and entrypoint pin the direct qmd command path", () => {
     /OPENCLAW_MEMORY_QMD_COMMAND:\-\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
   );
 });
+
+test("workspace qmd file entries index from workspace root with a file pattern", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(
+    src,
+    /name: `workspace-file-\$\{slug\}`,[\s\S]*path: WORKSPACE_DIR,[\s\S]*pattern: entry\.name,/,
+  );
+  assert.doesNotMatch(
+    src,
+    /name: `workspace-file-\$\{slug\}`,[\s\S]*path: entryPath,[\s\S]*\}/,
+  );
+});

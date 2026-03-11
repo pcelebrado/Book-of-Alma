@@ -242,7 +242,8 @@ function resolveWorkspaceQmdPaths() {
     if (entry.isFile() && !["memory.md", "MEMORY.md"].includes(entry.name)) {
       paths.push({
         name: `workspace-file-${slug}`,
-        path: entryPath,
+        path: WORKSPACE_DIR,
+        pattern: entry.name,
       });
     }
   }
