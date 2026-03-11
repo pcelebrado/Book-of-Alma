@@ -90,7 +90,6 @@ const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/ent
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
 const OPENCLAW_MEMORY_BACKEND = process.env.OPENCLAW_MEMORY_BACKEND?.trim() || "qmd";
 const OPENCLAW_MEMORY_QMD_COMMAND = process.env.OPENCLAW_MEMORY_QMD_COMMAND?.trim() || "qmd";
-const OPENCLAW_MEMORY_QMD_SEARCH_MODE = process.env.OPENCLAW_MEMORY_QMD_SEARCH_MODE?.trim() || "search";
 const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() || "";
@@ -789,6 +788,33 @@ function setConfigValue(target, dottedPath, value) {
   cursor[parts[parts.length - 1]] = cloneJsonValue(value);
 }
 
+function deleteConfigValue(target, dottedPath) {
+  const parts = String(dottedPath || "")
+    .split(".")
+    .filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error(`Invalid config path: ${dottedPath}`);
+  }
+
+  let cursor = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const current = cursor?.[key];
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      return false;
+    }
+    cursor = current;
+  }
+
+  const leaf = parts[parts.length - 1];
+  if (!Object.prototype.hasOwnProperty.call(cursor, leaf)) {
+    return false;
+  }
+
+  delete cursor[leaf];
+  return true;
+}
+
 function applyConfigPatch(entries) {
   try {
     const snapshot = readConfigJsonFromDisk();
@@ -830,6 +856,52 @@ function applyConfigPatch(entries) {
   }
 }
 
+function removeConfigKeys(dottedPaths) {
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const nextConfig = cloneJsonValue(snapshot.config) || {};
+    const removed = [];
+
+    for (const dottedPath of dottedPaths) {
+      if (deleteConfigValue(nextConfig, dottedPath)) {
+        removed.push(dottedPath);
+      }
+    }
+
+    if (removed.length === 0) {
+      return {
+        ok: true,
+        changed: false,
+        removed,
+        path: snapshot.path,
+        output: `[config] unchanged ${snapshot.path}`,
+      };
+    }
+
+    const nextRaw = `${JSON.stringify(nextConfig, null, 2)}\n`;
+    fs.mkdirSync(path.dirname(snapshot.path), { recursive: true });
+    const tempPath = `${snapshot.path}.tmp`;
+    fs.writeFileSync(tempPath, nextRaw, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tempPath, snapshot.path);
+
+    return {
+      ok: true,
+      changed: true,
+      removed,
+      path: snapshot.path,
+      output: `[config] removed ${removed.join(", ")} from ${snapshot.path}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      removed: [],
+      path: configPath(),
+      output: `[config] cleanup failed: ${String(err)}`,
+    };
+  }
+}
+
 // One-time migration: rename legacy config files to openclaw.json so existing
 // deployments that still have the old filename on their volume keep working.
 (function migrateLegacyConfigFile() {
@@ -850,6 +922,19 @@ function applyConfigPatch(entries) {
     } catch (err) {
       console.warn(`[migration] Failed to rename ${legacy}: ${err}`);
     }
+  }
+})();
+
+(function scrubLegacyConfigKeys() {
+  if (!isConfigured()) return;
+
+  const cleanup = removeConfigKeys(["memory.qmd.searchMode"]);
+  if (!cleanup.ok) {
+    console.warn(`[migration] Failed to scrub legacy config keys: ${cleanup.output}`);
+    return;
+  }
+  if (cleanup.changed) {
+    console.log(`[migration] Scrubbed legacy config keys: ${cleanup.removed.join(", ")}`);
   }
 })();
 
@@ -2729,10 +2814,6 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
       OPENCLAW_NODE,
       clawArgs(["config", "get", "memory.qmd.command"]),
     );
-    const memoryQmdSearchMode = await runCmd(
-      OPENCLAW_NODE,
-      clawArgs(["config", "get", "memory.qmd.searchMode"]),
-    );
 
     res.json({
       ok: true,
@@ -2766,7 +2847,6 @@ app.get("/internal/openclaw/setup/debug", requireInternalApiAuth, async (_req, r
           indexPresent: fs.existsSync(QMD_INDEX_SQLITE_PATH),
           configuredBackend: redactSecrets(memoryBackend.output),
           configuredCommand: redactSecrets(memoryQmdCommand.output),
-          configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
         },
         memoryCorpus: collectWorkspaceMemoryStats(),
         channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
@@ -3691,7 +3771,6 @@ async function applyMemoryBackendDefaults() {
   const patch = applyConfigPatch([
     ["memory.backend", "qmd"],
     ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
-    ["memory.qmd.searchMode", OPENCLAW_MEMORY_QMD_SEARCH_MODE],
     ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
     ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
     ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
@@ -3912,7 +3991,6 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
   const dc = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
   const memoryBackend = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.backend"]));
   const memoryQmdCommand = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.command"]));
-  const memoryQmdSearchMode = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "memory.qmd.searchMode"]));
 
   const tgOut = redactSecrets(tg.output || "");
   const dcOut = redactSecrets(dc.output || "");
@@ -3952,7 +4030,6 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
         version: redactSecrets(qmd.output),
         configuredBackend: redactSecrets(memoryBackend.output),
         configuredCommand: redactSecrets(memoryQmdCommand.output),
-        configuredSearchMode: redactSecrets(memoryQmdSearchMode.output),
       },
       channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
       channels: {
