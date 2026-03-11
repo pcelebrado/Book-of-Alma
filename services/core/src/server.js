@@ -1,8 +1,10 @@
 import childProcess from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import express from "express";
 import httpProxy from "http-proxy";
@@ -125,6 +127,15 @@ const WEB_RATE_LIMITS_STORE_PATH = path.join(STATE_DIR, "web-rate-limits.json");
 const WEB_AUDIT_LOG_STORE_PATH = path.join(STATE_DIR, "web-audit-log.json");
 const WEB_BOOK_SECTIONS_STORE_PATH = path.join(STATE_DIR, "web-book-sections.json");
 const WEB_BOOK_TOC_STORE_PATH = path.join(STATE_DIR, "web-book-toc.json");
+const OPENCLAW_PACKAGE_ROOT = process.env.OPENCLAW_PACKAGE_ROOT?.trim() || "/openclaw";
+const OPENCLAW_PACKAGE_JSON = path.join(OPENCLAW_PACKAGE_ROOT, "package.json");
+const ADMIN_OAUTH_FLOW_TIMEOUT_MS = 10 * 60 * 1000;
+const OPENAI_CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
+const OPENAI_CODEX_AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize";
+const OPENAI_CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
+const OPENAI_CODEX_SCOPE = "openid profile email offline_access";
+const OPENAI_CODEX_REDIRECT_URI = "http://localhost:1455/auth/callback";
+const OPENAI_CODEX_JWT_CLAIM_PATH = "https://api.openai.com/auth";
 
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
@@ -2241,97 +2252,7 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
     const ok = onboard.code === 0 && isConfigured();
 
     if (ok) {
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
-
-      const memoryDefaults = await applyMemoryBackendDefaults();
-      extra += `\n[memory backend] ${memoryDefaults.reason}`;
-      if (memoryDefaults.output) {
-        extra += `\n${memoryDefaults.output}`;
-      }
-
-      if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
-        const providerId = payload.customProviderId.trim();
-        const baseUrl = payload.customProviderBaseUrl.trim();
-        const api = (payload.customProviderApi || "openai-completions").trim();
-        const apiKeyEnv = (payload.customProviderApiKeyEnv || "").trim();
-        const modelId = (payload.customProviderModelId || "").trim();
-
-        if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
-          extra += `\n[custom provider] skipped: invalid provider id`;
-        } else if (!/^https?:\/\//.test(baseUrl)) {
-          extra += `\n[custom provider] skipped: baseUrl must start with http(s)://`;
-        } else if (api !== "openai-completions" && api !== "openai-responses") {
-          extra += `\n[custom provider] skipped: api must be openai-completions or openai-responses`;
-        } else if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
-          extra += `\n[custom provider] skipped: invalid api key env var name`;
-        } else {
-          const providerCfg = {
-            baseUrl,
-            api,
-            apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
-            models: modelId ? [{ id: modelId, name: modelId }] : undefined,
-          };
-          await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "models.mode", "merge"]));
-          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", `models.providers.${providerId}`, JSON.stringify(providerCfg)]));
-          extra += `\n[custom provider] exit=${set.code}\n${set.output || "(no output)"}`;
-        }
-      }
-
-      const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
-      const helpText = channelsHelp.output || "";
-      const supports = (name) => helpText.includes(name);
-
-      if (payload.telegramToken?.trim()) {
-        if (!supports("telegram")) {
-          extra += "\n[telegram] skipped (unsupported build)\n";
-        } else {
-          const token = payload.telegramToken.trim();
-          const cfgObj = { enabled: true, dmPolicy: "pairing", botToken: token, groupPolicy: "allowlist", streamMode: "partial" };
-          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
-          const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
-          const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
-          extra += `\n[telegram config] exit=${set.code}\n[telegram verify] exit=${get.code}\n[telegram plugin] exit=${plug.code}`;
-        }
-      }
-
-      if (payload.discordToken?.trim()) {
-        if (!supports("discord")) {
-          extra += "\n[discord] skipped (unsupported build)\n";
-        } else {
-          const token = payload.discordToken.trim();
-          const cfgObj = { enabled: true, token, groupPolicy: "allowlist", dm: { policy: "pairing" } };
-          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
-          const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
-          extra += `\n[discord config] exit=${set.code}\n[discord verify] exit=${get.code}`;
-        }
-      }
-
-      if (payload.slackBotToken?.trim() || payload.slackAppToken?.trim()) {
-        if (!supports("slack")) {
-          extra += "\n[slack] skipped (unsupported build)\n";
-        } else {
-          const cfgObj = {
-            enabled: true,
-            botToken: payload.slackBotToken?.trim() || undefined,
-            appToken: payload.slackAppToken?.trim() || undefined,
-          };
-          const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.slack", JSON.stringify(cfgObj)]));
-          const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
-          extra += `\n[slack config] exit=${set.code}\n[slack verify] exit=${get.code}`;
-        }
-      }
-
-      await restartGateway();
-      const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
-      extra += `\n[doctor --fix] exit=${fix.code}`;
-      await restartGateway();
+      extra = await applyConfiguredSetupPayload(payload);
     }
 
     return respondJson(ok ? 200 : 500, {
@@ -2341,6 +2262,177 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
   } catch (err) {
     console.error("[/internal/openclaw/setup/run] error:", err);
     if (!res.headersSent) res.status(500).json({ ok: false, output: `Internal error: ${String(err)}` });
+  }
+});
+
+app.post("/internal/openclaw/setup/oauth/start", requireInternalApiAuth, async (req, res) => {
+  cleanupExpiredAdminOauthFlows();
+
+  try {
+    const payload = req.body || {};
+    const authChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
+    if (authChoice !== "openai-codex") {
+      return res.status(400).json({
+        ok: false,
+        error: { code: "invalid_auth_choice", message: "OAuth start only supports authChoice=openai-codex" },
+      });
+    }
+
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+    const flowId = crypto.randomUUID();
+    const completionToken = crypto.randomBytes(32).toString("hex");
+    const redirectUri = String(payload.hostedRedirectUri || payload.redirectUri || OPENAI_CODEX_REDIRECT_URI).trim();
+    if (!/^https?:\/\//i.test(redirectUri)) {
+      return res.status(400).json({
+        ok: false,
+        error: { code: "invalid_redirect_uri", message: "redirectUri must be an http(s) URL" },
+      });
+    }
+
+    const codeVerifier = createOpenAICodexPkceVerifier();
+    const oauthState = crypto.randomBytes(16).toString("hex");
+    const authUrl = buildOpenAICodexAuthorizationUrl({
+      codeVerifier,
+      redirectUri,
+      state: oauthState,
+    });
+    const hostedFlow = redirectUri !== OPENAI_CODEX_REDIRECT_URI;
+    const flow = {
+      id: flowId,
+      completionToken,
+      createdAt: Date.now(),
+      payload,
+      authUrl,
+      instructions: hostedFlow
+        ? "Complete sign-in in the popup. OpenClaw will finish onboarding when the browser returns to Railway."
+        : "Open this URL in your local browser, sign in, then paste the full redirect URL back into Admin.",
+      completed: false,
+      codeVerifier,
+      oauthState,
+      redirectUri,
+    };
+
+    pendingAdminOauthFlows.set(flowId, flow);
+
+    return res.json({
+      ok: true,
+      flowId,
+      completionToken,
+      authUrl: flow.authUrl,
+      instructions: flow.instructions,
+      expiresAt: new Date(flow.createdAt + ADMIN_OAUTH_FLOW_TIMEOUT_MS).toISOString(),
+      output:
+        hostedFlow
+          ? "[oauth] Open the authorization URL, complete sign-in, and OpenClaw will finish when the browser returns to Railway.\n"
+          : "[oauth] Open the authorization URL in your local browser, complete sign-in, then paste the full redirect URL into Admin.\n",
+    });
+  } catch (err) {
+    console.error("[/internal/openclaw/setup/oauth/start] error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: { code: "oauth_start_failed", message: String(err) },
+    });
+  }
+});
+
+app.post("/internal/openclaw/setup/oauth/complete", requireInternalApiAuth, async (req, res) => {
+  cleanupExpiredAdminOauthFlows();
+
+  try {
+    const flowId = String(req.body?.flowId || "").trim();
+    const authorizationInput = String(
+      req.body?.authorizationInput || req.body?.redirectUrl || req.body?.callbackUrl || req.body?.code || "",
+    ).trim();
+    const completionToken = String(req.body?.completionToken || "").trim();
+    const payload = req.body?.payload || null;
+
+    if (!flowId) {
+      return res.status(400).json({
+        ok: false,
+        error: { code: "missing_flow_id", message: "flowId is required" },
+      });
+    }
+
+    if (!authorizationInput) {
+      return res.status(400).json({
+        ok: false,
+        error: { code: "missing_authorization_input", message: "authorizationInput is required" },
+      });
+    }
+
+    const parsedAuthorization = parseOpenAICodexAuthorizationInput(authorizationInput);
+    const flow = resolvePendingAdminOauthFlow({
+      flowId,
+      oauthState: parsedAuthorization.state,
+    });
+    if (!flow) {
+      return res.status(404).json({
+        ok: false,
+        error: { code: "oauth_flow_not_found", message: "OAuth flow not found or expired" },
+      });
+    }
+
+    if (flow.completed) {
+      return res.status(409).json({
+        ok: false,
+        error: { code: "oauth_flow_completed", message: "OAuth flow was already completed" },
+      });
+    }
+
+    if (flowId && flow.completionToken && flow.completionToken !== completionToken) {
+      return res.status(403).json({
+        ok: false,
+        error: { code: "invalid_completion_token", message: "completionToken is invalid" },
+      });
+    }
+
+    if (parsedAuthorization.state && flow.oauthState !== parsedAuthorization.state) {
+      return res.status(400).json({
+        ok: false,
+        error: { code: "oauth_state_mismatch", message: "OAuth state mismatch" },
+      });
+    }
+
+    if (!parsedAuthorization.code) {
+      return res.status(400).json({
+        ok: false,
+        error: { code: "missing_authorization_code", message: "Authorization code is missing" },
+      });
+    }
+
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+    const creds = flow.cachedCreds || await exchangeOpenAICodexAuthorizationCode({
+      code: parsedAuthorization.code,
+      codeVerifier: flow.codeVerifier,
+      redirectUri: flow.redirectUri,
+    });
+    flow.cachedCreds = creds;
+    const persisted = await persistOpenAICodexOAuth(creds);
+    const extra = await applyConfiguredSetupPayload(payload || flow.payload || {});
+    flow.completed = true;
+    pendingAdminOauthFlows.delete(flow.id);
+
+    return res.json({
+      ok: true,
+      profileId: persisted.profileId,
+      output: [
+        "[oauth] OpenAI Codex OAuth completed.",
+        persisted.output?.trim(),
+        extra?.trim(),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    });
+  } catch (err) {
+    console.error("[/internal/openclaw/setup/oauth/complete] error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: { code: "oauth_complete_failed", message: String(err) },
+    });
   }
 });
 
@@ -2674,7 +2766,6 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
 
 const AUTH_GROUPS = [
   { value: "openai", label: "OpenAI", hint: "Codex OAuth + API key", options: [
-    { value: "codex-cli", label: "OpenAI Codex OAuth (Codex CLI)" },
     { value: "openai-codex", label: "OpenAI Codex (ChatGPT OAuth)" },
     { value: "openai-api-key", label: "OpenAI API key" }
   ]},
@@ -2763,6 +2854,10 @@ async function resolveAuthChoiceCompatibility(authChoice) {
   const help = (await getOnboardHelpText()).toLowerCase();
   const normalized = String(authChoice).trim();
 
+  if (normalized === "codex-cli") {
+    return "openai-codex";
+  }
+
   // Backward-compat: older OpenClaw builds may not expose Kimi Code as a
   // separate auth-choice. Fall back to Moonshot API key path in that case.
   if (normalized === "kimi-code-api-key" && !help.includes("kimi-code-api-key")) {
@@ -2843,16 +2938,18 @@ async function buildOnboardArgs(payload) {
 function runCmd(cmd, args, opts = {}) {
   return new Promise((resolve) => {
     const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : 120_000;
+    const { env: extraEnv, ...spawnOpts } = opts;
 
     const proc = childProcess.spawn(cmd, args, {
-      ...opts,
+      ...spawnOpts,
       env: {
         ...process.env,
+        ...extraEnv,
         // Railway containers can be tight on memory during onboarding.
         // Give Node-based OpenClaw subprocesses more headroom by default.
-        NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=1024",
-        OPENCLAW_STATE_DIR: STATE_DIR,
-        OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
+        NODE_OPTIONS: extraEnv?.NODE_OPTIONS || process.env.NODE_OPTIONS || "--max-old-space-size=1024",
+        OPENCLAW_STATE_DIR: extraEnv?.OPENCLAW_STATE_DIR || STATE_DIR,
+        OPENCLAW_WORKSPACE_DIR: extraEnv?.OPENCLAW_WORKSPACE_DIR || WORKSPACE_DIR,
       },
     });
 
@@ -2883,6 +2980,400 @@ function runCmd(cmd, args, opts = {}) {
       resolve({ code: code ?? 0, output: out });
     });
   });
+}
+
+let openClawPiAiPromise = null;
+const pendingAdminOauthFlows = new Map();
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function loadOpenClawPiAi() {
+  if (!openClawPiAiPromise) {
+    const requireFromOpenClaw = createRequire(OPENCLAW_PACKAGE_JSON);
+    const resolved = requireFromOpenClaw.resolve("@mariozechner/pi-ai");
+    openClawPiAiPromise = import(pathToFileURL(resolved).href);
+  }
+  return openClawPiAiPromise;
+}
+
+function toBase64Url(buffer) {
+  return Buffer.from(buffer)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function createOpenAICodexPkceVerifier() {
+  return toBase64Url(crypto.randomBytes(32));
+}
+
+function createOpenAICodexPkceChallenge(codeVerifier) {
+  return toBase64Url(crypto.createHash("sha256").update(codeVerifier).digest());
+}
+
+function buildOpenAICodexAuthorizationUrl({ codeVerifier, redirectUri, state }) {
+  const url = new URL(OPENAI_CODEX_AUTHORIZE_URL);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", OPENAI_CODEX_CLIENT_ID);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", OPENAI_CODEX_SCOPE);
+  url.searchParams.set("code_challenge", createOpenAICodexPkceChallenge(codeVerifier));
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("state", state);
+  url.searchParams.set("id_token_add_organizations", "true");
+  url.searchParams.set("codex_cli_simplified_flow", "true");
+  url.searchParams.set("originator", "pi");
+  return url.toString();
+}
+
+function parseOpenAICodexAuthorizationInput(input) {
+  const value = String(input || "").trim();
+  if (!value) return {};
+
+  try {
+    const url = new URL(value);
+    return {
+      code: url.searchParams.get("code") || undefined,
+      state: url.searchParams.get("state") || undefined,
+    };
+  } catch {
+    // ignore
+  }
+
+  if (value.includes("code=")) {
+    const params = new URLSearchParams(value);
+    return {
+      code: params.get("code") || undefined,
+      state: params.get("state") || undefined,
+    };
+  }
+
+  if (value.includes("#")) {
+    const [code, state] = value.split("#", 2);
+    return { code: code || undefined, state: state || undefined };
+  }
+
+  return { code: value };
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = String(token || "").split(".");
+    if (parts.length !== 3) return null;
+    return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function extractOpenAICodexAccountId(accessToken) {
+  const payload = decodeJwtPayload(accessToken);
+  const auth = payload?.[OPENAI_CODEX_JWT_CLAIM_PATH];
+  const accountId = auth?.chatgpt_account_id;
+  return typeof accountId === "string" && accountId ? accountId : null;
+}
+
+async function exchangeOpenAICodexAuthorizationCode({ code, codeVerifier, redirectUri }) {
+  const response = await fetch(OPENAI_CODEX_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: OPENAI_CODEX_CLIENT_ID,
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`OpenAI Codex token exchange failed (${response.status}): ${text || "no response body"}`);
+  }
+
+  const json = await response.json();
+  if (!json?.access_token || !json?.refresh_token || typeof json?.expires_in !== "number") {
+    throw new Error("OpenAI Codex token response was missing required fields");
+  }
+
+  const accountId = extractOpenAICodexAccountId(json.access_token);
+  if (!accountId) {
+    throw new Error("Failed to extract accountId from OpenAI Codex access token");
+  }
+
+  return {
+    access: json.access_token,
+    refresh: json.refresh_token,
+    expires: Date.now() + json.expires_in * 1000,
+    accountId,
+  };
+}
+
+function resolvePendingAdminOauthFlow({ flowId, oauthState }) {
+  if (flowId) {
+    return pendingAdminOauthFlows.get(flowId) || null;
+  }
+
+  if (!oauthState) {
+    return null;
+  }
+
+  for (const flow of pendingAdminOauthFlows.values()) {
+    if (flow.oauthState === oauthState) {
+      return flow;
+    }
+  }
+
+  return null;
+}
+
+function resolveMainAgentDir() {
+  return path.join(STATE_DIR, "agents", "main", "agent");
+}
+
+async function runOpenClawSourceEval(source, extraEnv = {}, timeoutMs = 60_000) {
+  return runCmd(
+    OPENCLAW_NODE,
+    ["--import", "tsx", "--input-type=module", "--eval", source],
+    {
+      cwd: OPENCLAW_PACKAGE_ROOT,
+      env: {
+        ...process.env,
+        OPENCLAW_STATE_DIR: STATE_DIR,
+        OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
+        ...extraEnv,
+      },
+      timeoutMs,
+    },
+  );
+}
+
+async function persistOpenAICodexOAuth(creds) {
+  const agentDir = resolveMainAgentDir();
+  const normalizedEmail = typeof creds?.email === "string" ? creds.email.trim() : "";
+  const fallbackProfileId = `openai-codex:${normalizedEmail || "default"}`;
+  const script = `
+    import fs from "node:fs";
+    import path from "node:path";
+    import process from "node:process";
+    import { writeOAuthCredentials } from "./src/commands/onboard-auth.credentials.js";
+    import { readConfigFileSnapshot, writeConfigFile } from "./src/config/config.js";
+    import { applyAuthProfileConfig } from "./src/commands/onboard-auth.config-core.js";
+    import { applyOpenAICodexModelDefault } from "./src/commands/openai-codex-model-default.js";
+
+    const agentDir = process.env.OPENCLAW_AGENT_DIR;
+    const creds = JSON.parse(process.env.OPENCLAW_OAUTH_CREDS_JSON || "{}");
+    const storedProfileId = await writeOAuthCredentials("openai-codex", creds, agentDir, {
+      syncSiblingAgents: true,
+    });
+    const normalizedEmail =
+      typeof creds.email === "string" && creds.email.trim() ? creds.email.trim() : "default";
+    const profileId =
+      typeof storedProfileId === "string" && storedProfileId.trim()
+        ? storedProfileId.trim()
+        : "openai-codex:" + normalizedEmail;
+
+    const snapshot = await readConfigFileSnapshot();
+    const baseConfig = snapshot.valid ? snapshot.config : {};
+    const existingProfiles =
+      baseConfig.auth && baseConfig.auth.profiles && typeof baseConfig.auth.profiles === "object"
+        ? baseConfig.auth.profiles
+        : {};
+    const repairedProfiles =
+      existingProfiles.undefined && existingProfiles.undefined.provider === "openai-codex"
+        ? Object.fromEntries(Object.entries(existingProfiles).filter(([key]) => key !== "undefined"))
+        : existingProfiles;
+    const repairedConfig =
+      repairedProfiles === existingProfiles
+        ? baseConfig
+        : {
+            ...baseConfig,
+            auth: {
+              ...baseConfig.auth,
+              profiles: repairedProfiles,
+            },
+          };
+    let next = applyAuthProfileConfig(repairedConfig, {
+      profileId,
+      provider: "openai-codex",
+      mode: "oauth",
+    });
+    next = applyOpenAICodexModelDefault(next).next;
+    await writeConfigFile(next);
+    const authJsonPath = path.join(agentDir, "auth.json");
+    let authJson = {};
+    try {
+      authJson = JSON.parse(fs.readFileSync(authJsonPath, "utf8"));
+    } catch {}
+    authJson["openai-codex"] = {
+      type: "oauth",
+      access: creds.access,
+      refresh: creds.refresh,
+      expires: creds.expires,
+    };
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(authJsonPath, JSON.stringify(authJson, null, 2) + "\\n", {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+
+    process.stdout.write(JSON.stringify({ ok: true, profileId }) + "\\n");
+  `;
+
+  const result = await runOpenClawSourceEval(
+    script,
+    {
+      OPENCLAW_AGENT_DIR: agentDir,
+      OPENCLAW_OAUTH_CREDS_JSON: JSON.stringify(creds),
+    },
+    90_000,
+  );
+
+  if (result.code !== 0) {
+    throw new Error(`Failed to persist Codex OAuth:\n${result.output || "(no output)"}`);
+  }
+
+  const lines = String(result.output || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let persistedProfileId = null;
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed && parsed.ok === true && typeof parsed.profileId === "string" && parsed.profileId.trim()) {
+        persistedProfileId = parsed.profileId.trim();
+      }
+    } catch {
+      // ignore non-JSON helper output
+    }
+  }
+
+  return {
+    profileId: persistedProfileId || fallbackProfileId,
+    output: result.output || "",
+  };
+}
+
+async function applyConfiguredSetupPayload(payload) {
+  let extra = "";
+
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.mode", "local"]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
+  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
+
+  const memoryDefaults = await applyMemoryBackendDefaults();
+  extra += `\n[memory backend] ${memoryDefaults.reason}`;
+  if (memoryDefaults.output) {
+    extra += `\n${memoryDefaults.output}`;
+  }
+
+  if (payload.customProviderId?.trim() && payload.customProviderBaseUrl?.trim()) {
+    const providerId = payload.customProviderId.trim();
+    const baseUrl = payload.customProviderBaseUrl.trim();
+    const api = (payload.customProviderApi || "openai-completions").trim();
+    const apiKeyEnv = (payload.customProviderApiKeyEnv || "").trim();
+    const modelId = (payload.customProviderModelId || "").trim();
+
+    if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
+      extra += `\n[custom provider] skipped: invalid provider id`;
+    } else if (!/^https?:\/\//.test(baseUrl)) {
+      extra += `\n[custom provider] skipped: baseUrl must start with http(s)://`;
+    } else if (api !== "openai-completions" && api !== "openai-responses") {
+      extra += `\n[custom provider] skipped: api must be openai-completions or openai-responses`;
+    } else if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
+      extra += `\n[custom provider] skipped: invalid api key env var name`;
+    } else {
+      const providerCfg = {
+        baseUrl,
+        api,
+        apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
+        models: modelId ? [{ id: modelId, name: modelId }] : undefined,
+      };
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "models.mode", "merge"]));
+      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", `models.providers.${providerId}`, JSON.stringify(providerCfg)]));
+      extra += `\n[custom provider] exit=${set.code}\n${set.output || "(no output)"}`;
+    }
+  }
+
+  const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
+  const helpText = channelsHelp.output || "";
+  const supports = (name) => helpText.includes(name);
+
+  if (payload.telegramToken?.trim()) {
+    if (!supports("telegram")) {
+      extra += "\n[telegram] skipped (unsupported build)\n";
+    } else {
+      const token = payload.telegramToken.trim();
+      const cfgObj = { enabled: true, dmPolicy: "pairing", botToken: token, groupPolicy: "allowlist", streamMode: "partial" };
+      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
+      const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
+      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
+      extra += `\n[telegram config] exit=${set.code}\n[telegram verify] exit=${get.code}\n[telegram plugin] exit=${plug.code}`;
+    }
+  }
+
+  if (payload.discordToken?.trim()) {
+    if (!supports("discord")) {
+      extra += "\n[discord] skipped (unsupported build)\n";
+    } else {
+      const token = payload.discordToken.trim();
+      const cfgObj = { enabled: true, token, groupPolicy: "allowlist", dm: { policy: "pairing" } };
+      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
+      const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
+      extra += `\n[discord config] exit=${set.code}\n[discord verify] exit=${get.code}`;
+    }
+  }
+
+  if (payload.slackBotToken?.trim() || payload.slackAppToken?.trim()) {
+    if (!supports("slack")) {
+      extra += "\n[slack] skipped (unsupported build)\n";
+    } else {
+      const cfgObj = {
+        enabled: true,
+        botToken: payload.slackBotToken?.trim() || undefined,
+        appToken: payload.slackAppToken?.trim() || undefined,
+      };
+      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.slack", JSON.stringify(cfgObj)]));
+      const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
+      extra += `\n[slack config] exit=${set.code}\n[slack verify] exit=${get.code}`;
+    }
+  }
+
+  await restartGateway();
+  const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
+  extra += `\n[doctor --fix] exit=${fix.code}`;
+  await restartGateway();
+
+  return extra;
+}
+
+function cleanupExpiredAdminOauthFlows() {
+  const now = Date.now();
+  for (const [flowId, flow] of pendingAdminOauthFlows.entries()) {
+    if (now - flow.createdAt < ADMIN_OAUTH_FLOW_TIMEOUT_MS) {
+      continue;
+    }
+    try {
+      flow.deferred.reject(new Error("OAuth flow expired"));
+    } catch {}
+    pendingAdminOauthFlows.delete(flowId);
+  }
 }
 
 async function applyMemoryBackendDefaults() {

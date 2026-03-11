@@ -77,6 +77,30 @@ interface SetupStatusPayload {
   authGroups?: AuthGroup[];
 }
 
+interface OnboardingPayload {
+  flow: 'quickstart' | 'manual';
+  authChoice: string;
+  authSecret: string;
+  customProviderId: string;
+  customProviderBaseUrl: string;
+  customProviderApi: 'openai-completions' | 'openai-responses';
+  customProviderApiKeyEnv: string;
+  customProviderModelId: string;
+  telegramToken: string;
+  discordToken: string;
+  slackBotToken: string;
+  slackAppToken: string;
+}
+
+interface OAuthFlowState {
+  flowId: string;
+  completionToken: string;
+  authUrl: string;
+  instructions?: string;
+  expiresAt?: string | null;
+  relayUrlTemplate?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Fallback auth groups (mirrors core AUTH_GROUPS so onboarding works even
 // when the core service is still starting / sleeping)
@@ -84,7 +108,6 @@ interface SetupStatusPayload {
 
 const FALLBACK_AUTH_GROUPS: AuthGroup[] = [
   { value: 'openai', label: 'OpenAI', hint: 'Codex OAuth + API key', options: [
-    { value: 'codex-cli', label: 'OpenAI Codex OAuth (Codex CLI)' },
     { value: 'openai-codex', label: 'OpenAI Codex (ChatGPT OAuth)' },
     { value: 'openai-api-key', label: 'OpenAI API key' },
   ]},
@@ -131,7 +154,6 @@ const FALLBACK_AUTH_GROUPS: AuthGroup[] = [
 ];
 
 const INTERACTIVE_AUTH_CHOICES = new Set([
-  'codex-cli',
   'openai-codex',
   'claude-cli',
   'google-antigravity',
@@ -166,6 +188,21 @@ function pickDefaultAuthOption(options: AuthOption[], includeInteractive: boolea
   if (includeInteractive) return options[0]?.value ?? '';
   const nonInteractive = options.find((opt) => !isInteractiveAuthOption(opt));
   return nonInteractive?.value ?? options[0]?.value ?? '';
+}
+
+function normalizeAuthChoice(value: string): string {
+  return value === 'codex-cli' ? 'openai-codex' : value;
+}
+
+function looksLikeOpenAICodexAuthorizationInput(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1):1455\/auth\/callback/i.test(trimmed) && trimmed.includes('code=')) {
+    return true;
+  }
+  if (trimmed.startsWith('code=')) return true;
+  if (/^ac_[A-Za-z0-9._-]+(?:#.*)?$/i.test(trimmed)) return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +276,9 @@ export default function AdminPage() {
   const [slackAppToken, setSlackAppToken] = useState('');
   const [onboardLog, setOnboardLog] = useState('');
   const [onboarding, setOnboarding] = useState(false);
+  const [oauthFlowState, setOauthFlowState] = useState<OAuthFlowState | null>(null);
+  const [oauthRedirectUrl, setOauthRedirectUrl] = useState('');
+  const oauthPopupRef = useRef<Window | null>(null);
 
   // --- Config editor ---
   const [configContent, setConfigContent] = useState('');
@@ -375,47 +415,106 @@ export default function AdminPage() {
     }
   }, [authOptions, selectedAuth, showAdvancedAuth, visibleAuthOptions]);
 
-  const requiresAuthSecret = SECRET_REQUIRED_CHOICES.has(selectedAuth);
+  useEffect(() => {
+    if (selectedAuth === 'openai-codex') return;
+    if (selectedAuth === 'codex-cli') return;
+    if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+      oauthPopupRef.current.close();
+    }
+    oauthPopupRef.current = null;
+    setOauthFlowState(null);
+    setOauthRedirectUrl('');
+  }, [selectedAuth]);
+
+  useEffect(() => {
+    return () => {
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+      oauthPopupRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as
+        | { type?: string; ok?: boolean; title?: string; message?: string }
+        | undefined;
+      if (data?.type !== 'openclaw-oauth-complete') return;
+
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+      oauthPopupRef.current = null;
+
+      if (data.ok) {
+        setOauthFlowState(null);
+        setOauthRedirectUrl('');
+        setOnboardLog((prev) =>
+          [prev.trim(), '[oauth] OpenAI Codex OAuth completed via hosted callback.', data.message || '']
+            .filter(Boolean)
+            .join('\n\n'),
+        );
+        toast.success(data.message || 'OpenAI Codex OAuth completed!');
+        void loadSettings();
+        void loadSetupStatus();
+        return;
+      }
+
+      setOnboardLog((prev) =>
+        [prev.trim(), '[oauth] Hosted callback failed.', data.message || 'Unable to complete OAuth.']
+          .filter(Boolean)
+          .join('\n\n'),
+      );
+      toast.error(data.message || 'OAuth completion failed');
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [loadSettings, loadSetupStatus]);
+
+  const normalizedSelectedAuth = normalizeAuthChoice(selectedAuth);
+  const requiresAuthSecret = SECRET_REQUIRED_CHOICES.has(normalizedSelectedAuth);
+  const isOpenAICodexOAuth = normalizedSelectedAuth === 'openai-codex';
+  const oauthCompletionPending = isOpenAICodexOAuth && Boolean(oauthFlowState);
   const onboardingBlocked =
     onboarding ||
-    (settings?.configured ?? setupStatus?.configured ?? false) ||
+    (!isOpenAICodexOAuth && (settings?.configured ?? setupStatus?.configured ?? false)) ||
     !selectedGroup ||
     !selectedAuth ||
-    (requiresAuthSecret && !authSecret.trim());
+    (requiresAuthSecret && !authSecret.trim()) ||
+    (oauthCompletionPending && !oauthRedirectUrl.trim());
 
   // -----------------------------------------------------------------------
   // Actions
   // -----------------------------------------------------------------------
 
-  const runOnboarding = async () => {
-    if (!selectedAuth) {
-      toast.error('Select an auth choice before running setup.');
-      return;
-    }
-    if (requiresAuthSecret && !authSecret.trim()) {
-      toast.error('This auth choice requires an API key / auth secret.');
-      return;
-    }
+  const buildOnboardingPayload = (): OnboardingPayload => ({
+    flow: onboardFlow,
+    authChoice: normalizedSelectedAuth,
+    authSecret,
+    customProviderId,
+    customProviderBaseUrl,
+    customProviderApi,
+    customProviderApiKeyEnv,
+    customProviderModelId,
+    telegramToken,
+    discordToken,
+    slackBotToken,
+    slackAppToken,
+  });
+
+  const runStandardOnboarding = async (payload: OnboardingPayload) => {
     setOnboarding(true);
     setOnboardLog('Running onboarding...\n');
     try {
       const data = await apiFetch<{ ok: boolean; output: string }>('/api/admin/openclaw/setup/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          flow: onboardFlow,
-          authChoice: selectedAuth,
-          authSecret,
-          customProviderId,
-          customProviderBaseUrl,
-          customProviderApi,
-          customProviderApiKeyEnv,
-          customProviderModelId,
-          telegramToken,
-          discordToken,
-          slackBotToken,
-          slackAppToken,
-        }),
+        body: JSON.stringify(payload),
       });
       setOnboardLog(data.output ?? JSON.stringify(data, null, 2));
       toast.success(data.ok ? 'Onboarding completed!' : 'Onboarding finished with issues');
@@ -427,6 +526,166 @@ export default function AdminPage() {
       toast.error(msg);
     } finally {
       setOnboarding(false);
+    }
+  };
+
+  const startOpenAICodexOauth = async (payload: OnboardingPayload) => {
+    if (typeof window !== 'undefined' && !oauthPopupRef.current?.closed) {
+      oauthPopupRef.current?.close();
+      oauthPopupRef.current = null;
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        oauthPopupRef.current = window.open('', 'openclaw-codex-oauth', 'popup=yes,width=520,height=760');
+      } catch {
+        oauthPopupRef.current = null;
+      }
+    }
+
+    setOnboarding(true);
+    setOnboardLog('Starting OpenAI Codex OAuth...\n');
+    try {
+      const data = await apiFetch<{
+        ok: boolean;
+        flowId: string;
+        completionToken: string;
+        authUrl: string;
+        instructions?: string;
+        expiresAt?: string | null;
+        relayUrlTemplate?: string | null;
+        output?: string;
+      }>('/api/admin/openclaw/setup/oauth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      setOauthFlowState({
+        flowId: data.flowId,
+        completionToken: data.completionToken,
+        authUrl: data.authUrl,
+        instructions: data.instructions,
+        expiresAt: data.expiresAt ?? null,
+        relayUrlTemplate: data.relayUrlTemplate ?? null,
+      });
+      setOauthRedirectUrl('');
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.location.href = data.authUrl;
+        oauthPopupRef.current.focus();
+      } else if (typeof window !== 'undefined') {
+        window.open(data.authUrl, '_blank', 'noopener,noreferrer');
+      }
+      setOnboardLog(
+        [
+          data.output?.trim(),
+          data.instructions?.trim(),
+          data.authUrl,
+          data.relayUrlTemplate ? `Relay: ${data.relayUrlTemplate}` : '',
+          data.expiresAt ? `Expires: ${new Date(data.expiresAt).toLocaleString()}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+      );
+      toast.success('OAuth started. Finish sign-in in the popup, then paste the callback URL or code.');
+    } catch (err) {
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+      oauthPopupRef.current = null;
+      const msg = err instanceof Error ? err.message : 'OAuth start failed';
+      setOnboardLog((prev) => prev + '\nError: ' + msg);
+      toast.error(msg);
+    } finally {
+      setOnboarding(false);
+    }
+  };
+
+  const completeOpenAICodexOauth = async (payload: OnboardingPayload, inputOverride?: string) => {
+    if (!oauthFlowState) {
+      toast.error('Start the OAuth flow first.');
+      return;
+    }
+    const authorizationInput = (inputOverride ?? oauthRedirectUrl).trim();
+    if (!authorizationInput) {
+      toast.error('Paste the callback URL or authorization code from your browser.');
+      return;
+    }
+
+    setOnboarding(true);
+    setOauthRedirectUrl(authorizationInput);
+    setOnboardLog((prev) => `${prev}\n\nCompleting OpenAI Codex OAuth...\n`);
+    try {
+      const data = await apiFetch<{ ok: boolean; output: string }>('/api/admin/openclaw/setup/oauth/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flowId: oauthFlowState.flowId,
+          completionToken: oauthFlowState.completionToken,
+          authorizationInput,
+          payload,
+        }),
+      });
+
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+      oauthPopupRef.current = null;
+      setOauthFlowState(null);
+      setOauthRedirectUrl('');
+      setOnboardLog(data.output ?? JSON.stringify(data, null, 2));
+      toast.success(data.ok ? 'OpenAI Codex OAuth completed!' : 'OAuth completion finished with issues');
+      void loadSettings();
+      void loadSetupStatus();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'OAuth completion failed';
+      setOnboardLog((prev) => prev + '\nError: ' + msg);
+      toast.error(msg);
+    } finally {
+      setOnboarding(false);
+    }
+  };
+
+  const runOnboarding = async () => {
+    if (!selectedAuth) {
+      toast.error('Select an auth choice before running setup.');
+      return;
+    }
+    if (requiresAuthSecret && !authSecret.trim()) {
+      toast.error('This auth choice requires an API key / auth secret.');
+      return;
+    }
+    const payload = buildOnboardingPayload();
+    if (isOpenAICodexOAuth) {
+      if (oauthFlowState) {
+        await completeOpenAICodexOauth(payload);
+        return;
+      }
+      await startOpenAICodexOauth(payload);
+      return;
+    }
+    await runStandardOnboarding(payload);
+  };
+
+  const readOauthCallbackFromClipboard = async () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) {
+      toast.error('Clipboard access is not available in this browser.');
+      return;
+    }
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) {
+        toast.error('Clipboard is empty.');
+        return;
+      }
+      setOauthRedirectUrl(text);
+      if (looksLikeOpenAICodexAuthorizationInput(text)) {
+        await completeOpenAICodexOauth(buildOnboardingPayload(), text);
+        return;
+      }
+      toast.success('Clipboard loaded. Review the value, then complete OAuth.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to read clipboard');
     }
   };
 
@@ -581,6 +840,8 @@ export default function AdminPage() {
     setResetting(true);
     try {
       await apiFetch('/api/admin/openclaw/setup/reset', { method: 'POST' });
+      setOauthFlowState(null);
+      setOauthRedirectUrl('');
       toast.success('Setup reset. You can re-run onboarding now.');
       void loadSettings();
       void loadSetupStatus();
@@ -935,6 +1196,127 @@ export default function AdminPage() {
                 )}
               </div>
 
+              {isOpenAICodexOAuth ? (
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">OpenAI Codex OAuth</p>
+                    <p className="text-xs text-muted-foreground">
+                      Start OAuth to open the OpenAI sign-in page automatically. OpenAI Codex OAuth still returns
+                      to a localhost callback, so finish with the callback URL/code field below or a local relay helper.
+                    </p>
+                  </div>
+
+                  {oauthFlowState ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium" htmlFor="oauth-auth-url">
+                          Authorization URL
+                        </label>
+                        <Textarea
+                          id="oauth-auth-url"
+                          className="min-h-[96px] font-mono text-xs"
+                          readOnly
+                          value={oauthFlowState.authUrl}
+                        />
+                      </div>
+                      {oauthFlowState.instructions ? (
+                        <p className="text-xs whitespace-pre-wrap text-muted-foreground">
+                          {oauthFlowState.instructions}
+                        </p>
+                      ) : null}
+                      {oauthFlowState.expiresAt ? (
+                        <p className="text-xs text-muted-foreground">
+                          Expires: {new Date(oauthFlowState.expiresAt).toLocaleString()}
+                        </p>
+                      ) : null}
+                      {oauthFlowState.relayUrlTemplate ? (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium" htmlFor="oauth-relay-url-template">
+                            Relay URL Template
+                          </label>
+                          <Textarea
+                            id="oauth-relay-url-template"
+                            className="min-h-[96px] font-mono text-xs"
+                            readOnly
+                            value={oauthFlowState.relayUrlTemplate}
+                          />
+                        </div>
+                      ) : null}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium" htmlFor="oauth-redirect-url">
+                          Callback URL or Code
+                        </label>
+                        <Textarea
+                          id="oauth-redirect-url"
+                          className="min-h-[96px] font-mono text-xs"
+                          placeholder="http://localhost:1455/auth/callback?... or ac_..."
+                          value={oauthRedirectUrl}
+                          onChange={(e) => setOauthRedirectUrl(e.target.value)}
+                          onPaste={(e) => {
+                            const pasted = e.clipboardData.getData('text').trim();
+                            if (!pasted || !looksLikeOpenAICodexAuthorizationInput(pasted)) return;
+                            e.preventDefault();
+                            setOauthRedirectUrl(pasted);
+                            void completeOpenAICodexOauth(buildOnboardingPayload(), pasted);
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+                              oauthPopupRef.current.focus();
+                              return;
+                            }
+                            window.open(oauthFlowState.authUrl, '_blank', 'noopener,noreferrer');
+                          }}
+                          disabled={onboarding}
+                        >
+                          Open OAuth Page
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void readOauthCallbackFromClipboard()}
+                          disabled={onboarding}
+                        >
+                          Read From Clipboard
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+                              oauthPopupRef.current.close();
+                            }
+                            oauthPopupRef.current = null;
+                            setOauthFlowState(null);
+                            setOauthRedirectUrl('');
+                          }}
+                          disabled={onboarding}
+                        >
+                          Start over
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Full zero-copy token capture is not possible from Railway alone because OpenAI sends the
+                        callback to your local `localhost:1455` URL.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Click Start OAuth to open the sign-in popup. If clipboard access is allowed, you can use
+                      Read From Clipboard instead of manually pasting the callback.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
               <Separator className="opacity-40" />
               <p className="text-xs text-muted-foreground">Custom provider (optional, docs: /start/onboarding-overview)</p>
 
@@ -1057,7 +1439,7 @@ export default function AdminPage() {
 
               <Button onClick={() => void runOnboarding()} disabled={onboardingBlocked}>
                 {onboarding ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
-                Run Setup
+                {isOpenAICodexOAuth ? (oauthFlowState ? 'Complete OAuth' : 'Start OAuth') : 'Run Setup'}
               </Button>
 
               <div className="rounded-md border p-3">

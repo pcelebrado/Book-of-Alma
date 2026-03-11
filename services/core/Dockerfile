@@ -98,7 +98,8 @@ RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
 RUN curl -fsSL https://bun.sh/install | bash \
   && /root/.bun/bin/bun install -g @tobilu/qmd \
   && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
-  && ln -sf /root/.bun/bin/qmd /usr/local/bin/qmd
+  && printf '%s\n' '#!/usr/bin/env bash' 'exec /root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd "$@"' > /usr/local/bin/qmd \
+  && chmod +x /usr/local/bin/qmd
 
 # Persist user-installed tool binaries on the Railway volume, but keep caches
 # ephemeral so cache churn does not consume persistent storage.
