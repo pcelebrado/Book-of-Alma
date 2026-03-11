@@ -108,7 +108,8 @@ interface OnboardingPayload {
   slackAppToken: string;
 }
 
-interface OAuthFlowState {
+interface InteractiveAuthFlowState {
+  kind: 'openai-codex' | 'claude-cli';
   flowId: string;
   completionToken: string;
   authUrl: string;
@@ -197,6 +198,7 @@ const SECRET_REQUIRED_CHOICES = new Set([
 ]);
 
 const CLAUDE_MAX_PROXY_AUTH_CHOICE = 'claude-max-proxy';
+const CLAUDE_CLI_AUTH_CHOICE = 'claude-cli';
 const CLAUDE_MAX_PROXY_PROVIDER_ID = 'claude-max';
 const CLAUDE_MAX_PROXY_BASE_URL = 'http://127.0.0.1:3456/v1';
 const CLAUDE_MAX_PROXY_DEFAULT_MODEL = 'claude-opus-4';
@@ -298,7 +300,7 @@ export default function AdminPage() {
   const [slackAppToken, setSlackAppToken] = useState('');
   const [onboardLog, setOnboardLog] = useState('');
   const [onboarding, setOnboarding] = useState(false);
-  const [oauthFlowState, setOauthFlowState] = useState<OAuthFlowState | null>(null);
+  const [oauthFlowState, setOauthFlowState] = useState<InteractiveAuthFlowState | null>(null);
   const [oauthRedirectUrl, setOauthRedirectUrl] = useState('');
   const oauthPopupRef = useRef<Window | null>(null);
 
@@ -440,6 +442,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (selectedAuth === 'openai-codex') return;
     if (selectedAuth === 'codex-cli') return;
+    if (selectedAuth === CLAUDE_CLI_AUTH_CHOICE) return;
     if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
       oauthPopupRef.current.close();
     }
@@ -465,7 +468,7 @@ export default function AdminPage() {
       const data = event.data as
         | { type?: string; ok?: boolean; title?: string; message?: string }
         | undefined;
-      if (data?.type !== 'openclaw-oauth-complete') return;
+      if (data?.type !== 'openclaw-oauth-complete' && data?.type !== 'openclaw-claude-auth-complete') return;
 
       if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
         oauthPopupRef.current.close();
@@ -473,14 +476,23 @@ export default function AdminPage() {
       oauthPopupRef.current = null;
 
       if (data.ok) {
+        const successLabel =
+          data.type === 'openclaw-claude-auth-complete'
+            ? '[claude-auth] Claude setup-token stored via hosted portal.'
+            : '[oauth] OpenAI Codex OAuth completed via hosted callback.';
         setOauthFlowState(null);
         setOauthRedirectUrl('');
         setOnboardLog((prev) =>
-          [prev.trim(), '[oauth] OpenAI Codex OAuth completed via hosted callback.', data.message || '']
+          [prev.trim(), successLabel, data.message || '']
             .filter(Boolean)
             .join('\n\n'),
         );
-        toast.success(data.message || 'OpenAI Codex OAuth completed!');
+        toast.success(
+          data.message ||
+            (data.type === 'openclaw-claude-auth-complete'
+              ? 'Claude auth completed!'
+              : 'OpenAI Codex OAuth completed!'),
+        );
         void loadSettings();
         void loadSetupStatus();
         return;
@@ -501,6 +513,7 @@ export default function AdminPage() {
   const normalizedSelectedAuth = normalizeAuthChoice(selectedAuth);
   const requiresAuthSecret = SECRET_REQUIRED_CHOICES.has(normalizedSelectedAuth);
   const isOpenAICodexOAuth = normalizedSelectedAuth === 'openai-codex';
+  const isClaudeCliInteractiveAuth = normalizedSelectedAuth === CLAUDE_CLI_AUTH_CHOICE;
   const isClaudeMaxProxy = normalizedSelectedAuth === CLAUDE_MAX_PROXY_AUTH_CHOICE;
   const oauthCompletionPending = isOpenAICodexOAuth && Boolean(oauthFlowState);
   const onboardingBlocked =
@@ -518,7 +531,7 @@ export default function AdminPage() {
   const buildOnboardingPayload = (): OnboardingPayload => ({
     flow: onboardFlow,
     authChoice: normalizedSelectedAuth,
-    authSecret: isClaudeMaxProxy ? '' : authSecret,
+    authSecret: isClaudeMaxProxy || isOpenAICodexOAuth || isClaudeCliInteractiveAuth ? '' : authSecret,
     customProviderId: isClaudeMaxProxy ? CLAUDE_MAX_PROXY_PROVIDER_ID : customProviderId,
     customProviderBaseUrl: isClaudeMaxProxy ? CLAUDE_MAX_PROXY_BASE_URL : customProviderBaseUrl,
     customProviderApi: isClaudeMaxProxy ? 'openai-completions' : customProviderApi,
@@ -595,6 +608,7 @@ export default function AdminPage() {
       });
 
       setOauthFlowState({
+        kind: 'openai-codex',
         flowId: data.flowId,
         completionToken: data.completionToken,
         authUrl: data.authUrl,
@@ -627,6 +641,72 @@ export default function AdminPage() {
       }
       oauthPopupRef.current = null;
       const msg = err instanceof Error ? err.message : 'OAuth start failed';
+      setOnboardLog((prev) => prev + '\nError: ' + msg);
+      toast.error(msg);
+    } finally {
+      setOnboarding(false);
+    }
+  };
+
+  const startClaudeCliAuth = async (payload: OnboardingPayload) => {
+    if (typeof window !== 'undefined' && !oauthPopupRef.current?.closed) {
+      oauthPopupRef.current?.close();
+      oauthPopupRef.current = null;
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        oauthPopupRef.current = window.open('', 'openclaw-claude-auth', 'popup=yes,width=640,height=860');
+      } catch {
+        oauthPopupRef.current = null;
+      }
+    }
+
+    setOnboarding(true);
+    setOnboardLog('Starting Claude setup-token portal...\n');
+    try {
+      const data = await apiFetch<{
+        ok: boolean;
+        flowId: string;
+        completionToken: string;
+        portalUrl: string;
+        instructions?: string;
+        expiresAt?: string | null;
+        output?: string;
+      }>('/api/admin/openclaw/setup/claude-auth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      setOauthFlowState({
+        kind: 'claude-cli',
+        flowId: data.flowId,
+        completionToken: data.completionToken,
+        authUrl: data.portalUrl,
+        instructions: data.instructions,
+        expiresAt: data.expiresAt ?? null,
+        relayUrlTemplate: null,
+      });
+      setOauthRedirectUrl('');
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.location.href = data.portalUrl;
+        oauthPopupRef.current.focus();
+      } else if (typeof window !== 'undefined') {
+        window.open(data.portalUrl, '_blank', 'noopener,noreferrer');
+      }
+      setOnboardLog(
+        [data.output?.trim(), data.instructions?.trim(), data.portalUrl, data.expiresAt ? `Expires: ${new Date(data.expiresAt).toLocaleString()}` : '']
+          .filter(Boolean)
+          .join('\n\n'),
+      );
+      toast.success('Claude auth started. Finish the setup-token flow in the popup.');
+    } catch (err) {
+      if (oauthPopupRef.current && !oauthPopupRef.current.closed) {
+        oauthPopupRef.current.close();
+      }
+      oauthPopupRef.current = null;
+      const msg = err instanceof Error ? err.message : 'Claude auth start failed';
       setOnboardLog((prev) => prev + '\nError: ' + msg);
       toast.error(msg);
     } finally {
@@ -695,6 +775,10 @@ export default function AdminPage() {
         return;
       }
       await startOpenAICodexOauth(payload);
+      return;
+    }
+    if (isClaudeCliInteractiveAuth) {
+      await startClaudeCliAuth(payload);
       return;
     }
     await runStandardOnboarding(payload);
@@ -1276,13 +1360,16 @@ export default function AdminPage() {
                 </div>
               ) : null}
 
-              {isOpenAICodexOAuth ? (
+              {isOpenAICodexOAuth || isClaudeCliInteractiveAuth ? (
                 <div className="space-y-3 rounded-md border p-3">
                   <div className="space-y-1">
-                    <p className="text-xs font-medium">OpenAI Codex OAuth</p>
+                    <p className="text-xs font-medium">
+                      {isClaudeCliInteractiveAuth ? 'Claude Code setup-token portal' : 'OpenAI Codex OAuth'}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      Start OAuth to open the OpenAI sign-in page automatically. OpenAI Codex OAuth still returns
-                      to a localhost callback, so finish with the callback URL/code field below or a local relay helper.
+                      {isClaudeCliInteractiveAuth
+                        ? 'Start the hosted portal to paste a Claude setup-token from the gateway host and store it in OpenClaw.'
+                        : 'Start OAuth to open the OpenAI sign-in page automatically. OpenAI Codex OAuth still returns to a localhost callback, so finish with the callback URL/code field below or a local relay helper.'}
                     </p>
                   </div>
 
@@ -1290,7 +1377,7 @@ export default function AdminPage() {
                     <>
                       <div className="space-y-2">
                         <label className="text-xs font-medium" htmlFor="oauth-auth-url">
-                          Authorization URL
+                          {oauthFlowState.kind === 'claude-cli' ? 'Hosted Portal URL' : 'Authorization URL'}
                         </label>
                         <Textarea
                           id="oauth-auth-url"
@@ -1309,7 +1396,7 @@ export default function AdminPage() {
                           Expires: {new Date(oauthFlowState.expiresAt).toLocaleString()}
                         </p>
                       ) : null}
-                      {oauthFlowState.relayUrlTemplate ? (
+                      {oauthFlowState.kind === 'openai-codex' && oauthFlowState.relayUrlTemplate ? (
                         <div className="space-y-2">
                           <label className="text-xs font-medium" htmlFor="oauth-relay-url-template">
                             Relay URL Template
@@ -1322,25 +1409,27 @@ export default function AdminPage() {
                           />
                         </div>
                       ) : null}
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium" htmlFor="oauth-redirect-url">
-                          Callback URL or Code
-                        </label>
-                        <Textarea
-                          id="oauth-redirect-url"
-                          className="min-h-[96px] font-mono text-xs"
-                          placeholder="http://localhost:1455/auth/callback?... or ac_..."
-                          value={oauthRedirectUrl}
-                          onChange={(e) => setOauthRedirectUrl(e.target.value)}
-                          onPaste={(e) => {
-                            const pasted = e.clipboardData.getData('text').trim();
-                            if (!pasted || !looksLikeOpenAICodexAuthorizationInput(pasted)) return;
-                            e.preventDefault();
-                            setOauthRedirectUrl(pasted);
-                            void completeOpenAICodexOauth(buildOnboardingPayload(), pasted);
-                          }}
-                        />
-                      </div>
+                      {oauthFlowState.kind === 'openai-codex' ? (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium" htmlFor="oauth-redirect-url">
+                            Callback URL or Code
+                          </label>
+                          <Textarea
+                            id="oauth-redirect-url"
+                            className="min-h-[96px] font-mono text-xs"
+                            placeholder="http://localhost:1455/auth/callback?... or ac_..."
+                            value={oauthRedirectUrl}
+                            onChange={(e) => setOauthRedirectUrl(e.target.value)}
+                            onPaste={(e) => {
+                              const pasted = e.clipboardData.getData('text').trim();
+                              if (!pasted || !looksLikeOpenAICodexAuthorizationInput(pasted)) return;
+                              e.preventDefault();
+                              setOauthRedirectUrl(pasted);
+                              void completeOpenAICodexOauth(buildOnboardingPayload(), pasted);
+                            }}
+                          />
+                        </div>
+                      ) : null}
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
@@ -1355,17 +1444,19 @@ export default function AdminPage() {
                           }}
                           disabled={onboarding}
                         >
-                          Open OAuth Page
+                          {oauthFlowState.kind === 'claude-cli' ? 'Open Portal' : 'Open OAuth Page'}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void readOauthCallbackFromClipboard()}
-                          disabled={onboarding}
-                        >
-                          Read From Clipboard
-                        </Button>
+                        {oauthFlowState.kind === 'openai-codex' ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void readOauthCallbackFromClipboard()}
+                            disabled={onboarding}
+                          >
+                            Read From Clipboard
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
@@ -1383,15 +1474,23 @@ export default function AdminPage() {
                           Start over
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Full zero-copy token capture is not possible from Railway alone because OpenAI sends the
-                        callback to your local `localhost:1455` URL.
-                      </p>
+                      {oauthFlowState.kind === 'openai-codex' ? (
+                        <p className="text-xs text-muted-foreground">
+                          Full zero-copy token capture is not possible from Railway alone because OpenAI sends the
+                          callback to your local `localhost:1455` URL.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          This follows OpenClaw&apos;s supported Anthropic subscription path: generate a setup-token
+                          with Claude Code CLI on the gateway host, then paste it into the hosted portal.
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Click Start OAuth to open the sign-in popup. If clipboard access is allowed, you can use
-                      Read From Clipboard instead of manually pasting the callback.
+                      {isClaudeCliInteractiveAuth
+                        ? 'Click Start Claude Auth to open the hosted portal.'
+                        : 'Click Start OAuth to open the sign-in popup. If clipboard access is allowed, you can use Read From Clipboard instead of manually pasting the callback.'}
                     </p>
                   )}
                 </div>
@@ -1519,7 +1618,11 @@ export default function AdminPage() {
 
               <Button onClick={() => void runOnboarding()} disabled={onboardingBlocked}>
                 {onboarding ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}
-                {isOpenAICodexOAuth ? (oauthFlowState ? 'Complete OAuth' : 'Start OAuth') : 'Run Setup'}
+                {isOpenAICodexOAuth
+                  ? (oauthFlowState ? 'Complete OAuth' : 'Start OAuth')
+                  : isClaudeCliInteractiveAuth
+                    ? 'Start Claude Auth'
+                    : 'Run Setup'}
               </Button>
 
               <div className="rounded-md border p-3">

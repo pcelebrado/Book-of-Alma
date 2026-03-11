@@ -526,6 +526,9 @@ const WEB_BOOK_TOC_STORE_PATH = path.join(STATE_DIR, "web-book-toc.json");
 const OPENCLAW_PACKAGE_ROOT = process.env.OPENCLAW_PACKAGE_ROOT?.trim() || "/openclaw";
 const OPENCLAW_PACKAGE_JSON = path.join(OPENCLAW_PACKAGE_ROOT, "package.json");
 const ADMIN_OAUTH_FLOW_TIMEOUT_MS = 10 * 60 * 1000;
+const ANTHROPIC_SETUP_TOKEN_PREFIX = "sk-ant-oat01-";
+const ANTHROPIC_SETUP_TOKEN_MIN_LENGTH = 80;
+const DEFAULT_ANTHROPIC_MODEL_REF = "anthropic/claude-sonnet-4-6";
 const OPENAI_CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const OPENAI_CODEX_AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize";
 const OPENAI_CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token";
@@ -1891,9 +1894,79 @@ async function readOpenClawConfig(path) {
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "64kb" }));
 
 // Minimal health endpoint for Railway.
 app.get("/setup/healthz", (_req, res) => res.json({ ok: true }));
+
+app.get("/claude-auth", (req, res) => {
+  cleanupExpiredAdminClaudeFlows();
+
+  const flowId = String(req.query?.flowId || "").trim();
+  const completionToken = String(req.query?.completionToken || "").trim();
+  const flow = resolvePendingAdminClaudeFlow({ flowId, completionToken });
+  if (!flow) {
+    return res.status(404).type("html").send(
+      buildClaudeAuthMessagePage({
+        ok: false,
+        title: "Claude auth expired",
+        message: "This Claude auth session was not found or has expired. Return to Admin and start it again.",
+      }),
+    );
+  }
+
+  return res.status(200).type("html").send(renderClaudeAuthPortalPage({ flow }));
+});
+
+app.post("/claude-auth", async (req, res) => {
+  cleanupExpiredAdminClaudeFlows();
+
+  const flowId = String(req.body?.flowId || "").trim();
+  const completionToken = String(req.body?.completionToken || "").trim();
+  const flow = resolvePendingAdminClaudeFlow({ flowId, completionToken });
+  if (!flow) {
+    return res.status(404).type("html").send(
+      buildClaudeAuthMessagePage({
+        ok: false,
+        title: "Claude auth expired",
+        message: "This Claude auth session was not found or has expired. Return to Admin and start it again.",
+      }),
+    );
+  }
+
+  const setupToken = String(req.body?.setupToken || "").trim();
+  const tokenError = validateAnthropicSetupTokenInput(setupToken);
+  if (tokenError) {
+    return res.status(400).type("html").send(renderClaudeAuthPortalPage({ flow, error: tokenError, token: setupToken }));
+  }
+
+  try {
+    const persisted = await persistAnthropicSetupToken(setupToken);
+    await applyConfiguredSetupPayload(flow.payload || {});
+    flow.completed = true;
+    pendingAdminClaudeFlows.delete(flow.id);
+    return res.status(200).type("html").send(
+      buildClaudeAuthMessagePage({
+        ok: true,
+        title: "Claude auth completed",
+        message: [
+          `Saved Anthropic profile ${persisted.profileId}.`,
+          "Return to the admin UI.",
+        ].join(" "),
+        openerOrigin: flow.openerOrigin,
+      }),
+    );
+  } catch (error) {
+    console.error("[/claude-auth] error:", error);
+    return res.status(500).type("html").send(
+      renderClaudeAuthPortalPage({
+        flow,
+        error: String(error),
+        token: setupToken,
+      }),
+    );
+  }
+});
 
 async function probeGateway() {
   // Don't assume HTTP — the gateway primarily speaks WebSocket.
@@ -3218,6 +3291,21 @@ app.post("/internal/openclaw/setup/run", requireInternalApiAuth, async (req, res
     fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
     const payload = normalizeSetupPayload(req.body || {});
+    const authChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
+    if (authChoice === "openai-codex" || authChoice === "claude-cli") {
+      const label =
+        authChoice === "openai-codex"
+          ? "OpenAI Codex OAuth"
+          : "Claude Code setup-token";
+      return respondJson(400, {
+        ok: false,
+        output: [
+          `Setup input error: ${label} is only supported from the web admin UI.`,
+          "Open this URL and continue there:",
+          "https://openclaw-web-reality-check.up.railway.app/admin",
+        ].join("\n"),
+      });
+    }
 
     let onboardArgs;
     try {
@@ -3413,6 +3501,59 @@ app.post("/internal/openclaw/setup/oauth/complete", requireInternalApiAuth, asyn
     return res.status(500).json({
       ok: false,
       error: { code: "oauth_complete_failed", message: String(err) },
+    });
+  }
+});
+
+app.post("/internal/openclaw/setup/claude-auth/start", requireInternalApiAuth, async (req, res) => {
+  cleanupExpiredAdminClaudeFlows();
+
+  try {
+    const payload = req.body || {};
+    const authChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
+    if (authChoice !== "claude-cli") {
+      return res.status(400).json({
+        ok: false,
+        error: {
+          code: "invalid_auth_choice",
+          message: "Claude auth start only supports authChoice=claude-cli",
+        },
+      });
+    }
+
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+    const flowId = crypto.randomUUID();
+    const completionToken = crypto.randomBytes(32).toString("hex");
+    const openerOrigin = String(payload.returnOrigin || payload.openerOrigin || "").trim();
+    const flow = {
+      id: flowId,
+      completionToken,
+      createdAt: Date.now(),
+      payload,
+      openerOrigin,
+      completed: false,
+      instructions:
+        "Complete Claude Code login on the gateway host if needed, run `claude setup-token`, then paste the token into the hosted portal.",
+    };
+
+    pendingAdminClaudeFlows.set(flowId, flow);
+
+    return res.json({
+      ok: true,
+      flowId,
+      completionToken,
+      instructions: flow.instructions,
+      expiresAt: new Date(flow.createdAt + ADMIN_OAUTH_FLOW_TIMEOUT_MS).toISOString(),
+      output:
+        "[claude-auth] Open the hosted portal, paste a Claude setup-token from the gateway host, and OpenClaw will store it for the main agent.\n",
+    });
+  } catch (err) {
+    console.error("[/internal/openclaw/setup/claude-auth/start] error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: { code: "claude_auth_start_failed", message: String(err) },
     });
   }
 });
@@ -4077,6 +4218,7 @@ function runCmd(cmd, args, opts = {}) {
 
 let openClawPiAiPromise = null;
 const pendingAdminOauthFlows = new Map();
+const pendingAdminClaudeFlows = new Map();
 
 function createDeferred() {
   let resolve;
@@ -4158,6 +4300,33 @@ function parseOpenAICodexAuthorizationInput(input) {
   return { code: value };
 }
 
+function validateAnthropicSetupTokenInput(input) {
+  const trimmed = String(input || "").trim();
+  if (!trimmed) {
+    return "Required";
+  }
+  if (!trimmed.startsWith(ANTHROPIC_SETUP_TOKEN_PREFIX)) {
+    return `Expected token starting with ${ANTHROPIC_SETUP_TOKEN_PREFIX}`;
+  }
+  if (trimmed.length < ANTHROPIC_SETUP_TOKEN_MIN_LENGTH) {
+    return "Token looks too short; paste the full setup-token";
+  }
+  return undefined;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function serializeForScript(value) {
+  return JSON.stringify(value).replaceAll("<", "\\u003c");
+}
+
 function decodeJwtPayload(token) {
   try {
     const parts = String(token || "").split(".");
@@ -4227,6 +4396,20 @@ function resolvePendingAdminOauthFlow({ flowId, oauthState }) {
   }
 
   return null;
+}
+
+function resolvePendingAdminClaudeFlow({ flowId, completionToken }) {
+  if (!flowId) {
+    return null;
+  }
+  const flow = pendingAdminClaudeFlows.get(flowId) || null;
+  if (!flow) {
+    return null;
+  }
+  if (completionToken && flow.completionToken !== completionToken) {
+    return null;
+  }
+  return flow;
 }
 
 function resolveMainAgentDir() {
@@ -4357,6 +4540,172 @@ async function persistOpenAICodexOAuth(creds) {
   };
 }
 
+async function persistAnthropicSetupToken(token) {
+  const agentDir = resolveMainAgentDir();
+  const fallbackProfileId = "anthropic:default";
+  const script = `
+    import fs from "node:fs";
+    import path from "node:path";
+    import process from "node:process";
+    import { upsertAuthProfile } from "./src/agents/auth-profiles.js";
+    import { readConfigFileSnapshot, writeConfigFile } from "./src/config/config.js";
+    import { applyAuthProfileConfig } from "./src/commands/onboard-auth.config-core.js";
+    import { applyAgentDefaultModelPrimary } from "./src/commands/onboard-auth.config-shared.js";
+    import { buildTokenProfileId, validateAnthropicSetupToken } from "./src/commands/auth-token.js";
+
+    const agentDir = process.env.OPENCLAW_AGENT_DIR;
+    const token = String(process.env.OPENCLAW_ANTHROPIC_SETUP_TOKEN || "").trim();
+    const tokenError = validateAnthropicSetupToken(token);
+    if (tokenError) {
+      throw new Error(tokenError);
+    }
+
+    const profileId = buildTokenProfileId({ provider: "anthropic", name: "" });
+    upsertAuthProfile({
+      profileId,
+      agentDir,
+      credential: {
+        type: "token",
+        provider: "anthropic",
+        token,
+      },
+    });
+
+    const snapshot = await readConfigFileSnapshot();
+    const baseConfig = snapshot.valid ? snapshot.config : {};
+    let next = applyAuthProfileConfig(baseConfig, {
+      profileId,
+      provider: "anthropic",
+      mode: "token",
+    });
+    next = applyAgentDefaultModelPrimary(next, ${JSON.stringify(DEFAULT_ANTHROPIC_MODEL_REF)});
+    await writeConfigFile(next);
+
+    const authJsonPath = path.join(agentDir, "auth.json");
+    let authJson = {};
+    try {
+      authJson = JSON.parse(fs.readFileSync(authJsonPath, "utf8"));
+    } catch {}
+    authJson.anthropic = {
+      type: "token",
+      token,
+    };
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(authJsonPath, JSON.stringify(authJson, null, 2) + "\\n", {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+
+    process.stdout.write(JSON.stringify({ ok: true, profileId }) + "\\n");
+  `;
+
+  const result = await runOpenClawSourceEval(
+    script,
+    {
+      OPENCLAW_AGENT_DIR: agentDir,
+      OPENCLAW_ANTHROPIC_SETUP_TOKEN: token,
+    },
+    90_000,
+  );
+
+  if (result.code !== 0) {
+    throw new Error(`Failed to persist Anthropic setup-token:\n${result.output || "(no output)"}`);
+  }
+
+  const lines = String(result.output || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let persistedProfileId = null;
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed && parsed.ok === true && typeof parsed.profileId === "string" && parsed.profileId.trim()) {
+        persistedProfileId = parsed.profileId.trim();
+      }
+    } catch {
+      // ignore helper output
+    }
+  }
+
+  return {
+    profileId: persistedProfileId || fallbackProfileId,
+    output: result.output || "",
+  };
+}
+
+function buildClaudeAuthMessagePage({
+  ok,
+  title,
+  message,
+  openerOrigin,
+  messageType = "openclaw-claude-auth-complete",
+}) {
+  const payload = { type: messageType, ok, title, message };
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="font-family: sans-serif; padding: 24px; line-height: 1.5;">
+  <h1 style="margin: 0 0 12px;">${escapeHtml(title)}</h1>
+  <p style="margin: 0 0 16px;">${escapeHtml(message)}</p>
+  <script>
+    const payload = ${serializeForScript(payload)};
+    const openerOrigin = ${serializeForScript(openerOrigin || "")};
+    if (openerOrigin && window.opener && window.opener !== window) {
+      window.opener.postMessage(payload, openerOrigin);
+      setTimeout(() => window.close(), 150);
+    }
+  </script>
+</body>
+</html>`;
+}
+
+function renderClaudeAuthPortalPage({ flow, error = "", token = "" }) {
+  const title = error ? "Claude auth failed" : "Claude auth";
+  const message = error
+    ? "Fix the setup-token and submit again."
+    : "Paste the setup-token generated by Claude Code CLI on the gateway host.";
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="font-family: sans-serif; max-width: 720px; margin: 0 auto; padding: 32px 20px; line-height: 1.5;">
+  <h1 style="margin: 0 0 12px;">${escapeHtml(title)}</h1>
+  <p style="margin: 0 0 16px;">${escapeHtml(message)}</p>
+  <div style="margin: 0 0 20px; padding: 16px; border: 1px solid #d4d4d8; border-radius: 12px; background: #fafafa;">
+    <p style="margin: 0 0 8px;"><strong>Supported OpenClaw flow</strong></p>
+    <ol style="margin: 0; padding-left: 20px;">
+      <li>Open Railway SSH for this core service.</li>
+      <li>Run <code>claude setup-token</code> on the gateway host.</li>
+      <li>Paste the resulting <code>${escapeHtml(ANTHROPIC_SETUP_TOKEN_PREFIX)}...</code> token below.</li>
+    </ol>
+  </div>
+  ${
+    error
+      ? `<div style="margin: 0 0 16px; padding: 12px 14px; border: 1px solid #ef4444; border-radius: 10px; background: #fef2f2; color: #991b1b;">${escapeHtml(error)}</div>`
+      : ""
+  }
+  <form method="post" action="/claude-auth" style="display: grid; gap: 12px;">
+    <input type="hidden" name="flowId" value="${escapeHtml(flow.id)}" />
+    <input type="hidden" name="completionToken" value="${escapeHtml(flow.completionToken)}" />
+    <label for="setup-token"><strong>Anthropic setup-token</strong></label>
+    <textarea id="setup-token" name="setupToken" rows="8" style="width: 100%; padding: 12px; font-family: monospace; border-radius: 10px; border: 1px solid #cbd5e1;" placeholder="${escapeHtml(ANTHROPIC_SETUP_TOKEN_PREFIX)}..." required>${escapeHtml(token)}</textarea>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <button type="submit" style="padding: 10px 16px; border: 0; border-radius: 999px; background: #111827; color: white; cursor: pointer;">Store token in OpenClaw</button>
+      <span style="color: #52525b; font-size: 14px;">Expires: ${escapeHtml(new Date(flow.createdAt + ADMIN_OAUTH_FLOW_TIMEOUT_MS).toLocaleString())}</span>
+    </div>
+  </form>
+</body>
+</html>`;
+}
+
 async function applyConfiguredSetupPayload(payload) {
   const normalizedPayload = normalizeSetupPayload(payload);
   let extra = "";
@@ -4460,6 +4809,16 @@ function cleanupExpiredAdminOauthFlows() {
       flow.deferred.reject(new Error("OAuth flow expired"));
     } catch {}
     pendingAdminOauthFlows.delete(flowId);
+  }
+}
+
+function cleanupExpiredAdminClaudeFlows() {
+  const now = Date.now();
+  for (const [flowId, flow] of pendingAdminClaudeFlows.entries()) {
+    if (now - flow.createdAt < ADMIN_OAUTH_FLOW_TIMEOUT_MS) {
+      continue;
+    }
+    pendingAdminClaudeFlows.delete(flowId);
   }
 }
 
@@ -4637,11 +4996,15 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     const payload = normalizeSetupPayload(req.body || {});
     const authChoice = await resolveAuthChoiceCompatibility(payload.authChoice);
-    if (authChoice === "openai-codex") {
+    if (authChoice === "openai-codex" || authChoice === "claude-cli") {
+      const label =
+        authChoice === "openai-codex"
+          ? "OpenAI Codex OAuth"
+          : "Claude Code setup-token";
       return respondJson(400, {
         ok: false,
         output: [
-          "Setup input error: OpenAI Codex OAuth is only supported from the web admin UI.",
+          `Setup input error: ${label} is only supported from the web admin UI.`,
           "Open this URL and continue there:",
           "https://openclaw-web-reality-check.up.railway.app/admin",
         ].join("\n"),

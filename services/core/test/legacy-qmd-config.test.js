@@ -154,3 +154,20 @@ test("core exposes Claude Max proxy as an Anthropic admin preset and supervises 
   assert.match(src, /models\.providers\.\$\{CLAUDE_MAX_PROXY_PROVIDER_ID\}/);
   assert.match(src, /agents\.defaults\.model\.primary/);
 });
+
+test("hosted Claude auth portal stores Anthropic setup-tokens through the admin UI flow", () => {
+  const coreSrc = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  const webAdmin = fs.readFileSync(
+    new URL("../../web/src/app/admin/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(coreSrc, /app\.get\("\/claude-auth"/);
+  assert.match(coreSrc, /app\.post\("\/claude-auth"/);
+  assert.match(coreSrc, /\/internal\/openclaw\/setup\/claude-auth\/start/);
+  assert.match(coreSrc, /persistAnthropicSetupToken/);
+  assert.match(coreSrc, /validateAnthropicSetupTokenInput/);
+  assert.match(webAdmin, /\/api\/admin\/openclaw\/setup\/claude-auth\/start/);
+  assert.match(webAdmin, /openclaw-claude-auth-complete/);
+  assert.match(webAdmin, /Start Claude Auth/);
+});
