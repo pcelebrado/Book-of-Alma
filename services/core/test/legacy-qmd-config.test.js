@@ -13,6 +13,7 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(src, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH/);
   assert.match(src, /gateway\.controlUi\.allowInsecureAuth/);
+  assert.match(src, /"gateway",\s*"run",\s*"--force"/);
 });
 
 test("template env surfaces no longer expose the removed qmd searchMode setting", () => {

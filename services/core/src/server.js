@@ -1030,6 +1030,7 @@ async function startGateway() {
   const args = [
     "gateway",
     "run",
+    "--force",
     "--bind",
     "loopback",
     "--port",
