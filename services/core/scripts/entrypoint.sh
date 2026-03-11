@@ -74,7 +74,7 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   # If full serve fails (for example missing embedded templates in slim image),
   # fall back to portable mode so SFTP upload remains operational.
   start_portable_sftpgo() {
-    PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-book-uploader}"
+    PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-${SFTPGO_DEFAULT_ADMIN_USERNAME:-book-uploader}}"
     PORTABLE_PASS="${SFTPGO_PORTABLE_PASSWORD:-${SFTPGO_DEFAULT_ADMIN_PASSWORD:-change-me-now}}"
     PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_WORKSPACE_VOLUME_DIR}}"
     mkdir -p "$PORTABLE_DIR"

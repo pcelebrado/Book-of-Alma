@@ -49,19 +49,19 @@
   },
   "SFTPGO_DEFAULT_ADMIN_USERNAME": {
     "value": "admin",
-    "description": "Username for default SFTPGo admin account."
+    "description": "Username for the default SFTPGo admin account. Portable SFTP mode reuses this username unless SFTPGO_PORTABLE_USERNAME is explicitly set."
   },
   "SFTPGO_DEFAULT_ADMIN_PASSWORD": {
     "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
-    "description": "Password for default SFTPGo admin account (auto-generated secret)."
+    "description": "Password for the default SFTPGo admin account (auto-generated secret). Portable SFTP mode reuses this password unless SFTPGO_PORTABLE_PASSWORD is explicitly set."
   },
   "SFTPGO_PORTABLE_USERNAME": {
-    "value": "book-uploader",
-    "description": "Fallback SFTP username used when full SFTPGo mode is unavailable and portable mode is activated."
+    "value": "",
+    "description": "Optional override for portable SFTP username. Leave blank to reuse SFTPGO_DEFAULT_ADMIN_USERNAME."
   },
   "SFTPGO_PORTABLE_PASSWORD": {
-    "value": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
-    "description": "Fallback SFTP password used in portable mode (set explicitly for deterministic testing)."
+    "value": "",
+    "description": "Optional override for portable SFTP password. Leave blank to reuse SFTPGO_DEFAULT_ADMIN_PASSWORD."
   },
   "SFTPGO_PORTABLE_DIRECTORY": {
     "value": "/data/workspace",

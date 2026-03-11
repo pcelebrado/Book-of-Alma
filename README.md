@@ -205,8 +205,8 @@ SFTP connection profile (core service):
 
 - Host: your core public domain (for example `openclaw-core-production.up.railway.app`)
 - Port: `2022` (requires Railway TCP Proxy enabled for core service)
-- Username: value of `SFTPGO_PORTABLE_USERNAME` (default: `book-uploader`)
-- Password: value of `SFTPGO_PORTABLE_PASSWORD`
+- Username: `SFTPGO_PORTABLE_USERNAME` if set, otherwise `SFTPGO_DEFAULT_ADMIN_USERNAME` (default: `admin`)
+- Password: `SFTPGO_PORTABLE_PASSWORD` if set, otherwise `SFTPGO_DEFAULT_ADMIN_PASSWORD`
 - Remote directory: `/data/workspace`
 
 If full SFTPGo mode cannot start in the runtime image, core automatically falls

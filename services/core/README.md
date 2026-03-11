@@ -37,12 +37,12 @@ Browser → [web] (public) → [core] (internal, this service)
    - `OPENCLAW_STATE_DIR=/data/.openclaw` (recommended)
    - `OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace` (recommended active path)
    - `OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace` (recommended persistent path)
-   - `OPENCLAW_GATEWAY_TOKEN` — auth token (auto-generated if not set)
-   - `INTERNAL_SERVICE_TOKEN` — must match the web service value
-   - `PORT=8080` — required when TCP Proxy is enabled for SFTP on 2022
-   - `SFTPGO_DEFAULT_ADMIN_USERNAME` / `SFTPGO_DEFAULT_ADMIN_PASSWORD`
-   - `SFTPGO_PORTABLE_USERNAME` (fallback mode login username)
-   - `SFTPGO_PORTABLE_DIRECTORY=/data/workspace`
+    - `OPENCLAW_GATEWAY_TOKEN` — auth token (auto-generated if not set)
+    - `INTERNAL_SERVICE_TOKEN` — must match the web service value
+    - `PORT=8080` — required when TCP Proxy is enabled for SFTP on 2022
+    - `SFTPGO_DEFAULT_ADMIN_USERNAME` / `SFTPGO_DEFAULT_ADMIN_PASSWORD`
+    - `SFTPGO_PORTABLE_USERNAME` / `SFTPGO_PORTABLE_PASSWORD` (optional overrides; if blank, portable mode reuses the admin credentials)
+    - `SFTPGO_PORTABLE_DIRECTORY=/data/workspace`
 4. **Disable Public Networking** — this service is internal only
 5. Deploy
 6. Complete setup via the web service's admin panel or direct internal access

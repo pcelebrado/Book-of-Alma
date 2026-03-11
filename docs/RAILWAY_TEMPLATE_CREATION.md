@@ -44,7 +44,8 @@
 | `INTERNAL_SERVICE_TOKEN` | `${{secret(64, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}}` | Auto-generated |
 | `OPENCLAW_GATEWAY_TOKEN` | `${{secret(64, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}}` | Auto-generated |
 | `OPENCLAW_STATE_DIR` | `/data/.openclaw` | |
-| `OPENCLAW_WORKSPACE_DIR` | `/data/workspace` | |
+| `OPENCLAW_WORKSPACE_DIR` | `/root/.openclaw/workspace` | Active OpenClaw path |
+| `OPENCLAW_WORKSPACE_VOLUME_DIR` | `/data/workspace` | Persistent workspace path |
 | `RAILWAY_RUN_UID` | `0` | Required for volume permissions |
 | `PORT` | `8080` | Keep HTTP wrapper off SFTP TCP proxy port |
 | `SFTPGO_ENABLED` | `true` | |
@@ -54,7 +55,9 @@
 | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN` | `true` | |
 | `SFTPGO_DEFAULT_ADMIN_USERNAME` | `admin` | |
 | `SFTPGO_DEFAULT_ADMIN_PASSWORD` | `${{secret(32, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}}` | Auto-generated |
-| `SFTPGO_PORTABLE_USERNAME` | `admin` | Portable fallback login username |
+| `SFTPGO_PORTABLE_USERNAME` | _(leave empty)_ | Optional override; blank reuses admin username |
+| `SFTPGO_PORTABLE_PASSWORD` | _(leave empty)_ | Optional override; blank reuses admin password |
+| `SFTPGO_PORTABLE_DIRECTORY` | `/data/workspace` | Shared workspace transfer path |
 | `INTERNAL_GATEWAY_HOST` | `127.0.0.1` | |
 | `INTERNAL_GATEWAY_PORT` | `18789` | |
 | `OPENCLAW_ENTRY` | `/openclaw/dist/entry.js` | |
