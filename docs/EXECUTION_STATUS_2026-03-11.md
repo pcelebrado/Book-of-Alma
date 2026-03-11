@@ -32,6 +32,7 @@ All timestamps below are America/Denver (`-06:00`).
 | `db3a7bba-38be-4540-a35f-2de5ddfc1290` | success | 2026-03-11 03:14:55 | OpenClaw-supported QMD command-timeout fix for Railway cold starts. |
 | `f774feca-0cff-4ee9-be11-0f4459f76e7e` | success | 2026-03-11 03:49:38 | Commit `b4838ac` removes Alma-specific QMD warmup drift, disables custom warmups by default, and scrubs the legacy Alma verification seed from persisted volumes. |
 | `e05bc772-6db0-4277-a376-cf2b26a816bc` | success | 2026-03-11 06:22:51 | Commit `26a48cb` restored `memory.qmd.searchMode=search`, but the image is pinned to OpenClaw `v2026.2.9`, so the live deployment rejected that key and had to be remediated in-place. |
+| `b1ac0213-af1c-4219-bb15-4927a89babc2` | building | 2026-03-11 06:49:44 | Commit `e2bdfc0` re-aligns the template with the pinned OpenClaw `v2026.2.9` release by scrubbing unsupported `memory.qmd.searchMode` instead of writing it. |
 
 ## Implemented during this pass
 
@@ -46,6 +47,7 @@ All timestamps below are America/Denver (`-06:00`).
 - Explicit Railway vars for the correction deploy: `OPENCLAW_QMD_WARM_ON_BOOT=false`, `OPENCLAW_MEMORY_WARMUP_ENABLED=false`, `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test`
 - New finding from live deploy `e05bc772-6db0-4277-a376-cf2b26a816bc`: the image is pinned to OpenClaw `v2026.2.9`, and that release rejects `memory.qmd.searchMode` as an unknown key even though newer OpenClaw docs/source now support it.
 - Live remediation applied on March 11, 2026: `openclaw doctor --fix` removed `memory.qmd.searchMode` from `/data/.openclaw/openclaw.json`, after which the gateway resumed listening on `127.0.0.1:18789`.
+- Corrective template commit `e2bdfc0` is now pushed to `main`, and Railway deploy `b1ac0213-af1c-4219-bb15-4927a89babc2` is the image rollout that should preserve that behavior across future restarts.
 
 ## Current live findings
 
