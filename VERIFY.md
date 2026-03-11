@@ -21,6 +21,8 @@ openclaw memory search "Alma"
 
 The template explicitly sets `memory.qmd.scope.default=allow` so the CLI search
 path above is valid even without an active chat session.
+It also sets `memory.qmd.paths` for the active workspace so QMD can recall
+general workspace files instead of only the default memory Markdown files.
 It also raises the QMD timeouts used during search and bootstrap so first-run
 local model downloads have longer to complete on Railway.
 QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
@@ -84,6 +86,7 @@ Expected output:
 find /data/workspace -maxdepth 2 -type f \( -name 'MEMORY.md' -o -path '/data/workspace/memory/*.md' \) | sort
 openclaw memory status
 openclaw memory index
+openclaw config get memory.qmd.paths --json
 openclaw memory status --agent main --deep --index --json
 ```
 
@@ -94,6 +97,7 @@ Expected output:
 - `memory/railway-alma-verification.md` exists on fresh Railway volumes
 - `openclaw memory status` does not report `disabled:true`
 - `openclaw memory index` does not report `Memory search disabled`
+- `memory.qmd.paths` contains at least one non-memory workspace entry
 - JSON with `results[0].status.files > 0`
 - JSON with `results[0].status.chunks > 0`
 

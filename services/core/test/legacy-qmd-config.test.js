@@ -36,6 +36,10 @@ test("template env surfaces no longer expose the removed qmd searchMode setting"
   );
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_PROVIDER=local/);
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_PROVIDER=local/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true/);
+  assert.match(envExample, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=\*\*\/\*/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=15000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=15000/);
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
@@ -46,4 +50,5 @@ test("runtime bootstrap seeds the Alma verification note for fresh Railway volum
   const bootstrap = fs.readFileSync(new URL("../scripts/runtime-bootstrap.sh", import.meta.url), "utf8");
   assert.match(bootstrap, /railway-alma-verification\.md/);
   assert.match(bootstrap, /Verification query: Alma/);
+  assert.match(bootstrap, /workspace-all/);
 });

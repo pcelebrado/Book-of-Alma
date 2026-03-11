@@ -13,6 +13,7 @@ CREDENTIALS_DIR="${STATE_DIR}/credentials"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-${DATA_ROOT}/sftpgo}"
 SFTPGO_SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
+QMD_WORKSPACE_PATTERN="${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN:-**/*}"
 QMD_STATE_DIR="${STATE_DIR}/agents/main/qmd"
 QMD_XDG_CONFIG_HOME="${QMD_STATE_DIR}/xdg-config"
 QMD_XDG_CACHE_HOME="${QMD_STATE_DIR}/xdg-cache"
@@ -25,6 +26,14 @@ MEMORY_SEARCH_STORE_PATH="${OPENCLAW_MEMORY_SEARCH_STORE_PATH:-${STATE_DIR}/memo
 
 log() {
   printf '[runtime-bootstrap] %s\n' "$*"
+}
+
+bool_env_true() {
+  local value="${1:-}"
+  case "$(printf '%s' "${value}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 timestamp() {
@@ -282,6 +291,10 @@ warm_qmd() {
   ensure_qmd_collection "memory-root" "${WORKSPACE_DIR}" "MEMORY.md" || true
   ensure_qmd_collection "memory-alt" "${WORKSPACE_DIR}" "memory.md" || true
   ensure_qmd_collection "memory-dir" "${WORKSPACE_DIR}/memory" "**/*.md" || true
+  if bool_env_true "${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE:-true}"; then
+    log "QMD workspace warmup collection enabled (root=${WORKSPACE_DIR}, pattern=${QMD_WORKSPACE_PATTERN})"
+    ensure_qmd_collection "workspace-all" "${WORKSPACE_DIR}" "${QMD_WORKSPACE_PATTERN}" || true
+  fi
 
   "${QMD_COMMAND}" update || true
   "${QMD_COMMAND}" embed || true

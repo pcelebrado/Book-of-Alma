@@ -95,6 +95,14 @@
     "value": "5m",
     "description": "QMD refresh cadence for memory ingestion updates."
   },
+  "OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE": {
+    "value": "true",
+    "description": "If true, the wrapper adds workspace-wide QMD collections so memory_search can recall more than MEMORY.md and memory/*.md."
+  },
+  "OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN": {
+    "value": "**/*",
+    "description": "Glob used for workspace-wide QMD collections under memory.qmd.paths."
+  },
   "OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC": {
     "value": "false",
     "description": "If false, OpenClaw does not block startup waiting for QMD boot sync."

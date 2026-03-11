@@ -112,6 +112,15 @@ retry_capture "openclaw memory index" /tmp/openclaw-memory-index.txt openclaw me
 assert_no_disabled_output "openclaw memory index" /tmp/openclaw-memory-index.txt
 
 retry_capture \
+  "openclaw config get memory.qmd.paths --json" \
+  /tmp/openclaw-memory-qmd-paths.json \
+  openclaw config get memory.qmd.paths --json
+
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-qmd-paths.json','utf8')); const paths=Array.isArray(data)?data:Array.isArray(data?.value)?data.value:[]; if(!paths.some((entry)=>entry&&typeof entry==='object'&&String(entry.name||'').startsWith('workspace-'))){process.exit(1)}" \
+  || fail "memory.qmd.paths is missing workspace-wide QMD entries"
+pass "memory.qmd.paths contains workspace-wide QMD entries"
+
+retry_capture \
   "openclaw memory status --agent main --deep --index --json" \
   /tmp/openclaw-memory-status.json \
   openclaw memory status --agent main --deep --index --json

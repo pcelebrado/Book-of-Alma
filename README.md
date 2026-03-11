@@ -433,6 +433,8 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m`
 - `OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false`
 - `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true`
+- `OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true`
+- `OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=**/*`
 - `OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=15000`
 - `OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000`
 - `OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000`
@@ -446,6 +448,8 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 The template also seeds `MEMORY.md`, `memory/YYYY-MM-DD.md`, and
 `memory/railway-alma-verification.md`, then warms QMD on boot using the same
 XDG directories that OpenClaw uses at runtime.
+It also writes `memory.qmd.paths` so QMD indexes the rest of the workspace by
+default instead of limiting retrieval to `MEMORY.md` and `memory/*.md`.
 
 The wrapper also sets `memory.qmd.scope.default=allow` so operator-side CLI
 checks like `openclaw memory search "Alma"` work from Railway shells without a
@@ -465,6 +469,7 @@ search strategy by default:
 - model `hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
 - cache dir `/data/.openclaw/models/node-llama-cpp`
 - store path `/data/.openclaw/memory/{agentId}.sqlite`
+- QMD paths `memory.qmd.paths[]=top-level workspace entries` with pattern `**/*`
 
 `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `VOYAGE_API_KEY` are optional and are
 only needed if you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` to a

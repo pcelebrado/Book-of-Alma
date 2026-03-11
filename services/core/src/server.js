@@ -99,6 +99,8 @@ const OPENCLAW_MEMORY_QMD_COMMAND =
   "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd";
 const OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL =
   process.env.OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL?.trim() || "5m";
+const OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN =
+  process.env.OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN?.trim() || "**/*";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || "";
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY?.trim() || "";
@@ -144,6 +146,10 @@ const OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY,
   true,
 );
+const OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE = parseBoolEnv(
+  process.env.OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE,
+  true,
+);
 const OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH = parseBoolEnv(
   process.env.OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH,
   IS_RAILWAY,
@@ -160,6 +166,79 @@ const OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS,
   300_000,
 );
+const WORKSPACE_QMD_IGNORED_NAMES = new Set([
+  ".git",
+  ".hg",
+  ".svn",
+  ".openclaw",
+  ".cache",
+  ".next",
+  ".turbo",
+  ".yarn",
+  ".pnpm",
+  ".pnpm-store",
+  ".npm",
+  ".venv",
+  "__pycache__",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  "memory",
+  "tmp",
+  "temp",
+]);
+
+function slugifyQmdCollectionName(value, fallback = "item") {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
+
+function shouldIndexWorkspaceEntry(name) {
+  const normalized = String(name || "").trim().toLowerCase();
+  if (!normalized) return false;
+  return !WORKSPACE_QMD_IGNORED_NAMES.has(normalized);
+}
+
+function resolveWorkspaceQmdPaths() {
+  if (!OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE) {
+    return [];
+  }
+
+  fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+  const entries = fs
+    .readdirSync(WORKSPACE_DIR, { withFileTypes: true })
+    .filter((entry) => shouldIndexWorkspaceEntry(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const paths = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(WORKSPACE_DIR, entry.name);
+    const slug = slugifyQmdCollectionName(entry.name);
+
+    if (entry.isDirectory()) {
+      paths.push({
+        name: `workspace-${slug}`,
+        path: entryPath,
+        pattern: OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN,
+      });
+      continue;
+    }
+
+    if (entry.isFile() && !["memory.md", "MEMORY.md"].includes(entry.name)) {
+      paths.push({
+        name: `workspace-file-${slug}`,
+        path: entryPath,
+      });
+    }
+  }
+
+  return paths;
+}
 
 function resolveMemorySearchStrategy() {
   const explicit = OPENCLAW_MEMORY_SEARCH_PROVIDER;
@@ -3940,11 +4019,19 @@ async function applyMemoryBackendDefaults() {
     ["memory.qmd.update.updateTimeoutMs", OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS],
     ["memory.qmd.update.embedTimeoutMs", OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS],
     ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
+    ["memory.qmd.paths", resolveWorkspaceQmdPaths()],
     ["memory.qmd.limits.timeoutMs", OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS],
     ["memory.qmd.scope.default", "allow"],
   ]);
   const memorySearch = await applyMemorySearchDefaults();
-  const output = [patch.output || "", memorySearch.output || ""].filter(Boolean).join("\n");
+  const workspaceQmdPaths = resolveWorkspaceQmdPaths();
+  const output = [
+    `[memory-qmd] workspaceIndex=${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE} paths=${workspaceQmdPaths.length} pattern=${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN}`,
+    patch.output || "",
+    memorySearch.output || "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   return {
     ok: patch.ok && memorySearch.ok,
     reason: !patch.ok ? "set_failed" : memorySearch.ok ? "configured" : memorySearch.reason,

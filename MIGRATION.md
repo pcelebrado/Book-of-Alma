@@ -27,6 +27,8 @@ OPENCLAW_MEMORY_BACKEND=qmd
 OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd
 OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true
 OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m
+OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true
+OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=**/*
 OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC=false
 OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=15000
 OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000
@@ -44,6 +46,7 @@ OPENCLAW_MEMORY_SEARCH_STORE_PATH=/data/.openclaw/memory/{agentId}.sqlite
 Default Railway memory-search strategy:
 
 - QMD remains the memory backend.
+- QMD now indexes the whole active workspace by default via `memory.qmd.paths`, not just `MEMORY.md` and `memory/*.md`.
 - QMD scope default is set to `allow` so CLI verification searches are not denied.
 - QMD query/update/embed timeouts are raised for Railway cold starts and model downloads.
 - The wrapper clears `BUN_INSTALL` and pins `OPENCLAW_MEMORY_QMD_COMMAND` to the direct `@tobilu/qmd` entrypoint on Railway.
