@@ -58,6 +58,18 @@ ensure_mode() {
   fi
 }
 
+ensure_writable_dir() {
+  local dir="$1"
+  local probe="${dir}/.write-test"
+  ensure_dir "${dir}"
+  ensure_mode "${dir}" 700
+  if ! printf 'ok' > "${probe}" 2>/dev/null; then
+    log "Warning: ${dir} is not writable"
+    return 1
+  fi
+  rm -f "${probe}" 2>/dev/null || true
+}
+
 backup_path() {
   local src="$1"
   local label="$2"
@@ -255,8 +267,8 @@ prepare_qmd_dirs() {
 
 prepare_memory_search_dirs() {
   local concrete_store_path="${MEMORY_SEARCH_STORE_PATH/\{agentId\}/main}"
-  ensure_dir "${MEMORY_SEARCH_CACHE_DIR}"
-  ensure_dir "$(dirname "${concrete_store_path}")"
+  ensure_writable_dir "${MEMORY_SEARCH_CACHE_DIR}" || true
+  ensure_writable_dir "$(dirname "${concrete_store_path}")" || true
 }
 
 qmd_collection_exists() {

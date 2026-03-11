@@ -76,7 +76,7 @@ retry_capture() {
 assert_no_disabled_output() {
   local label="$1"
   local file="$2"
-  if grep -Eiq 'Memory search disabled|disabled:[[:space:]]*true|missing embedding provider auth|missing embedding model path' "${file}"; then
+  if grep -Eiq 'Memory search disabled|disabled:[[:space:]]*true|missing embedding provider auth|missing embedding model path|timed out after|ENOENT|rename .*\.ipull' "${file}"; then
     cat "${file}" >&2 || true
     fail "${label} reports memory search disabled"
   fi

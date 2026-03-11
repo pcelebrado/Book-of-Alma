@@ -168,6 +168,14 @@ const OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS = parsePositiveIntEnv(
 );
 const OPENCLAW_MEMORY_QMD_WARMUP_QUERY =
   process.env.OPENCLAW_MEMORY_QMD_WARMUP_QUERY?.trim() || "Alma verification note";
+const OPENCLAW_MEMORY_WARMUP_RETRIES = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_WARMUP_RETRIES,
+  3,
+);
+const OPENCLAW_MEMORY_WARMUP_BACKOFF_MS = parsePositiveIntEnv(
+  process.env.OPENCLAW_MEMORY_WARMUP_BACKOFF_MS,
+  10_000,
+);
 const WORKSPACE_QMD_IGNORED_NAMES = new Set([
   ".git",
   ".hg",
@@ -368,6 +376,16 @@ function resolveMemorySearchRuntime() {
   return runtime;
 }
 
+function ensureWritableDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+  try {
+    fs.chmodSync(dirPath, 0o700);
+  } catch {}
+  const probePath = path.join(dirPath, ".write-test");
+  fs.writeFileSync(probePath, "ok", { encoding: "utf8", mode: 0o600 });
+  fs.rmSync(probePath, { force: true });
+}
+
 function ensureMemorySearchRuntimeLayout(runtime = resolveMemorySearchRuntime()) {
   const dirs = [path.dirname(materializeAgentToken(runtime.storePath, "main"))];
 
@@ -376,7 +394,11 @@ function ensureMemorySearchRuntimeLayout(runtime = resolveMemorySearchRuntime())
   }
 
   for (const dir of dirs.filter(Boolean)) {
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      ensureWritableDir(dir);
+    } catch (err) {
+      console.warn(`[memory-search] warning: failed to prepare writable dir ${dir}: ${String(err)}`);
+    }
   }
 
   return runtime;
@@ -4055,33 +4077,44 @@ function startMemoryIndexWarmup(reason = "boot") {
   logMemorySearchRuntime(runtime, `warmup:${reason}`);
   memoryIndexWarmup = (async () => {
     console.log(`[memory-search] warmup starting reason=${reason}`);
-    const index = await runCmd(OPENCLAW_NODE, clawArgs(["memory", "index", "--agent", "main"]), {
-      timeoutMs: 300_000,
-    });
-    if (index.code === 0) {
-      const search = await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY]),
-        {
-          timeoutMs: 300_000,
-        },
-      );
-      if (search.code === 0) {
-        console.log(`[memory-search] warmup complete reason=${reason}`);
-        return;
+    for (let attempt = 1; attempt <= OPENCLAW_MEMORY_WARMUP_RETRIES; attempt += 1) {
+      ensureMemorySearchRuntimeLayout(runtime);
+      const index = await runCmd(OPENCLAW_NODE, clawArgs(["memory", "index", "--agent", "main"]), {
+        timeoutMs: 300_000,
+      });
+      if (index.code === 0) {
+        const search = await runCmd(
+          OPENCLAW_NODE,
+          clawArgs(["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY]),
+          {
+            timeoutMs: 300_000,
+          },
+        );
+        if (search.code === 0) {
+          console.log(`[memory-search] warmup complete reason=${reason} attempt=${attempt}`);
+          return;
+        }
+
+        console.warn(
+          `[memory-search] warmup query warning: openclaw memory search exited ${search.code} attempt=${attempt}`,
+        );
+        if (search.output) {
+          console.warn(trimCommandOutput(search.output));
+        }
+      } else {
+        console.warn(`[memory-search] warmup warning: openclaw memory index exited ${index.code} attempt=${attempt}`);
+        if (index.output) {
+          console.warn(trimCommandOutput(index.output));
+        }
       }
 
-      console.warn(`[memory-search] warmup query warning: openclaw memory search exited ${search.code}`);
-      if (search.output) {
-        console.warn(trimCommandOutput(search.output));
+      if (attempt < OPENCLAW_MEMORY_WARMUP_RETRIES) {
+        const backoffMs = OPENCLAW_MEMORY_WARMUP_BACKOFF_MS * attempt;
+        console.warn(`[memory-search] warmup retrying in ${backoffMs}ms`);
+        await sleep(backoffMs);
       }
-      return;
     }
-
-    console.warn(`[memory-search] warmup warning: openclaw memory index exited ${index.code}`);
-    if (index.output) {
-      console.warn(trimCommandOutput(index.output));
-    }
+    console.warn(`[memory-search] warmup exhausted after ${OPENCLAW_MEMORY_WARMUP_RETRIES} attempts`);
   })()
     .catch((err) => {
       console.warn(`[memory-search] warmup error: ${String(err)}`);
