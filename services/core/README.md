@@ -35,7 +35,7 @@ Browser → [web] (public) → [core] (internal, this service)
 3. Set environment variables:
    - `SETUP_PASSWORD` — password for the `/setup` wizard and Control UI
    - `OPENCLAW_STATE_DIR=/data/.openclaw` (recommended)
-   - `OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace` (recommended active path)
+   - `OPENCLAW_WORKSPACE_DIR=/data/workspace` (recommended active path)
    - `OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace` (recommended persistent path)
     - `OPENCLAW_GATEWAY_TOKEN` — auth token (auto-generated if not set)
     - `INTERNAL_SERVICE_TOKEN` — must match the web service value
@@ -58,7 +58,7 @@ docker run --rm -p 8080:8080 \
   -e PORT=8080 \
   -e SETUP_PASSWORD=test \
   -e OPENCLAW_STATE_DIR=/data/.openclaw \
-  -e OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace \
+  -e OPENCLAW_WORKSPACE_DIR=/data/workspace \
   -e OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace \
   -v $(pwd)/.tmpdata:/data \
   openclaw-core
@@ -70,8 +70,8 @@ Railway containers have an ephemeral filesystem. Only the mounted volume at `/da
 
 What persists:
 - **OpenClaw config and credentials** — `/data/.openclaw/`
-- **Physical agent workspace** — `/data/workspace/`
-- **Active agent workspace** — `/root/.openclaw/workspace` (symlink to `/data/workspace`)
+- **Active agent workspace** — `/data/workspace/`
+- **Compatibility workspace path** — `/root/.openclaw/workspace` (symlink to `/data/workspace`)
 - **QMD sqlite index** — `/data/.openclaw/agents/main/qmd/xdg-cache/qmd/index.sqlite`
 - **Workspace sqlite pointers** — `/data/workspace/SQLITE_SOURCES.md`, `/data/workspace/qmd-index.sqlite`
 - **Node global tools** — `/data/npm/`, `/data/pnpm/`
@@ -86,7 +86,7 @@ On every boot the service:
 
 - creates `/data/workspace` and `/data/.openclaw`
 - migrates or backs up non-symlink `/root/.openclaw/workspace`
-- rewires `/root/.openclaw/workspace -> /data/workspace`
+- points `/root/.openclaw/workspace -> /data/workspace`
 - maps legacy `/workspace -> /data/workspace`
 - enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
 - seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing

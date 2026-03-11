@@ -49,7 +49,7 @@ Set these values in Railway Variables (service-level), not in git.
 - `SETUP_PASSWORD` -> set from `OC_SETUP_PASSWORD`
 - `OPENCLAW_GATEWAY_TOKEN` -> set from `OC_GATEWAY_TOKEN` (recommended)
 - `OPENCLAW_STATE_DIR=/data/.openclaw`
-- `OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace`
+- `OPENCLAW_WORKSPACE_DIR=/data/workspace`
 - `OPENCLAW_WORKSPACE_VOLUME_DIR=/data/workspace`
 - Optional:
   - `INTERNAL_GATEWAY_HOST`

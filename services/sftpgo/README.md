@@ -7,7 +7,7 @@ Optional SFTPGo service for book-source ingestion and operator file exchange.
 - Provides SFTP over SSH on port `2022`.
 - Provides WebAdmin/API on port `8080`.
 - Persists user data and host keys on Railway volume (`/data/sftpgo`).
-- Mirrors the persistent OpenClaw workspace at `/data/workspace`.
+- Mirrors the active OpenClaw workspace at `/data/workspace`.
 
 ## Railway setup
 

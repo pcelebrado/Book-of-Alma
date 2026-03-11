@@ -4,11 +4,12 @@ set -euo pipefail
 export OPENCLAW_DATA_ROOT="${OPENCLAW_DATA_ROOT:-/data}"
 export OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-${OPENCLAW_DATA_ROOT}/.openclaw}"
 export OPENCLAW_WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR:-${OPENCLAW_DATA_ROOT}/workspace}"
-export OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-/root/.openclaw/workspace}"
+export OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${OPENCLAW_WORKSPACE_VOLUME_DIR}}"
 
 STATE_DIR="${OPENCLAW_STATE_DIR}"
 WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR}"
 WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR}"
+WORKSPACE_COMPAT_DIR="${OPENCLAW_WORKSPACE_COMPAT_DIR:-/root/.openclaw/workspace}"
 CREDENTIALS_DIR="${STATE_DIR}/credentials"
 QUERY="${1:-railway persistent workspace}"
 
@@ -32,7 +33,10 @@ assert_eq() {
 }
 
 real_workspace="$(readlink -f "${WORKSPACE_DIR}")"
-assert_eq "${real_workspace}" "${WORKSPACE_VOLUME_DIR}" "workspace symlink"
+assert_eq "${real_workspace}" "${WORKSPACE_VOLUME_DIR}" "active workspace path"
+
+compat_workspace="$(readlink -f "${WORKSPACE_COMPAT_DIR}")"
+assert_eq "${compat_workspace}" "${WORKSPACE_DIR}" "compatibility workspace symlink"
 
 credentials_mode="$(stat -c '%a' "${CREDENTIALS_DIR}")"
 assert_eq "${credentials_mode}" "700" "credentials dir permissions"

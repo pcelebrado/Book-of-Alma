@@ -44,7 +44,7 @@
 | `INTERNAL_SERVICE_TOKEN` | `${{secret(64, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}}` | Auto-generated |
 | `OPENCLAW_GATEWAY_TOKEN` | `${{secret(64, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}}` | Auto-generated |
 | `OPENCLAW_STATE_DIR` | `/data/.openclaw` | |
-| `OPENCLAW_WORKSPACE_DIR` | `/root/.openclaw/workspace` | Active OpenClaw path |
+| `OPENCLAW_WORKSPACE_DIR` | `/data/workspace` | Active OpenClaw path |
 | `OPENCLAW_WORKSPACE_VOLUME_DIR` | `/data/workspace` | Persistent workspace path |
 | `RAILWAY_RUN_UID` | `0` | Required for volume permissions |
 | `PORT` | `8080` | Keep HTTP wrapper off SFTP TCP proxy port |

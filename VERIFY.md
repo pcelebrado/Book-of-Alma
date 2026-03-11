@@ -8,19 +8,21 @@ Run these commands inside the `openclaw-core` container after deploy and after a
 bash /app/scripts/post-deploy-verify.sh
 ```
 
-Expected result: every line starts with `[verify] PASS`, including workspace symlink, permissions, QMD version, memory file/chunk counts, and memory search snippets.
+Expected result: every line starts with `[verify] PASS`, including the active workspace path, the compatibility symlink, permissions, QMD version, memory file/chunk counts, and memory search snippets.
 
 ## Manual checks
 
-1. Active workspace resolves to the persistent volume:
+1. Active workspace and compatibility path resolve to the same persistent volume:
 
 ```bash
+readlink -f /data/workspace
 readlink -f /root/.openclaw/workspace
 ```
 
 Expected output:
 
 ```text
+/data/workspace
 /data/workspace
 ```
 

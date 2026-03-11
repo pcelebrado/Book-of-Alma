@@ -46,7 +46,7 @@ const WORKSPACE_VOLUME_DIR =
 
 const WORKSPACE_DIR =
   process.env.OPENCLAW_WORKSPACE_DIR?.trim() ||
-  (IS_RAILWAY ? path.join(os.homedir(), ".openclaw", "workspace") : WORKSPACE_VOLUME_DIR);
+  (IS_RAILWAY ? WORKSPACE_VOLUME_DIR : path.join(os.homedir(), ".openclaw", "workspace"));
 const CREDENTIALS_DIR = path.join(STATE_DIR, "credentials");
 
 // Protect /setup with a user-provided password.

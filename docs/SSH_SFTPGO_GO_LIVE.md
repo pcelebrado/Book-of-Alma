@@ -40,7 +40,7 @@ curl -fsS "https://<sftpgo-domain>/healthz"
 sftp -P 2022 <username>@<sftpgo-domain>
 ```
 
-5. Upload a probe file and confirm it appears under `/data/workspace` and is visible to OpenClaw at `/root/.openclaw/workspace`.
+5. Upload a probe file and confirm it appears under `/data/workspace` and is visible through the compatibility path `/root/.openclaw/workspace`.
 
 ## Operational notes
 

@@ -168,10 +168,9 @@ Railway will create a project with the repo attached. Configure
 Core now enforces one durable workspace layout on every boot:
 
 - `/data/.openclaw` stores persistent OpenClaw state
-- `/data/workspace` stores the physical workspace contents
-- `/root/.openclaw/workspace` is the active OpenClaw workspace path
-- `/root/.openclaw/workspace` is recreated as a symlink to `/data/workspace`
-- SFTPGo transfers must target `/data/workspace`
+- `/data/workspace` is the configured OpenClaw workspace path
+- `/root/.openclaw/workspace` is recreated as a compatibility symlink to `/data/workspace`
+- SFTPGo transfers land directly in `/data/workspace`
 
 ### 3. After Deploy
 
@@ -211,8 +210,8 @@ SFTP connection profile (core service):
 
 If full SFTPGo mode cannot start in the runtime image, core automatically falls
 back to `sftpgo portable` so SFTP uploads remain available for testing. Portable
-mode is pinned to `/data/workspace` to keep SFTP transfers and the active
-OpenClaw workspace aligned.
+mode is pinned to the configured `OPENCLAW_WORKSPACE_DIR`, which defaults to
+`/data/workspace`, so SFTP transfers land in the same directory OpenClaw uses.
 
 ### Option 2: Git-based Import
 

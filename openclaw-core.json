@@ -16,8 +16,8 @@
     "description": "Persistent directory for OpenClaw state, credentials, and runtime config."
   },
   "OPENCLAW_WORKSPACE_DIR": {
-    "value": "/root/.openclaw/workspace",
-    "description": "Active OpenClaw workspace path inside the container. Startup rewires this symlink to the persistent Railway volume at /data/workspace."
+    "value": "/data/workspace",
+    "description": "Configured OpenClaw workspace path inside the container. Template defaults this to the persistent Railway volume so SFTP lands in the same directory OpenClaw uses."
   },
   "OPENCLAW_WORKSPACE_VOLUME_DIR": {
     "value": "/data/workspace",
@@ -65,7 +65,7 @@
   },
   "SFTPGO_PORTABLE_DIRECTORY": {
     "value": "/data/workspace",
-    "description": "Directory exposed via SFTP portable mode. This must match the persistent OpenClaw workspace to avoid split-brain restores."
+    "description": "Directory exposed via SFTP portable mode. Keep this aligned with OPENCLAW_WORKSPACE_DIR so SFTP sessions land in the active OpenClaw workspace."
   },
   "INTERNAL_GATEWAY_HOST": {
     "value": "127.0.0.1",

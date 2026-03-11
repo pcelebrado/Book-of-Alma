@@ -4,8 +4,9 @@ set -euo pipefail
 DATA_ROOT="${OPENCLAW_DATA_ROOT:-/data}"
 STATE_DIR="${OPENCLAW_STATE_DIR:-${DATA_ROOT}/.openclaw}"
 WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR:-${DATA_ROOT}/workspace}"
-WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-/root/.openclaw/workspace}"
-ROOT_HOME_OPENCLAW_DIR="$(dirname "${WORKSPACE_DIR}")"
+WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${WORKSPACE_VOLUME_DIR}}"
+WORKSPACE_COMPAT_DIR="${OPENCLAW_WORKSPACE_COMPAT_DIR:-/root/.openclaw/workspace}"
+ROOT_HOME_OPENCLAW_DIR="$(dirname "${WORKSPACE_COMPAT_DIR}")"
 CREDENTIALS_DIR="${STATE_DIR}/credentials"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-${DATA_ROOT}/sftpgo}"
 SFTPGO_SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
@@ -14,8 +15,8 @@ QMD_STATE_DIR="${STATE_DIR}/agents/main/qmd"
 QMD_XDG_CONFIG_HOME="${QMD_STATE_DIR}/xdg-config"
 QMD_XDG_CACHE_HOME="${QMD_STATE_DIR}/xdg-cache"
 BOOTSTRAP_DATE="$(date -u +%F)"
-BOOTSTRAP_MEMORY_FILE="${WORKSPACE_VOLUME_DIR}/MEMORY.md"
-BOOTSTRAP_DAILY_MEMORY_FILE="${WORKSPACE_VOLUME_DIR}/memory/${BOOTSTRAP_DATE}.md"
+BOOTSTRAP_MEMORY_FILE="${WORKSPACE_DIR}/MEMORY.md"
+BOOTSTRAP_DAILY_MEMORY_FILE="${WORKSPACE_DIR}/memory/${BOOTSTRAP_DATE}.md"
 
 log() {
   printf '[runtime-bootstrap] %s\n' "$*"
@@ -68,24 +69,74 @@ sync_if_target_empty() {
   fi
 }
 
-ensure_workspace_symlink() {
+ensure_workspace_target() {
+  ensure_dir "$(dirname "${WORKSPACE_DIR}")"
   ensure_dir "${WORKSPACE_VOLUME_DIR}"
-  ensure_dir "${ROOT_HOME_OPENCLAW_DIR}"
+
+  if [ "${WORKSPACE_DIR}" = "${WORKSPACE_COMPAT_DIR}" ]; then
+    if [ -L "${WORKSPACE_DIR}" ]; then
+      local target
+      target="$(readlink -f "${WORKSPACE_DIR}" || true)"
+      if [ "${target}" = "${WORKSPACE_VOLUME_DIR}" ]; then
+        return 0
+      fi
+      backup_path "${WORKSPACE_DIR}" "root-openclaw-workspace-link"
+    elif [ -e "${WORKSPACE_DIR}" ]; then
+      sync_if_target_empty "${WORKSPACE_DIR}" "${WORKSPACE_VOLUME_DIR}"
+      backup_path "${WORKSPACE_DIR}" "root-openclaw-workspace"
+    fi
+
+    ln -sfn "${WORKSPACE_VOLUME_DIR}" "${WORKSPACE_DIR}"
+    log "Linked ${WORKSPACE_DIR} -> ${WORKSPACE_VOLUME_DIR}"
+    return 0
+  fi
 
   if [ -L "${WORKSPACE_DIR}" ]; then
     local target
     target="$(readlink -f "${WORKSPACE_DIR}" || true)"
     if [ "${target}" = "${WORKSPACE_VOLUME_DIR}" ]; then
+      rm -f "${WORKSPACE_DIR}"
+      ensure_dir "${WORKSPACE_DIR}"
+      sync_if_target_empty "${WORKSPACE_VOLUME_DIR}" "${WORKSPACE_DIR}"
+      log "Promoted ${WORKSPACE_DIR} from symlinked volume path to direct workspace directory"
       return 0
     fi
-    backup_path "${WORKSPACE_DIR}" "root-openclaw-workspace-link"
-  elif [ -e "${WORKSPACE_DIR}" ]; then
-    sync_if_target_empty "${WORKSPACE_DIR}" "${WORKSPACE_VOLUME_DIR}"
-    backup_path "${WORKSPACE_DIR}" "root-openclaw-workspace"
+    if [ "${target}" = "$(readlink -f "${WORKSPACE_DIR}")" ]; then
+      return 0
+    fi
+    backup_path "${WORKSPACE_DIR}" "configured-workspace-link"
   fi
 
-  ln -sfn "${WORKSPACE_VOLUME_DIR}" "${WORKSPACE_DIR}"
-  log "Linked ${WORKSPACE_DIR} -> ${WORKSPACE_VOLUME_DIR}"
+  if [ ! -e "${WORKSPACE_DIR}" ]; then
+    ensure_dir "${WORKSPACE_DIR}"
+  fi
+
+  if [ "${WORKSPACE_DIR}" != "${WORKSPACE_VOLUME_DIR}" ]; then
+    sync_if_target_empty "${WORKSPACE_VOLUME_DIR}" "${WORKSPACE_DIR}"
+  fi
+}
+
+ensure_workspace_compat_link() {
+  ensure_dir "${ROOT_HOME_OPENCLAW_DIR}"
+
+  if [ "${WORKSPACE_DIR}" = "${WORKSPACE_COMPAT_DIR}" ]; then
+    return 0
+  fi
+
+  if [ -L "${WORKSPACE_COMPAT_DIR}" ]; then
+    local target
+    target="$(readlink -f "${WORKSPACE_COMPAT_DIR}" || true)"
+    if [ "${target}" = "$(readlink -f "${WORKSPACE_DIR}")" ]; then
+      return 0
+    fi
+    backup_path "${WORKSPACE_COMPAT_DIR}" "root-openclaw-workspace-link"
+  elif [ -e "${WORKSPACE_COMPAT_DIR}" ]; then
+    sync_if_target_empty "${WORKSPACE_COMPAT_DIR}" "${WORKSPACE_DIR}"
+    backup_path "${WORKSPACE_COMPAT_DIR}" "root-openclaw-workspace"
+  fi
+
+  ln -sfn "${WORKSPACE_DIR}" "${WORKSPACE_COMPAT_DIR}"
+  log "Linked ${WORKSPACE_COMPAT_DIR} -> ${WORKSPACE_DIR}"
 }
 
 ensure_legacy_workspace_mapping() {
@@ -93,17 +144,17 @@ ensure_legacy_workspace_mapping() {
   if [ -L "${legacy}" ]; then
     local target
     target="$(readlink -f "${legacy}" || true)"
-    if [ "${target}" = "${WORKSPACE_VOLUME_DIR}" ]; then
+    if [ "${target}" = "$(readlink -f "${WORKSPACE_DIR}")" ]; then
       return 0
     fi
     backup_path "${legacy}" "legacy-workspace-link"
   elif [ -e "${legacy}" ]; then
-    sync_if_target_empty "${legacy}" "${WORKSPACE_VOLUME_DIR}"
+    sync_if_target_empty "${legacy}" "${WORKSPACE_DIR}"
     backup_path "${legacy}" "legacy-workspace"
   fi
 
-  ln -sfn "${WORKSPACE_VOLUME_DIR}" "${legacy}"
-  log "Mapped ${legacy} -> ${WORKSPACE_VOLUME_DIR}"
+  ln -sfn "${WORKSPACE_DIR}" "${legacy}"
+  log "Mapped ${legacy} -> ${WORKSPACE_DIR}"
 }
 
 fix_permissions() {
@@ -128,7 +179,7 @@ fix_permissions() {
 }
 
 seed_memory_corpus() {
-  ensure_dir "${WORKSPACE_VOLUME_DIR}/memory"
+  ensure_dir "${WORKSPACE_DIR}/memory"
 
   if [ ! -f "${BOOTSTRAP_MEMORY_FILE}" ]; then
     cat > "${BOOTSTRAP_MEMORY_FILE}" <<EOF
@@ -137,7 +188,7 @@ seed_memory_corpus() {
 - Active OpenClaw workspace path: ${WORKSPACE_DIR}
 - Persistent workspace volume path: ${WORKSPACE_VOLUME_DIR}
 - Persistent OpenClaw state path: ${STATE_DIR}
-- SFTPGo transfer path: ${WORKSPACE_VOLUME_DIR}
+- SFTPGo transfer path: ${WORKSPACE_DIR}
 - Search query hint: railway persistent workspace
 EOF
     chmod 600 "${BOOTSTRAP_MEMORY_FILE}" 2>/dev/null || true
@@ -148,8 +199,8 @@ EOF
     cat > "${BOOTSTRAP_DAILY_MEMORY_FILE}" <<EOF
 # Boot Note ${BOOTSTRAP_DATE}
 
-This deployment stores the active OpenClaw workspace on the Railway volume at ${WORKSPACE_VOLUME_DIR}.
-The path ${WORKSPACE_DIR} is a symlink that must resolve to the same workspace.
+This deployment stores the active OpenClaw workspace at ${WORKSPACE_DIR}.
+The compatibility path ${WORKSPACE_COMPAT_DIR} must resolve to the same workspace.
 EOF
     chmod 600 "${BOOTSTRAP_DAILY_MEMORY_FILE}" 2>/dev/null || true
     log "Seeded ${BOOTSTRAP_DAILY_MEMORY_FILE}"
@@ -158,8 +209,8 @@ EOF
 
 expose_workspace_for_sftpgo() {
   ensure_dir "${SFTPGO_SRV_DIR}"
-  ln -sfn "${WORKSPACE_VOLUME_DIR}" "${SFTPGO_DATA_ROOT}/workspace"
-  ln -sfn "${WORKSPACE_VOLUME_DIR}" "${SFTPGO_SRV_DIR}/workspace"
+  ln -sfn "${WORKSPACE_DIR}" "${SFTPGO_DATA_ROOT}/workspace"
+  ln -sfn "${WORKSPACE_DIR}" "${SFTPGO_SRV_DIR}/workspace"
 }
 
 sqlite_extension_probe() {
@@ -205,9 +256,9 @@ warm_qmd() {
 
   log "QMD version: $(${QMD_COMMAND} --version 2>/dev/null || echo unavailable)"
 
-  ensure_qmd_collection "memory-root" "${WORKSPACE_VOLUME_DIR}" "MEMORY.md" || true
-  ensure_qmd_collection "memory-alt" "${WORKSPACE_VOLUME_DIR}" "memory.md" || true
-  ensure_qmd_collection "memory-dir" "${WORKSPACE_VOLUME_DIR}/memory" "**/*.md" || true
+  ensure_qmd_collection "memory-root" "${WORKSPACE_DIR}" "MEMORY.md" || true
+  ensure_qmd_collection "memory-alt" "${WORKSPACE_DIR}" "memory.md" || true
+  ensure_qmd_collection "memory-dir" "${WORKSPACE_DIR}/memory" "**/*.md" || true
 
   "${QMD_COMMAND}" update || true
   "${QMD_COMMAND}" embed || true
@@ -217,7 +268,8 @@ prepare_runtime() {
   ensure_dir "${DATA_ROOT}"
   ensure_dir "${WORKSPACE_VOLUME_DIR}"
   ensure_dir "${STATE_DIR}"
-  ensure_workspace_symlink
+  ensure_workspace_target
+  ensure_workspace_compat_link
   ensure_legacy_workspace_mapping
   fix_permissions
   seed_memory_corpus
@@ -230,7 +282,9 @@ prepare_runtime() {
     log "sqlite3 extension support probe failed"
   fi
 
+  log "Active workspace configured at ${WORKSPACE_DIR}"
   log "Active workspace resolves to $(readlink -f "${WORKSPACE_DIR}" || echo unresolved)"
+  log "Compatibility workspace resolves to $(readlink -f "${WORKSPACE_COMPAT_DIR}" || echo unresolved)"
 }
 
 case "${1:-prepare}" in
