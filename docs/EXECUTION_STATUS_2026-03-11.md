@@ -30,6 +30,7 @@ All timestamps below are America/Denver (`-06:00`).
 | `dbba54c6-dac4-4d81-8413-31cdfdb60c2e` | removed | 2026-03-10 23:52:46 | QMD query/update/embed timeout increases and verifier retry exit-code fix. |
 | `bcab78d7-ad77-403f-8e3f-aed8e95406ac` | removed | 2026-03-11 00:11:33 | Bun env cleanup pass. |
 | `db3a7bba-38be-4540-a35f-2de5ddfc1290` | success | 2026-03-11 03:14:55 | OpenClaw-supported QMD command-timeout fix for Railway cold starts. |
+| `f774feca-0cff-4ee9-be11-0f4459f76e7e` | deploying | 2026-03-11 03:49:38 | Commit `b4838ac` removes Alma-specific QMD warmup drift, disables custom warmups by default, and scrubs the legacy Alma verification seed from persisted volumes. |
 
 ## Implemented during this pass
 
@@ -41,6 +42,7 @@ All timestamps below are America/Denver (`-06:00`).
 - Deployment verifier retry exit-code fix
 - Docs/env/schema updates reflecting the real Railway runtime contract
 - Later correction: Alma-specific verification seed/query were template drift and are being removed in the next deploy
+- Explicit Railway vars for the correction deploy: `OPENCLAW_QMD_WARM_ON_BOOT=false`, `OPENCLAW_MEMORY_WARMUP_ENABLED=false`, `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test`
 
 ## Current live findings
 
