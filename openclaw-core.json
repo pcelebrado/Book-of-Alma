@@ -111,10 +111,6 @@
     "value": "true",
     "description": "Include MEMORY.md plus memory/YYYY-MM-DD.md files in QMD collections."
   },
-  "OPENCLAW_MEMORY_QMD_SEARCH_MODE": {
-    "value": "search",
-    "description": "QMD recall mode used by OpenClaw memory_search. Keep `search` on Railway to match the upstream fast default and avoid first-query reranker/query-expansion cold starts."
-  },
   "OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS": {
     "value": "120000",
     "description": "QMD search timeout in milliseconds for Railway runtime memory_search calls. Keep this high enough for first-query model warmup."

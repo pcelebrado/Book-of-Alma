@@ -91,7 +91,7 @@ On every boot the service:
 - enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
 - seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing
 - configures QMD to index the rest of `/data/workspace` via `memory.qmd.paths`
-- pins `memory.qmd.searchMode=search` so Railway uses OpenClaw's fast default instead of `qmd query`
+- scrubs unsupported `memory.qmd.searchMode` keys on boot for the pinned OpenClaw `v2026.2.9` release
 - removes the legacy `memory/railway-alma-verification.md` seed if present
 
 ### Bootstrap hook
@@ -108,7 +108,7 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
 | `memory search disabled` | QMD or local embedding warmup is still running, or the provider override is wrong | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index` and `openclaw config get memory.qmd.paths --json`; Railway defaults to explicit local embeddings with the GGUF cached under `/data/.openclaw/models/node-llama-cpp` unless you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` |
-| `qmd query ... timed out` | Runtime drifted into QMD's heavy hybrid mode | Ensure `OPENCLAW_MEMORY_QMD_SEARCH_MODE=search` is set and redeploy so OpenClaw uses the upstream default BM25 path on Railway |
+| `memory.qmd: Unrecognized key: "searchMode"` | The current pinned OpenClaw release (`v2026.2.9`) does not support that config key | Remove it with `openclaw doctor --fix`, or redeploy the template so the wrapper scrubs it automatically |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
 
 ## Migration and verification

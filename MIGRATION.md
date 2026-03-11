@@ -26,7 +26,6 @@ SFTPGO_PORTABLE_DIRECTORY=/data/workspace
 OPENCLAW_MEMORY_BACKEND=qmd
 OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd
 OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=true
-OPENCLAW_MEMORY_QMD_SEARCH_MODE=search
 OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL=5m
 OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE=true
 OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN=**/*.md
@@ -53,10 +52,10 @@ Default Railway memory-search strategy:
 
 - QMD remains the memory backend.
 - QMD now indexes the whole active workspace by default via `memory.qmd.paths`, not just `MEMORY.md` and `memory/*.md`.
-- QMD search mode is pinned to `search`, which is OpenClaw's documented default and the correct CPU-friendly mode for Railway.
 - QMD scope default is set to `allow` so CLI verification searches are not denied.
 - QMD query/update/embed timeouts are raised for Railway cold starts and model downloads.
 - The wrapper clears `BUN_INSTALL` and pins `OPENCLAW_MEMORY_QMD_COMMAND` to the direct `@tobilu/qmd` entrypoint on Railway.
+- The current image is pinned to OpenClaw `v2026.2.9`, which does not accept `memory.qmd.searchMode`; startup scrubs that key automatically if a bad deploy wrote it.
 - Semantic memory search uses explicit local embeddings.
 - No embedding API key is required unless you intentionally switch providers.
 - Remote override path: set `OPENCLAW_MEMORY_SEARCH_PROVIDER=openai|gemini|voyage` plus the matching API key.
