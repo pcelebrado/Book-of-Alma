@@ -171,3 +171,14 @@ test("hosted Claude auth portal stores Anthropic setup-tokens through the admin 
   assert.match(webAdmin, /openclaw-claude-auth-complete/);
   assert.match(webAdmin, /Start Claude Auth/);
 });
+
+test("onboarding setup applies wrapper-managed config in one pass without doctor or plugin CLI churn", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /function buildManagedRuntimeConfigEntries\(/);
+  assert.match(src, /function buildSetupChannelConfigEntries\(/);
+  assert.match(src, /function buildSetupMemoryBackendDefaults\(/);
+  assert.match(src, /const runtimePatch = applyConfigPatch\(entries\)/);
+  assert.match(src, /extra = await applyConfiguredSetupPayload\(payload\);/);
+  assert.doesNotMatch(src, /clawArgs\(\["plugins", "enable", "telegram"\]\)/);
+  assert.doesNotMatch(src, /clawArgs\(\["doctor", "--fix"\]\)/);
+});

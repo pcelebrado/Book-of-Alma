@@ -4169,6 +4169,267 @@ function applyCustomProviderConfig(payload) {
   };
 }
 
+function buildManagedRuntimeConfigEntries() {
+  return [
+    ["gateway.mode", "local"],
+    ["gateway.auth.mode", "token"],
+    ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
+    ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
+    ["gateway.http.endpoints.chatCompletions.enabled", true],
+    ["gateway.http.endpoints.responses.enabled", true],
+    ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
+    ["gateway.bind", "loopback"],
+    ["gateway.port", INTERNAL_GATEWAY_PORT],
+    ["gateway.trustedProxies", ["127.0.0.1"]],
+    ["commands.native", true],
+    ["commands.nativeSkills", true],
+    ["commands.text", true],
+    ["commands.bash", true],
+    ["commands.config", true],
+    ["commands.debug", true],
+    ["commands.restart", true],
+    ["commands.useAccessGroups", false],
+    ["tools.profile", "full"],
+    ["tools.elevated.enabled", true],
+    ["tools.exec.host", "gateway"],
+    ["tools.exec.security", "full"],
+    ["tools.exec.ask", "off"],
+    ["tools.message.allowCrossContextSend", true],
+    ["tools.message.crossContext.allowWithinProvider", true],
+    ["tools.message.crossContext.allowAcrossProviders", true],
+    ["tools.message.broadcast.enabled", true],
+    ["tools.agentToAgent.enabled", true],
+  ];
+}
+
+function buildSetupChannelConfigEntries(normalizedPayload, supportsChannel = () => true) {
+  const entries = [];
+  const lines = [];
+
+  if (normalizedPayload.telegramToken?.trim()) {
+    if (!supportsChannel("telegram")) {
+      lines.push("[telegram] skipped (unsupported build)");
+    } else {
+      entries.push([
+        "channels.telegram",
+        {
+          enabled: true,
+          dmPolicy: "pairing",
+          botToken: normalizedPayload.telegramToken.trim(),
+          groupPolicy: "allowlist",
+          streamMode: "partial",
+        },
+      ]);
+      entries.push(["plugins.entries.telegram.enabled", true]);
+      lines.push("[telegram] configured via channels.telegram + plugins.entries.telegram.enabled");
+    }
+  }
+
+  if (normalizedPayload.discordToken?.trim()) {
+    if (!supportsChannel("discord")) {
+      lines.push("[discord] skipped (unsupported build)");
+    } else {
+      entries.push([
+        "channels.discord",
+        {
+          enabled: true,
+          token: normalizedPayload.discordToken.trim(),
+          groupPolicy: "allowlist",
+          dm: {
+            policy: "pairing",
+          },
+        },
+      ]);
+      entries.push(["plugins.entries.discord.enabled", true]);
+      lines.push("[discord] configured via channels.discord + plugins.entries.discord.enabled");
+    }
+  }
+
+  if (normalizedPayload.slackBotToken?.trim() || normalizedPayload.slackAppToken?.trim()) {
+    if (!supportsChannel("slack")) {
+      lines.push("[slack] skipped (unsupported build)");
+    } else {
+      entries.push([
+        "channels.slack",
+        {
+          enabled: true,
+          botToken: normalizedPayload.slackBotToken?.trim() || undefined,
+          appToken: normalizedPayload.slackAppToken?.trim() || undefined,
+        },
+      ]);
+      entries.push(["plugins.entries.slack.enabled", true]);
+      lines.push("[slack] configured via channels.slack + plugins.entries.slack.enabled");
+    }
+  }
+
+  return {
+    ok: true,
+    entries,
+    output: lines.join("\n"),
+  };
+}
+
+function buildSetupCustomProviderConfig(payload) {
+  const normalizedPayload = normalizeSetupPayload(payload);
+  if (!normalizedPayload.customProviderId?.trim() || !normalizedPayload.customProviderBaseUrl?.trim()) {
+    return {
+      ok: true,
+      entries: [],
+      output: "",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+
+  const providerId = normalizedPayload.customProviderId.trim();
+  const baseUrl = normalizedPayload.customProviderBaseUrl.trim();
+  const api = (normalizedPayload.customProviderApi || "openai-completions").trim();
+  const apiKeyEnv = (normalizedPayload.customProviderApiKeyEnv || "").trim();
+  const modelId = (normalizedPayload.customProviderModelId || "").trim();
+
+  if (!/^[A-Za-z0-9_-]+$/.test(providerId)) {
+    return {
+      ok: false,
+      entries: [],
+      output: "[custom provider] skipped: invalid provider id (use letters/numbers/_/-)",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+  if (!/^https?:\/\//.test(baseUrl)) {
+    return {
+      ok: false,
+      entries: [],
+      output: "[custom provider] skipped: baseUrl must start with http(s)://",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+  if (api !== "openai-completions" && api !== "openai-responses") {
+    return {
+      ok: false,
+      entries: [],
+      output: "[custom provider] skipped: api must be openai-completions or openai-responses",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+  if (apiKeyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
+    return {
+      ok: false,
+      entries: [],
+      output: "[custom provider] skipped: invalid api key env var name",
+      selectedAuthChoice: normalizedPayload.authChoice || "",
+    };
+  }
+
+  const isClaudeMaxPreset = isClaudeMaxProxyAuthChoice(payload.authChoice);
+  const providerCfg = isClaudeMaxPreset
+    ? buildClaudeMaxProxyProviderConfig()
+    : {
+        baseUrl,
+        api,
+        apiKey: apiKeyEnv ? "${" + apiKeyEnv + "}" : undefined,
+        models: modelId ? [{ id: modelId, name: modelId }] : undefined,
+      };
+
+  const entries = [
+    ["models.mode", "merge"],
+    [`models.providers.${providerId}`, providerCfg],
+  ];
+
+  const lines = [];
+  if (isClaudeMaxPreset) {
+    const modelRef = buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL);
+    entries.push(["agents.defaults.model.primary", modelRef]);
+    entries.push([`agents.defaults.models.${modelRef}`, { alias: "Claude Max" }]);
+    lines.push(
+      `[claude-max] provider=${CLAUDE_MAX_PROXY_PROVIDER_ID} model=${buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL)} baseUrl=${CLAUDE_MAX_PROXY_BASE_URL}`,
+    );
+  }
+
+  return {
+    ok: true,
+    entries,
+    output: ["[custom provider] configured", ...lines].filter(Boolean).join("\n"),
+    selectedAuthChoice: normalizedPayload.authChoice || "",
+  };
+}
+
+async function buildSetupMemoryBackendDefaults() {
+  if (!isConfigured()) {
+    return {
+      ok: false,
+      reason: "not_configured",
+      entries: [],
+      output: "[memory] skipped: config not present",
+    };
+  }
+
+  const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
+  const runtime = ensureMemorySearchRuntimeLayout();
+  const memorySearchEntries = [
+    ["agents.defaults.memorySearch.provider", runtime.provider],
+    ["agents.defaults.memorySearch.fallback", runtime.fallback],
+    ["agents.defaults.memorySearch.store.path", runtime.storePath],
+  ];
+  if (runtime.model) {
+    memorySearchEntries.push(["agents.defaults.memorySearch.model", runtime.model]);
+  }
+  if (runtime.local) {
+    memorySearchEntries.push(["agents.defaults.memorySearch.local.modelPath", runtime.local.modelPath]);
+    memorySearchEntries.push(["agents.defaults.memorySearch.local.modelCacheDir", runtime.local.modelCacheDir]);
+  }
+  const memorySearchLines = [
+    `[memory-search] ${describeMemorySearchRuntime(runtime)}`,
+    ...runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`),
+    ...runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`),
+  ];
+
+  if (backend !== "qmd") {
+    return {
+      ok: true,
+      reason: "configured",
+      entries: [["memory.backend", backend], ...memorySearchEntries],
+      output: [`[memory] backend=${backend}`, ...memorySearchLines].filter(Boolean).join("\n"),
+    };
+  }
+
+  const qmdVersion = await runCmd(OPENCLAW_MEMORY_QMD_COMMAND, ["--version"], {
+    timeoutMs: 20_000,
+  });
+  if (qmdVersion.code !== 0) {
+    return {
+      ok: false,
+      reason: "qmd_missing",
+      entries: [],
+      output: `[memory] qmd command unavailable (cmd=${OPENCLAW_MEMORY_QMD_COMMAND}) exit=${qmdVersion.code}\n${qmdVersion.output || ""}`,
+    };
+  }
+
+  const workspaceQmdPaths = resolveWorkspaceQmdPaths();
+  return {
+    ok: true,
+    reason: "configured",
+    entries: [
+      ["memory.backend", "qmd"],
+      ["memory.qmd.command", OPENCLAW_MEMORY_QMD_COMMAND],
+      ["memory.qmd.update.interval", OPENCLAW_MEMORY_QMD_UPDATE_INTERVAL],
+      ["memory.qmd.update.waitForBootSync", OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC],
+      ["memory.qmd.update.commandTimeoutMs", OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS],
+      ["memory.qmd.update.updateTimeoutMs", OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS],
+      ["memory.qmd.update.embedTimeoutMs", OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS],
+      ["memory.qmd.includeDefaultMemory", OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY],
+      ["memory.qmd.paths", workspaceQmdPaths],
+      ["memory.qmd.limits.timeoutMs", OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS],
+      ["memory.qmd.scope.default", "allow"],
+      ...memorySearchEntries,
+    ],
+    output: [
+      `[memory-qmd] includeDefaultMemory=${OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY} workspaceIndex=${OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE} paths=${workspaceQmdPaths.length} pattern=${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN}`,
+      ...memorySearchLines,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+}
+
 function runCmd(cmd, args, opts = {}) {
   return new Promise((resolve) => {
     const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : 120_000;
@@ -4709,82 +4970,41 @@ function renderClaudeAuthPortalPage({ flow, error = "", token = "" }) {
 async function applyConfiguredSetupPayload(payload) {
   const normalizedPayload = normalizeSetupPayload(payload);
   let extra = "";
-
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.mode", "local"]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.chatCompletions.enabled", "true"]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.http.endpoints.responses.enabled", "true"]));
-  await runCmd(
-    OPENCLAW_NODE,
-    clawArgs([
-      "config",
-      "set",
-      "gateway.controlUi.allowInsecureAuth",
-      OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH ? "true" : "false",
-    ]),
-  );
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]));
-
-  const memoryDefaults = await applyMemoryBackendDefaults();
+  const entries = [...buildManagedRuntimeConfigEntries()];
+  const memoryDefaults = await buildSetupMemoryBackendDefaults();
   extra += `\n[memory backend] ${memoryDefaults.reason}`;
   if (memoryDefaults.output) {
     extra += `\n${memoryDefaults.output}`;
   }
   if (memoryDefaults.ok) {
-    startMemoryIndexWarmup("configured-setup");
+    entries.push(...memoryDefaults.entries);
   }
 
-  const providerPatch = applyCustomProviderConfig(normalizedPayload);
+  const providerPatch = buildSetupCustomProviderConfig(normalizedPayload);
   if (providerPatch.output) {
     extra += `\n${providerPatch.output}`;
+  }
+  if (providerPatch.ok) {
+    entries.push(...providerPatch.entries);
   }
 
   const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
   const helpText = channelsHelp.output || "";
   const supports = (name) => helpText.includes(name);
+  const channelPatch = buildSetupChannelConfigEntries(normalizedPayload, supports);
+  if (channelPatch.output) {
+    extra += `\n${channelPatch.output}`;
+  }
+  entries.push(...channelPatch.entries);
 
-  if (normalizedPayload.telegramToken?.trim()) {
-    if (!supports("telegram")) {
-      extra += "\n[telegram] skipped (unsupported build)\n";
-    } else {
-      const token = normalizedPayload.telegramToken.trim();
-      const cfgObj = { enabled: true, dmPolicy: "pairing", botToken: token, groupPolicy: "allowlist", streamMode: "partial" };
-      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
-      const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
-      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
-      extra += `\n[telegram config] exit=${set.code}\n[telegram verify] exit=${get.code}\n[telegram plugin] exit=${plug.code}`;
-    }
+  const runtimePatch = applyConfigPatch(entries);
+  extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}`;
+  if (runtimePatch.output) {
+    extra += `\n${runtimePatch.output}`;
   }
 
-  if (normalizedPayload.discordToken?.trim()) {
-    if (!supports("discord")) {
-      extra += "\n[discord] skipped (unsupported build)\n";
-    } else {
-      const token = normalizedPayload.discordToken.trim();
-      const cfgObj = { enabled: true, token, groupPolicy: "allowlist", dm: { policy: "pairing" } };
-      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
-      const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
-      extra += `\n[discord config] exit=${set.code}\n[discord verify] exit=${get.code}`;
-    }
-  }
-
-  if (normalizedPayload.slackBotToken?.trim() || normalizedPayload.slackAppToken?.trim()) {
-    if (!supports("slack")) {
-      extra += "\n[slack] skipped (unsupported build)\n";
-    } else {
-      const cfgObj = {
-        enabled: true,
-        botToken: normalizedPayload.slackBotToken?.trim() || undefined,
-        appToken: normalizedPayload.slackAppToken?.trim() || undefined,
-      };
-      const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.slack", JSON.stringify(cfgObj)]));
-      const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
-      extra += `\n[slack config] exit=${set.code}\n[slack verify] exit=${get.code}`;
-    }
+  if (runtimePatch.ok && memoryDefaults.ok) {
+    startMemoryIndexWarmup("configured-setup");
   }
 
   await restartGateway();
@@ -4792,9 +5012,6 @@ async function applyConfiguredSetupPayload(payload) {
   if (claudeMaxSync?.output) {
     extra += `\n${claudeMaxSync.output}`;
   }
-  const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
-  extra += `\n[doctor --fix] exit=${fix.code}`;
-  await restartGateway();
 
   return extra;
 }
@@ -5025,143 +5242,8 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   const ok = onboard.code === 0 && isConfigured();
 
-  // Optional setup (only after successful onboarding).
   if (ok) {
-    const runtimePatch = applyConfigPatch([
-      ["gateway.auth.mode", "token"],
-      ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
-      ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
-      ["gateway.http.endpoints.chatCompletions.enabled", true],
-      ["gateway.http.endpoints.responses.enabled", true],
-      ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
-      ["gateway.bind", "loopback"],
-      ["gateway.port", INTERNAL_GATEWAY_PORT],
-      ["gateway.trustedProxies", ["127.0.0.1"]],
-      ["commands.native", true],
-      ["commands.nativeSkills", true],
-      ["commands.text", true],
-      ["commands.bash", true],
-      ["commands.config", true],
-      ["commands.debug", true],
-      ["commands.restart", true],
-      ["commands.useAccessGroups", false],
-      ["tools.profile", "full"],
-      ["tools.elevated.enabled", true],
-      ["tools.exec.host", "gateway"],
-      ["tools.exec.security", "full"],
-      ["tools.exec.ask", "off"],
-      ["tools.message.allowCrossContextSend", true],
-      ["tools.message.crossContext.allowWithinProvider", true],
-      ["tools.message.crossContext.allowAcrossProviders", true],
-      ["tools.message.broadcast.enabled", true],
-      ["tools.agentToAgent.enabled", true],
-    ]);
-    extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}\n${runtimePatch.output || ""}`;
-
-    const memoryDefaults = await applyMemoryBackendDefaults();
-    extra += `\n[memory backend] ${memoryDefaults.reason}`;
-    if (memoryDefaults.output) {
-      extra += `\n${memoryDefaults.output}`;
-    }
-    if (memoryDefaults.ok) {
-      startMemoryIndexWarmup("setup-api-run");
-    }
-
-    // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
-    const providerPatch = applyCustomProviderConfig(payload);
-    if (providerPatch.output) {
-      extra += `\n${providerPatch.output}`;
-    }
-
-    const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
-    const helpText = channelsHelp.output || "";
-
-    const supports = (name) => helpText.includes(name);
-
-    if (payload.telegramToken?.trim()) {
-      if (!supports("telegram")) {
-        extra += "\n[telegram] skipped (this openclaw build does not list telegram in `channels add --help`)\n";
-      } else {
-        // Avoid `channels add` here (it has proven flaky across builds); write config directly.
-        const token = payload.telegramToken.trim();
-        const cfgObj = {
-          enabled: true,
-          dmPolicy: "pairing",
-          botToken: token,
-          groupPolicy: "allowlist",
-          streamMode: "partial",
-        };
-        const set = await runCmd(
-          OPENCLAW_NODE,
-          clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]),
-        );
-        const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
-
-        // Best-effort: enable the telegram plugin explicitly (some builds require this even when configured).
-        const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
-
-        extra += `\n[telegram config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
-        extra += `\n[telegram verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
-        extra += `\n[telegram plugin enable] exit=${plug.code} (output ${plug.output.length} chars)\n${plug.output || "(no output)"}`;
-      }
-    }
-
-    if (payload.discordToken?.trim()) {
-      if (!supports("discord")) {
-        extra += "\n[discord] skipped (this openclaw build does not list discord in `channels add --help`)\n";
-      } else {
-        const token = payload.discordToken.trim();
-        const cfgObj = {
-          enabled: true,
-          token,
-          groupPolicy: "allowlist",
-          dm: {
-            policy: "pairing",
-          },
-        };
-        const set = await runCmd(
-          OPENCLAW_NODE,
-          clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]),
-        );
-        const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.discord"]));
-        extra += `\n[discord config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
-        extra += `\n[discord verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
-      }
-    }
-
-    if (payload.slackBotToken?.trim() || payload.slackAppToken?.trim()) {
-      if (!supports("slack")) {
-        extra += "\n[slack] skipped (this openclaw build does not list slack in `channels add --help`)\n";
-      } else {
-        const cfgObj = {
-          enabled: true,
-          botToken: payload.slackBotToken?.trim() || undefined,
-          appToken: payload.slackAppToken?.trim() || undefined,
-        };
-        const set = await runCmd(
-          OPENCLAW_NODE,
-          clawArgs(["config", "set", "--json", "channels.slack", JSON.stringify(cfgObj)]),
-        );
-        const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
-        extra += `\n[slack config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
-        extra += `\n[slack verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
-      }
-    }
-
-    // Apply changes immediately.
-    await restartGateway();
-    const claudeMaxSync = await syncClaudeMaxProxyState();
-    if (claudeMaxSync?.output) {
-      extra += `\n${claudeMaxSync.output}`;
-    }
-
-    // Ensure OpenClaw applies any "configured but not enabled" channel/plugin changes.
-    // This makes Telegram/Discord pairing issues much less "silent".
-    const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
-    extra += `\n[doctor --fix] exit=${fix.code} (output ${fix.output.length} chars)\n${fix.output || "(no output)"}`;
-
-    // Doctor may require a restart depending on changes.
-    await restartGateway();
+    extra = await applyConfiguredSetupPayload(payload);
   }
 
   return respondJson(ok ? 200 : 500, {
