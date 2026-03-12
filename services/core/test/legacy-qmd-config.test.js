@@ -179,6 +179,7 @@ test("onboarding setup applies wrapper-managed config in one pass without doctor
   assert.match(src, /function buildSetupMemoryBackendDefaults\(/);
   assert.match(src, /const runtimePatch = applyConfigPatch\(entries\)/);
   assert.match(src, /extra = await applyConfiguredSetupPayload\(payload\);/);
+  assert.match(src, /const providerPatch = buildSetupCustomProviderConfig\(payload\);/);
   assert.doesNotMatch(src, /clawArgs\(\["plugins", "enable", "telegram"\]\)/);
   assert.doesNotMatch(src, /clawArgs\(\["doctor", "--fix"\]\)/);
 });

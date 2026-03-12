@@ -4980,7 +4980,7 @@ async function applyConfiguredSetupPayload(payload) {
     entries.push(...memoryDefaults.entries);
   }
 
-  const providerPatch = buildSetupCustomProviderConfig(normalizedPayload);
+  const providerPatch = buildSetupCustomProviderConfig(payload);
   if (providerPatch.output) {
     extra += `\n${providerPatch.output}`;
   }
