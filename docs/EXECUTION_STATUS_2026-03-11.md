@@ -6,7 +6,8 @@ This note records the direct Railway deployments and live remediations performed
 from the local working tree on March 10-11, 2026 for
 `codex/railway-state-qmd-remediation`, the later `main` follow-up, the
 Claude Max proxy onboarding rollout, and the March 13, 2026 auth-persistence /
-workspace source-of-truth hardening pass.
+workspace source-of-truth hardening pass, plus the March 13, 2026 direct-QMD
+default rollout and verifier hardening follow-up.
 
 ## How deployments were done
 
@@ -55,6 +56,9 @@ All timestamps below are America/Denver (`-06:00`).
 | `e8da3fac-dc4a-4a10-88dc-a64aaee7a6b5` | success | 2026-03-11 13:58:38 | Commit `9f82f4a` deployed via repo-root `railway up` and added the hosted `/claude-auth` portal on the core domain, plus internal start/storage handling for Anthropic setup-token onboarding through the admin UI. |
 | `cf006a4a-bdf7-4b08-b48b-d54f09028898` | removed | 2026-03-12 19:11:32 | First March 13 Dockerfile rollout for auth persistence and workspace source-of-truth seeding. Build completed, but the deployment was later removed during cleanup of a stray CLI deploy. |
 | `86ae5ffa-5161-4d00-b456-7afb5a96c3f1` | success | 2026-03-12 19:15:06 | Commits `0ccb25c` and `0977e98` deployed the auth-profile reconciliation path plus managed workspace source-of-truth sync. Live runtime now preserves Codex/Kimi/Anthropic profiles together and seeds the OpenClaw control-plane skill/docs into `/data/workspace`. |
+| `f5d9a2c6-a566-4282-b540-fd6551228b46` | removed | 2026-03-12 21:40:04 | Commit `d2a1912` moved the template to direct QMD retrieval by default: Kimi primary with Codex fallback, OpenClaw `memorySearch` disabled, heartbeat every 4 hours, and managed QMD retrieval/writeback tooling seeded into the workspace. |
+| `fb328cd9-6fd5-41c5-9cbb-107514de14e0` | removed | 2026-03-12 21:54:27 | Commit `2be3adf` hardened the seeded QMD helpers to default to `/data/workspace`, emit a clear missing-collection hint, and replaced the sticky verifier `openclaw status` gate with a local setup-health check. |
+| `7505f089-f9d3-4c74-8052-f74428f57301` | success | 2026-03-12 22:00:22 | Commit `8f6d8aa` aligned the post-deploy verifier with the pinned OpenClaw `models status --json` shape and is the current live direct-QMD image. |
 
 ## Web deployment chain
 
@@ -101,6 +105,18 @@ All timestamps below are America/Denver (`-06:00`).
   - `patterns/resend-email-control-plane-pattern.md`
   - `knowledge/WORKSPACE_STATUS.md`
 - The same bootstrap pass archives stale Stalwart email guidance so Resend remains the active email control plane in the workspace docs.
+- Commit `d2a1912` switched the template to a direct-QMD operating model:
+  - `agents.defaults.model.primary = "kimi-coding/k2p5"`
+  - `agents.defaults.model.fallbacks = ["openai-codex/gpt-5.3-codex"]`
+  - `agents.defaults.memorySearch.enabled = false`
+  - `agents.defaults.heartbeat.every = "4h"`
+  - `agents.defaults.heartbeat.target = "none"`
+  - direct retrieval flow is `bash tools/admin/qmd-rescan.sh` -> `python3 skills/qmd-retrieval/scripts/qmd_memory_search.py` -> file read/writeback
+- Commit `2be3adf` hardened the direct-QMD helper surface:
+  - seeded helper defaults now point at `/data/workspace`
+  - missing QMD collections now produce an explicit `run bash tools/admin/qmd-rescan.sh first` hint instead of a raw traceback
+  - the post-deploy verifier now checks wrapper `/setup/healthz` instead of hanging on `openclaw status`
+- Commit `8f6d8aa` finished the verifier compatibility pass by teaching it the pinned OpenClaw `2026.2.9` `models status --json` output shape.
 
 ## Current live findings
 
@@ -138,6 +154,13 @@ Operational interpretation:
   - `/usr/local/bin/claude`
   - `/usr/local/bin/claude-max-api`
   - `/data/.claude` exists and is a directory
+- Current live direct-QMD proof on deployment `7505f089-f9d3-4c74-8052-f74428f57301`:
+  - `openclaw config get agents.defaults.memorySearch.enabled --json` -> `false`
+  - `openclaw config get agents.defaults.heartbeat --json` -> `{"every":"4h","target":"none"}`
+  - `openclaw models status --json` -> `defaultModel: "kimi-coding/k2p5"` and `fallbacks: ["openai-codex/gpt-5.3-codex"]`
+  - `bash /data/workspace/tools/admin/qmd-rescan.sh` -> `/data/workspace/knowledge/qmd/qmd-rescan-20260313T040559Z.log`
+  - `python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_search.py --query OpenClaw --max-results 5 --min-score 0` returned citation-ready snippets from `/data/workspace/memory/openclaw/...`
+  - `bash /app/scripts/post-deploy-verify.sh` passed end-to-end
 - The hosted admin setup/auth endpoints remain protected. An unauthenticated
   request to `/api/admin/openclaw/setup/auth-groups` now returns `401 Not authenticated`,
   which is expected for the web service.
@@ -160,8 +183,5 @@ Operational interpretation:
 
 ## Follow-up still worth doing
 
-1. Re-deploy the template image that hard-codes `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false`
-   so the live hotfix survives future image replacements.
-2. Re-run the live in-container verifier and capture the final
-   `openclaw memory status` and `openclaw memory search "Railway workspace"`
-   outputs into this repo.
+1. Surface the direct-QMD policy and retrieval order in the hosted admin UI so Nate can see that `memorySearch` is intentionally disabled on this template.
+2. If the pinned OpenClaw release later gains a reliable QMD-first direct retrieval contract, reassess whether the template should re-enable `memorySearch` or keep QMD as the explicit control-plane path.
