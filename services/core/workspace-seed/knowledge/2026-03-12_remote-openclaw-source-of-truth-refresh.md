@@ -15,6 +15,7 @@ Reduce hallucinations by aligning live OpenClaw config, provider persistence, em
 
 ## Changes completed
 
+- Remote config repair restored `openai-codex:default` in the live Railway `openclaw.json` before the template redeploy.
 - Added `skills/openclaw-control-plane/` with script-backed audit and patch workflow.
 - Refreshed OpenClaw source-of-truth docs in `memory/system/` and `knowledge/`.
 - Replaced the active Stalwart operations pattern with a Resend control-plane pattern.
