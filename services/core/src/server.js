@@ -153,6 +153,28 @@ function parsePositiveIntEnv(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseEnumEnv(value, allowedValues, fallback) {
+  if (value == null) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  return allowedValues.includes(normalized) ? normalized : fallback;
+}
+
+const OPENCLAW_DEFAULT_THINKING = parseEnumEnv(
+  process.env.OPENCLAW_DEFAULT_THINKING,
+  ["off", "minimal", "low", "medium", "high", "xhigh", "adaptive"],
+  "high",
+);
+const OPENCLAW_DEFAULT_VERBOSE = parseEnumEnv(
+  process.env.OPENCLAW_DEFAULT_VERBOSE,
+  ["off", "on", "full"],
+  "full",
+);
+const OPENCLAW_MAIN_SESSION_REASONING = parseEnumEnv(
+  process.env.OPENCLAW_MAIN_SESSION_REASONING,
+  ["off", "on", "stream"],
+  "stream",
+);
+
 const OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_QMD_WAIT_FOR_BOOT_SYNC,
   false,
@@ -4429,6 +4451,8 @@ function buildManagedRuntimeConfigEntries() {
     ["agents.defaults.model.primary", OPENCLAW_DEFAULT_MODEL_PRIMARY],
     ["agents.defaults.model.fallbacks", OPENCLAW_DEFAULT_MODEL_FALLBACKS],
     ["agents.defaults.models", buildManagedModelsConfigValue(managedModelRefs, aliasForModelRef)],
+    ["agents.defaults.thinkingDefault", OPENCLAW_DEFAULT_THINKING],
+    ["agents.defaults.verboseDefault", OPENCLAW_DEFAULT_VERBOSE],
     ["agents.defaults.heartbeat.every", OPENCLAW_HEARTBEAT_EVERY],
     ["agents.defaults.heartbeat.target", OPENCLAW_HEARTBEAT_TARGET],
     ["gateway.mode", "local"],
@@ -5007,6 +5031,84 @@ function resolveMainAgentDir() {
   return path.join(STATE_DIR, "agents", "main", "agent");
 }
 
+function resolveMainSessionsStorePath() {
+  return path.join(STATE_DIR, "agents", "main", "sessions", "sessions.json");
+}
+
+function reconcileMainSessionDefaults(reason = "boot") {
+  const storePath = resolveMainSessionsStorePath();
+  const sessionKey = "agent:main:main";
+
+  try {
+    if (!fs.existsSync(storePath)) {
+      return {
+        ok: true,
+        changed: false,
+        output: `[session defaults] skipped (${reason}): ${storePath} missing`,
+      };
+    }
+
+    const raw = fs.readFileSync(storePath, "utf8");
+    const parsed = raw.trim() ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {
+        ok: false,
+        changed: false,
+        output: `[session defaults] failed (${reason}): invalid session store shape`,
+      };
+    }
+
+    const nextStore = cloneJsonValue(parsed) || {};
+    const entry = nextStore[sessionKey];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return {
+        ok: true,
+        changed: false,
+        output: `[session defaults] skipped (${reason}): ${sessionKey} missing`,
+      };
+    }
+
+    const currentReasoning =
+      typeof entry.reasoningLevel === "string" ? entry.reasoningLevel.trim().toLowerCase() : "";
+    let changed = false;
+
+    if (!currentReasoning && OPENCLAW_MAIN_SESSION_REASONING !== "off") {
+      entry.reasoningLevel = OPENCLAW_MAIN_SESSION_REASONING;
+      changed = true;
+    } else if (currentReasoning && OPENCLAW_MAIN_SESSION_REASONING === "off") {
+      delete entry.reasoningLevel;
+      changed = true;
+    }
+
+    if (!changed) {
+      return {
+        ok: true,
+        changed: false,
+        output: `[session defaults] unchanged (${reason}): ${sessionKey} reasoning=${currentReasoning || "inherit"}`,
+      };
+    }
+
+    const tempPath = `${storePath}.tmp`;
+    fs.writeFileSync(tempPath, `${JSON.stringify(nextStore, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    fs.renameSync(tempPath, storePath);
+
+    return {
+      ok: true,
+      changed: true,
+      output: `[session defaults] seeded (${reason}): ${sessionKey} reasoning=${OPENCLAW_MAIN_SESSION_REASONING}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      output: `[session defaults] failed (${reason}): ${String(err)}`,
+    };
+  }
+}
+
 async function runOpenClawSourceEval(source, extraEnv = {}, timeoutMs = 60_000) {
   return runCmd(
     OPENCLAW_NODE,
@@ -5343,6 +5445,12 @@ async function applyConfiguredSetupPayload(payload) {
   extra += `\n[auth profiles] ${authProfileRepair.ok ? "reconciled" : "failed"}`;
   if (authProfileRepair.output) {
     extra += `\n${authProfileRepair.output}`;
+  }
+
+  const sessionDefaults = reconcileMainSessionDefaults("configured-setup");
+  extra += `\n[session defaults] ${sessionDefaults.ok ? "checked" : "failed"}`;
+  if (sessionDefaults.output) {
+    extra += `\n${sessionDefaults.output}`;
   }
 
   if (runtimePatch.ok && memoryDefaults.ok) {
@@ -6251,6 +6359,11 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       console.log(`[wrapper] runtime config: ${runtimePatch.ok ? "configured" : "failed"}`);
       if (runtimePatch.output) {
         console.log(runtimePatch.output);
+      }
+      const sessionDefaults = reconcileMainSessionDefaults("boot-sync");
+      console.log(`[wrapper] session defaults: ${sessionDefaults.ok ? "checked" : "failed"}`);
+      if (sessionDefaults.output) {
+        console.log(sessionDefaults.output);
       }
       const memoryDefaults = await applyMemoryBackendDefaults();
       console.log(`[wrapper] memory backend: ${memoryDefaults.reason}`);

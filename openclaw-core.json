@@ -123,6 +123,18 @@
     "value": "openai-codex/gpt-5.3-codex",
     "description": "Comma-separated fallback chain for the default agent. Railway template policy prefers Codex as the automatic fallback and leaves Anthropic for explicit task-specific use."
   },
+  "OPENCLAW_DEFAULT_THINKING": {
+    "value": "high",
+    "description": "Global thinking default used when a session stays on inherit. OpenClaw supports this as agents.defaults.thinkingDefault."
+  },
+  "OPENCLAW_DEFAULT_VERBOSE": {
+    "value": "full",
+    "description": "Global verbose default used when a session stays on inherit. OpenClaw supports this as agents.defaults.verboseDefault."
+  },
+  "OPENCLAW_MAIN_SESSION_REASONING": {
+    "value": "stream",
+    "description": "Wrapper-managed main-session reasoning seed. The pinned OpenClaw build has no global reasoning default, so the wrapper seeds the main session to stream when no explicit reasoning override exists."
+  },
   "OPENCLAW_HEARTBEAT_EVERY": {
     "value": "4h",
     "description": "Default heartbeat cadence for the main agent."

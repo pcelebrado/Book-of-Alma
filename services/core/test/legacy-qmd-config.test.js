@@ -254,6 +254,33 @@ test("runtime writes managed model aliases without dotted config paths", () => {
   assert.doesNotMatch(src, /`agents\.defaults\.models\.\$\{modelRef\}`/);
 });
 
+test("runtime sets session inheritance defaults for thinking and verbose and seeds main reasoning at boot", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  const envExample = fs.readFileSync(new URL("../.env.example", import.meta.url), "utf8");
+  const envRailway = fs.readFileSync(new URL("../.env.railway", import.meta.url), "utf8");
+  const templateVars = fs.readFileSync(new URL("../../../openclaw-core.json", import.meta.url), "utf8");
+
+  assert.match(src, /OPENCLAW_DEFAULT_THINKING = parseEnumEnv/);
+  assert.match(src, /OPENCLAW_DEFAULT_VERBOSE = parseEnumEnv/);
+  assert.match(src, /OPENCLAW_MAIN_SESSION_REASONING = parseEnumEnv/);
+  assert.match(src, /\["agents\.defaults\.thinkingDefault", OPENCLAW_DEFAULT_THINKING\]/);
+  assert.match(src, /\["agents\.defaults\.verboseDefault", OPENCLAW_DEFAULT_VERBOSE\]/);
+  assert.match(src, /function reconcileMainSessionDefaults\(/);
+  assert.match(src, /reconcileMainSessionDefaults\("configured-setup"\)/);
+  assert.match(src, /reconcileMainSessionDefaults\("boot-sync"\)/);
+  assert.doesNotMatch(src, /reasoningDefault/);
+
+  assert.match(envExample, /OPENCLAW_DEFAULT_THINKING=high/);
+  assert.match(envRailway, /OPENCLAW_DEFAULT_THINKING=high/);
+  assert.match(envExample, /OPENCLAW_DEFAULT_VERBOSE=full/);
+  assert.match(envRailway, /OPENCLAW_DEFAULT_VERBOSE=full/);
+  assert.match(envExample, /OPENCLAW_MAIN_SESSION_REASONING=stream/);
+  assert.match(envRailway, /OPENCLAW_MAIN_SESSION_REASONING=stream/);
+  assert.match(templateVars, /"OPENCLAW_DEFAULT_THINKING"/);
+  assert.match(templateVars, /"OPENCLAW_DEFAULT_VERBOSE"/);
+  assert.match(templateVars, /"OPENCLAW_MAIN_SESSION_REASONING"/);
+});
+
 test("openclaw control-plane patch tool blocks unsupported pinned config keys", () => {
   const tool = fs.readFileSync(
     new URL("../workspace-seed/skills/openclaw-control-plane/scripts/openclaw_admin.py", import.meta.url),
