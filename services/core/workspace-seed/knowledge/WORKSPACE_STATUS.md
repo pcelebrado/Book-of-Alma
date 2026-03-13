@@ -19,9 +19,13 @@ These files are authoritative for current system behavior:
 ## Current runtime shape
 
 - Primary model: `kimi-coding/k2p5`
-- Preserved provider access should include OpenAI Codex when available
+- Default fallback: `openai-codex/gpt-5.3-codex`
+- Preserved provider access should include OpenAI Codex and Anthropic when available
 - Memory backend: `qmd`
-- Memory search: local embeddings with persistent store
+- OpenClaw `memorySearch`: disabled
+- Direct retrieval: `skills/qmd-retrieval/`
+- Direct retrieval flow: `bash tools/admin/qmd-rescan.sh` -> `python3 skills/qmd-retrieval/scripts/qmd_memory_search.py --query "..."`
+- Heartbeat cadence: `4h`
 - Gateway: token auth on loopback behind Railway wrapper
 - Outbound email: `Resend`
 
@@ -35,4 +39,4 @@ These files are authoritative for current system behavior:
 
 1. Re-onboarding can accidentally narrow provider auth if config persistence is not audited.
 2. Historical Stalwart notes can cause email-stack hallucinations if not archived or superseded.
-3. OpenClaw runtime changes can drift from docs if the control-plane skill is not updated.
+3. OpenClaw runtime changes can drift from docs if the control-plane skill and QMD retrieval skill are not updated.

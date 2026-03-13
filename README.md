@@ -444,9 +444,16 @@ curl -i https://<your-domain>/api/notes?limit=1
 Probe → Snapshot → Mutate → Verify → Record → Learn
 ```
 
-### QMD Memory Backend Defaults
+### Model Routing And Direct QMD Defaults
 
-Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept docs):
+Core keeps OpenClaw on Railway in a deterministic multi-provider shape:
+
+- `OPENCLAW_DEFAULT_MODEL_PRIMARY=kimi-coding/k2p5`
+- `OPENCLAW_DEFAULT_MODEL_FALLBACKS=openai-codex/gpt-5.3-codex`
+- `OPENCLAW_HEARTBEAT_EVERY=4h`
+- `OPENCLAW_HEARTBEAT_TARGET=none`
+
+Workspace recall defaults to direct QMD, not OpenClaw `memory_search`:
 
 - `OPENCLAW_MEMORY_BACKEND=qmd`
 - `OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
@@ -459,16 +466,17 @@ Core enables OpenClaw memory via QMD by default (see OpenClaw memory concept doc
 - `OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000`
 - `OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000`
 - `OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000`
+- `OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS=14400`
 - `OPENCLAW_QMD_WARM_ON_BOOT=false`
 - `OPENCLAW_MEMORY_WARMUP_ENABLED=false`
 - `OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test`
 - `OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000`
 - `OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true`
+- `OPENCLAW_MEMORY_SEARCH_ENABLED=false`
 - `OPENCLAW_MEMORY_SEARCH_PROVIDER=local`
 - `OPENCLAW_MEMORY_SEARCH_FALLBACK=none`
 - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
 - `OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp`
-
 - `OPENCLAW_MEMORY_SEARCH_STORE_PATH=/data/.openclaw/memory/{agentId}.sqlite`
 
 The template seeds `MEMORY.md` and `memory/YYYY-MM-DD.md`, and removes the old
@@ -483,9 +491,6 @@ directory-rooted collection instead of deriving file-root collections from
 directories, so Railway defaults `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY` to
 `false` and keeps workspace retrieval on `/data/workspace` with `**/*.md`.
 
-The wrapper also sets `memory.qmd.scope.default=allow` so operator-side CLI
-checks like `openclaw memory search "Railway workspace"` work from Railway shells without a
-chat session key.
 It also reconciles `auth.profiles` from the persisted main-agent auth store and
 config backups so re-onboarding can change the primary model without dropping
 Codex, Claude, or other previously authenticated providers from `openclaw.json`.
@@ -500,21 +505,26 @@ The wrapper and helper scripts clear `BUN_INSTALL` before calling QMD and pin
 the command to the direct `@tobilu/qmd` entrypoint so Railway shells do not
 depend on the ambient `qmd` launcher state.
 
-Fresh deployments can have a slow first memory query while QMD or the local
-embedding model downloads assets. Railway now uses one deterministic memory
-search strategy by default:
+The supported retrieval flow in this template is:
 
-- provider `local`
-- fallback `none`
-- model `hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf`
-- cache dir `/data/.openclaw/models/node-llama-cpp`
-- store path `/data/.openclaw/memory/{agentId}.sqlite`
-- QMD paths `memory.qmd.paths[]=workspace root` with pattern `**/*.md`
-- QMD default-memory derived roots disabled (`includeDefaultMemory=false`)
+1. `bash tools/admin/qmd-rescan.sh`
+2. `python3 skills/qmd-retrieval/scripts/qmd_memory_search.py --query "..."`
+3. exact-file inspection with `python3 skills/qmd-retrieval/scripts/qmd_memory_get.py ...`
+4. web research for current external facts
+5. writeback into `references/`, then durable docs in `knowledge/`, `patterns/`, or `memory/system/`
+
+Heartbeat runs every 4 hours, uses the managed `qmd-rescan.sh` wrapper, and
+skips work when the previous successful rescan is still fresh. The rescan uses
+incremental `qmd update` only; it does not force `qmd embed` on the heartbeat
+lane.
+
+OpenClaw `memory_search` is intentionally disabled by default. The provider and
+store settings remain in the template only as scaffolding if you later choose to
+re-enable that subsystem deliberately.
 
 `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `VOYAGE_API_KEY` are optional and are
-only needed if you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` to a
-remote embedding provider.
+only needed if you intentionally re-enable OpenClaw `memorySearch` and point it
+at a remote embedding provider.
 
 See `docs/PREDEPLOY_NEXT_STEPS.md`, [MIGRATION.md](./MIGRATION.md), and
 [VERIFY.md](./VERIFY.md) for the full deployment, migration, and verification flow.
@@ -525,9 +535,12 @@ Fresh boots now sync a managed OpenClaw source-of-truth payload into the
 workspace:
 
 - `skills/openclaw-control-plane/`
+- `skills/qmd-retrieval/`
 - `memory/system/openclaw-configuration-bible.md`
+- `memory/system/openclaw-memory-bible.md`
 - `memory/system/email-control-plane-bible.md`
 - `patterns/openclaw-admin-pattern.md`
+- `patterns/qmd-memory-retrieval-wrapper-pattern.md`
 - `patterns/resend-email-control-plane-pattern.md`
 - `knowledge/WORKSPACE_STATUS.md`
 

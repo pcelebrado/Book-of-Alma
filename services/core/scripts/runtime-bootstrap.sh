@@ -115,7 +115,7 @@ sync_seed_file() {
 
   cp "${src}" "${dst}"
   case "${dst}" in
-    *.py)
+    *.py|*.sh)
       chmod 700 "${dst}" 2>/dev/null || true
       ;;
     *)
@@ -193,12 +193,21 @@ sync_workspace_source_of_truth() {
   sync_seed_file "skills/openclaw-control-plane/SKILL.md"
   sync_seed_file "skills/openclaw-control-plane/references/source-of-truth.md"
   sync_seed_file "skills/openclaw-control-plane/scripts/openclaw_admin.py"
+  sync_seed_file "skills/qmd-retrieval/SKILL.md"
+  sync_seed_file "skills/qmd-retrieval/scripts/qmd_memory_search.py"
+  sync_seed_file "skills/qmd-retrieval/scripts/qmd_memory_get.py"
+  sync_seed_file "tools/admin/qmd-rescan.sh"
+  sync_seed_file "HEARTBEAT.md"
+  sync_seed_file "memory/heartbeat-prompt.md"
   sync_seed_file "memory/system/openclaw-configuration-bible.md"
+  sync_seed_file "memory/system/openclaw-memory-bible.md"
   sync_seed_file "memory/system/email-control-plane-bible.md"
   sync_seed_file "patterns/openclaw-admin-pattern.md"
+  sync_seed_file "patterns/qmd-memory-retrieval-wrapper-pattern.md"
   sync_seed_file "patterns/resend-email-control-plane-pattern.md"
   sync_seed_file "knowledge/WORKSPACE_STATUS.md"
   sync_seed_file "knowledge/2026-03-12_remote-openclaw-source-of-truth-refresh.md"
+  sync_seed_file "knowledge/2026-03-13_remote-qmd-direct-control-plane-refresh.md"
   ensure_openclaw_governance_note
 }
 
@@ -386,7 +395,8 @@ prepare_qmd_dirs() {
 }
 
 prepare_memory_search_dirs() {
-  local concrete_store_path="${MEMORY_SEARCH_STORE_PATH/\{agentId\}/main}"
+  local concrete_store_path
+  concrete_store_path="$(printf '%s' "${MEMORY_SEARCH_STORE_PATH}" | sed 's/{agentId}/main/g')"
   ensure_writable_dir "${MEMORY_SEARCH_CACHE_DIR}" || true
   ensure_writable_dir "$(dirname "${concrete_store_path}")" || true
 }

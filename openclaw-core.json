@@ -115,9 +115,25 @@
     "value": "claude-opus-4",
     "description": "Default Claude Max proxy model id selected by the Admin preset."
   },
+  "OPENCLAW_DEFAULT_MODEL_PRIMARY": {
+    "value": "kimi-coding/k2p5",
+    "description": "Default primary model for the main agent. Railway template policy keeps Kimi primary unless an operator changes it."
+  },
+  "OPENCLAW_DEFAULT_MODEL_FALLBACKS": {
+    "value": "openai-codex/gpt-5.3-codex",
+    "description": "Comma-separated fallback chain for the default agent. Railway template policy prefers Codex as the automatic fallback and leaves Anthropic for explicit task-specific use."
+  },
+  "OPENCLAW_HEARTBEAT_EVERY": {
+    "value": "4h",
+    "description": "Default heartbeat cadence for the main agent."
+  },
+  "OPENCLAW_HEARTBEAT_TARGET": {
+    "value": "none",
+    "description": "Heartbeat target selector. Railway template keeps this at `none` so heartbeat stays in local observation/maintenance mode."
+  },
   "OPENCLAW_MEMORY_BACKEND": {
     "value": "qmd",
-    "description": "OpenClaw memory backend (`qmd` to enable QMD sidecar retrieval, `sqlite` for builtin manager)."
+    "description": "OpenClaw memory backend. Railway keeps this at `qmd` for managed workspace collection metadata while the default agent uses direct QMD wrappers instead of OpenClaw memorySearch."
   },
   "OPENCLAW_MEMORY_QMD_COMMAND": {
     "value": "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd",
@@ -129,7 +145,7 @@
   },
   "OPENCLAW_MEMORY_QMD_INDEX_WORKSPACE": {
     "value": "true",
-    "description": "If true, the wrapper adds workspace-wide QMD collections so memory_search can recall more than MEMORY.md and memory/*.md."
+    "description": "If true, the wrapper adds a workspace-wide QMD collection rooted at /data/workspace with the configured markdown glob."
   },
   "OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN": {
     "value": "**/*.md",
@@ -159,6 +175,10 @@
     "value": "300000",
     "description": "QMD embed timeout in milliseconds so first-run local model warmups can finish on Railway."
   },
+  "OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS": {
+    "value": "14400",
+    "description": "Minimum spacing between direct QMD heartbeat rescans. The managed qmd-rescan script skips if the last successful run is newer than this interval."
+  },
   "OPENCLAW_QMD_WARM_ON_BOOT": {
     "value": "false",
     "description": "Optional shell-level QMD warmup hook. Leave disabled by default so Railway boot does not issue template-specific probe queries."
@@ -179,13 +199,17 @@
     "value": "true",
     "description": "Compatibility toggle for Railway-hosted Control UI/WebChat so the wrapper's injected bearer auth can be used without device pairing."
   },
+  "OPENCLAW_MEMORY_SEARCH_ENABLED": {
+    "value": "false",
+    "description": "Default Railway policy for the agent memory_search tool. Keep this false to prefer the direct QMD retrieval skill and avoid OpenClaw builtin memory churn."
+  },
   "OPENCLAW_MEMORY_SEARCH_PROVIDER": {
     "value": "local",
-    "description": "Default Railway memory-search provider. Keep `local` for deterministic no-secret embeddings, or intentionally override to `openai`, `gemini`, or `voyage`."
+    "description": "Provider scaffold for OpenClaw memorySearch if you intentionally re-enable it. The Railway template leaves memorySearch disabled by default."
   },
   "OPENCLAW_MEMORY_SEARCH_FALLBACK": {
     "value": "none",
-    "description": "Fallback provider for agents.defaults.memorySearch.fallback. Keep `none` for deterministic Railway boot unless you intentionally chain providers."
+    "description": "Fallback provider for agents.defaults.memorySearch.fallback if you intentionally re-enable OpenClaw memorySearch."
   },
   "OPENCLAW_MEMORY_SEARCH_OPENAI_MODEL": {
     "value": "text-embedding-3-small",
@@ -205,15 +229,15 @@
   },
   "OPENAI_API_KEY": {
     "value": "",
-    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=openai or models.providers.openai.apiKey is not defined elsewhere."
+    "description": "Optional. Only required when you intentionally re-enable OpenClaw memorySearch with OPENCLAW_MEMORY_SEARCH_PROVIDER=openai or models.providers.openai.apiKey is not defined elsewhere."
   },
   "GEMINI_API_KEY": {
     "value": "",
-    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=gemini or models.providers.gemini.apiKey is not defined elsewhere."
+    "description": "Optional. Only required when you intentionally re-enable OpenClaw memorySearch with OPENCLAW_MEMORY_SEARCH_PROVIDER=gemini or models.providers.gemini.apiKey is not defined elsewhere."
   },
   "VOYAGE_API_KEY": {
     "value": "",
-    "description": "Optional. Only required when OPENCLAW_MEMORY_SEARCH_PROVIDER=voyage or models.providers.voyage.apiKey is not defined elsewhere."
+    "description": "Optional. Only required when you intentionally re-enable OpenClaw memorySearch with OPENCLAW_MEMORY_SEARCH_PROVIDER=voyage or models.providers.voyage.apiKey is not defined elsewhere."
   },
   "BOOK_SOURCE_MODE": {
     "value": "external",

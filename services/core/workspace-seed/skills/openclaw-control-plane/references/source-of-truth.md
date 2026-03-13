@@ -19,9 +19,12 @@ Rules:
 Current intended runtime shape:
 
 - Primary model: `kimi-coding/k2p5`
-- Additional provider access: preserve `openai-codex:default` when available
+- Model fallback: `openai-codex/gpt-5.3-codex`
+- Additional provider access: preserve `openai-codex:default` and `anthropic:default` when available
 - Memory backend: `qmd`
-- Memory search provider: `local`
+- OpenClaw `memorySearch`: disabled
+- Direct retrieval path: `skills/qmd-retrieval/`
+- Heartbeat cadence: `4h`
 - Gateway auth: token on loopback behind the Railway wrapper
 
 Question routing:
@@ -29,3 +32,4 @@ Question routing:
 - Provider/model selection: use `openclaw_admin.py summary` and current auth profiles first
 - Config persistence concerns: use `openclaw_admin.py audit-backups`
 - Runtime mutation: use `openclaw_admin.py patch`
+- Retrieval and memory questions: use `memory/system/openclaw-memory-bible.md` and `skills/qmd-retrieval/`

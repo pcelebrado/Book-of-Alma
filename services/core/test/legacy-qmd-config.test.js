@@ -33,11 +33,20 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
 test("template env does not expose unsupported qmd searchMode on the pinned release", () => {
   const envExample = fs.readFileSync(new URL("../.env.example", import.meta.url), "utf8");
   const envRailway = fs.readFileSync(new URL("../.env.railway", import.meta.url), "utf8");
+  const templateVars = fs.readFileSync(new URL("../../../openclaw-core.json", import.meta.url), "utf8");
 
   assert.doesNotMatch(envExample, /OPENCLAW_MEMORY_QMD_SEARCH_MODE/);
   assert.doesNotMatch(envRailway, /OPENCLAW_MEMORY_QMD_SEARCH_MODE/);
   assert.match(envExample, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true/);
   assert.match(envRailway, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true/);
+  assert.match(envExample, /OPENCLAW_DEFAULT_MODEL_PRIMARY=kimi-coding\/k2p5/);
+  assert.match(envRailway, /OPENCLAW_DEFAULT_MODEL_PRIMARY=kimi-coding\/k2p5/);
+  assert.match(envExample, /OPENCLAW_DEFAULT_MODEL_FALLBACKS=openai-codex\/gpt-5\.3-codex/);
+  assert.match(envRailway, /OPENCLAW_DEFAULT_MODEL_FALLBACKS=openai-codex\/gpt-5\.3-codex/);
+  assert.match(envExample, /OPENCLAW_HEARTBEAT_EVERY=4h/);
+  assert.match(envRailway, /OPENCLAW_HEARTBEAT_EVERY=4h/);
+  assert.match(envExample, /OPENCLAW_HEARTBEAT_TARGET=none/);
+  assert.match(envRailway, /OPENCLAW_HEARTBEAT_TARGET=none/);
   assert.match(
     envExample,
     /OPENCLAW_MEMORY_QMD_COMMAND=\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
@@ -58,6 +67,8 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000/);
   assert.match(envExample, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000/);
+  assert.match(envExample, /OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS=14400/);
+  assert.match(envRailway, /OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS=14400/);
   assert.match(envExample, /OPENCLAW_QMD_WARM_ON_BOOT=false/);
   assert.match(envRailway, /OPENCLAW_QMD_WARM_ON_BOOT=false/);
   assert.match(envExample, /OPENCLAW_MEMORY_WARMUP_ENABLED=false/);
@@ -66,6 +77,8 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   assert.match(envRailway, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test/);
   assert.match(envExample, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
   assert.match(envRailway, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000/);
+  assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_ENABLED=false/);
+  assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_ENABLED=false/);
   assert.match(envExample, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
   assert.match(envRailway, /OPENCLAW_MEMORY_SEARCH_STORE_PATH=\/data\/\.openclaw\/memory\/\{agentId\}\.sqlite/);
   assert.match(envExample, /OPENCLAW_CLAUDE_STATE_DIR=\/data\/\.claude/);
@@ -74,6 +87,12 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   assert.match(envRailway, /OPENCLAW_CLAUDE_MAX_PROXY_COMMAND=claude-max-api/);
   assert.match(envExample, /OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL=http:\/\/127\.0\.0\.1:3456\/v1/);
   assert.match(envRailway, /OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL=http:\/\/127\.0\.0\.1:3456\/v1/);
+  assert.match(templateVars, /"OPENCLAW_DEFAULT_MODEL_PRIMARY"/);
+  assert.match(templateVars, /"OPENCLAW_DEFAULT_MODEL_FALLBACKS"/);
+  assert.match(templateVars, /"OPENCLAW_HEARTBEAT_EVERY"/);
+  assert.match(templateVars, /"OPENCLAW_HEARTBEAT_TARGET"/);
+  assert.match(templateVars, /"OPENCLAW_MEMORY_SEARCH_ENABLED"/);
+  assert.match(templateVars, /"OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS"/);
 });
 
 test("runtime defaults workspace qmd indexing to markdown globs", () => {
@@ -92,9 +111,14 @@ test("runtime bootstrap removes the legacy Alma verification note and keeps gene
   assert.match(bootstrap, /WORKSPACE_SOURCE_SEED_DIR/);
   assert.match(bootstrap, /sync_workspace_source_of_truth/);
   assert.match(bootstrap, /openclaw-control-plane/);
+  assert.match(bootstrap, /qmd-retrieval/);
+  assert.match(bootstrap, /qmd-rescan\.sh/);
+  assert.match(bootstrap, /HEARTBEAT\.md/);
+  assert.match(bootstrap, /openclaw-memory-bible\.md/);
   assert.match(bootstrap, /stalwart-single-control-plane-email-ops-pattern\.md/);
   assert.match(bootstrap, /BEGIN MANAGED OPENCLAW GOVERNANCE/);
   assert.match(bootstrap, /QMD_WARMUP_QUERY/);
+  assert.match(bootstrap, /sed 's\/\{agentId\}\/main\/g'/);
   assert.match(bootstrap, /Skipping direct qmd update\/embed warmup/);
   assert.doesNotMatch(bootstrap, /collection add/);
   assert.doesNotMatch(bootstrap, /"\$\{QMD_COMMAND\}" update/);
@@ -141,10 +165,19 @@ test("runtime scrubs stale qmd workspace collections from persisted agent state"
 test("runtime warmup uses memory search without forcing a full memory index", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(src, /OPENCLAW_MEMORY_WARMUP_ENABLED = parseBoolEnv/);
+  assert.match(src, /OPENCLAW_DEFAULT_MODEL_PRIMARY/);
+  assert.match(src, /OPENCLAW_DEFAULT_MODEL_FALLBACKS/);
+  assert.match(src, /OPENCLAW_HEARTBEAT_EVERY/);
+  assert.match(src, /OPENCLAW_HEARTBEAT_TARGET/);
+  assert.match(src, /OPENCLAW_MEMORY_SEARCH_ENABLED/);
   assert.match(src, /OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
   assert.match(src, /OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS/);
   assert.match(src, /OPENCLAW_MEMORY_QMD_WARMUP_QUERY\?\.trim\(\) \|\| "test"/);
   assert.match(src, /"memory\.qmd\.update\.commandTimeoutMs", OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS/);
+  assert.match(src, /"agents\.defaults\.model\.fallbacks", OPENCLAW_DEFAULT_MODEL_FALLBACKS/);
+  assert.match(src, /"agents\.defaults\.heartbeat\.every", OPENCLAW_HEARTBEAT_EVERY/);
+  assert.match(src, /"agents\.defaults\.memorySearch\.enabled", OPENCLAW_MEMORY_SEARCH_ENABLED/);
+  assert.match(src, /direct-qmd workflow preferred; use skills\/qmd-retrieval and bash tools\/admin\/qmd-rescan\.sh/);
   assert.match(src, /clawArgs\(\["memory", "search", "--agent", "main", "--json", OPENCLAW_MEMORY_QMD_WARMUP_QUERY\]\)/);
   assert.match(src, /!OPENCLAW_MEMORY_WARMUP_ENABLED/);
   assert.doesNotMatch(src, /clawArgs\(\["memory", "index", "--agent", "main"\]\)/);

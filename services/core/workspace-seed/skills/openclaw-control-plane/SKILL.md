@@ -19,10 +19,11 @@ Use this skill for both questions and changes involving the live OpenClaw system
 
 1. Read `references/source-of-truth.md`.
 2. Run:
-   - `python skills/openclaw-control-plane/scripts/openclaw_admin.py summary`
-   - `python skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups`
+   - `python3 skills/openclaw-control-plane/scripts/openclaw_admin.py summary`
+   - `python3 skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups`
 3. For source-of-truth questions, prefer:
    - `memory/system/openclaw-configuration-bible.md`
+   - `memory/system/openclaw-memory-bible.md`
    - `memory/system/email-control-plane-bible.md`
    - `knowledge/WORKSPACE_STATUS.md`
 4. Treat archived or historical notes as non-authoritative unless they are explicitly restored by current docs.
@@ -43,28 +44,39 @@ Use this skill for both questions and changes involving the live OpenClaw system
 - Keep auth state separate from model routing decisions.
 - Choose the primary model for the current default workflow, not as a destructive replacement for every other provider.
 - Preserve operator-verified access to Codex, Kimi, Claude Max, and other configured providers unless the user explicitly wants removal.
+- Default model routing for this workspace is `kimi-coding/k2p5` with fallback `openai-codex/gpt-5.3-codex`.
+- Anthropic is available for task-specific use, not as the default automatic fallback.
 - For weak-reasoning models, provide guardrails:
   - smaller task scope
   - explicit verification steps
   - stronger writeback requirements
   - escalation to a stronger model when reasoning quality matters
 
+## Memory and retrieval policy
+
+- OpenClaw `memorySearch` is disabled for the default agent in this workspace.
+- Use `skills/qmd-retrieval/` for whole-workspace markdown retrieval.
+- Use `bash tools/admin/qmd-rescan.sh` to refresh the direct QMD index.
+- Retrieval order is `QMD -> local directory/file inspection -> web research -> writeback to references/ + durable docs`.
+
 ## Common commands
 
 Audit current runtime:
 
 ```bash
-python skills/openclaw-control-plane/scripts/openclaw_admin.py summary
-python skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups
+python3 skills/openclaw-control-plane/scripts/openclaw_admin.py summary
+python3 skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups
 ```
 
 Apply a safe JSON merge patch with backup:
 
 ```bash
-python skills/openclaw-control-plane/scripts/openclaw_admin.py patch \
+python3 skills/openclaw-control-plane/scripts/openclaw_admin.py patch \
   --backup-label preserve-codex \
   --merge-json '{"auth":{"profiles":{"openai-codex:default":{"provider":"openai-codex","mode":"oauth"}}}}'
 ```
+
+Prefer `--merge-file <path>` for larger patches to avoid shell-quoting errors.
 
 ## Output contract
 

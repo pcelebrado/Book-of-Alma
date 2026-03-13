@@ -14,8 +14,12 @@ WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR}"
 WORKSPACE_VOLUME_DIR="${OPENCLAW_WORKSPACE_VOLUME_DIR}"
 WORKSPACE_COMPAT_DIR="${OPENCLAW_WORKSPACE_COMPAT_DIR:-/root/.openclaw/workspace}"
 CREDENTIALS_DIR="${STATE_DIR}/credentials"
-QUERY="${1:-Railway workspace}"
+QUERY="${1:-OpenClaw}"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+QMD_RESCAN_SCRIPT="${WORKSPACE_DIR}/tools/admin/qmd-rescan.sh"
+QMD_SEARCH_SCRIPT="${WORKSPACE_DIR}/skills/qmd-retrieval/scripts/qmd_memory_search.py"
+OPENCLAW_ADMIN_SCRIPT="${WORKSPACE_DIR}/skills/openclaw-control-plane/scripts/openclaw_admin.py"
 VERIFY_TIMEOUT_SECONDS="${OPENCLAW_VERIFY_TIMEOUT_SECONDS:-240}"
 VERIFY_RETRIES="${OPENCLAW_VERIFY_RETRIES:-4}"
 VERIFY_RETRY_DELAY_SECONDS="${OPENCLAW_VERIFY_RETRY_DELAY_SECONDS:-10}"
@@ -37,6 +41,22 @@ assert_eq() {
     fail "${label}: expected '${expected}', got '${actual}'"
   fi
   pass "${label}: ${actual}"
+}
+
+assert_file_exists() {
+  local target="$1"
+  if [ ! -e "${target}" ]; then
+    fail "missing required file: ${target}"
+  fi
+  pass "found ${target}"
+}
+
+assert_file_absent() {
+  local target="$1"
+  if [ -e "${target}" ]; then
+    fail "unexpected file present: ${target}"
+  fi
+  pass "absent ${target}"
 }
 
 run_capture() {
@@ -74,16 +94,6 @@ retry_capture() {
   fail "${label} failed after ${VERIFY_RETRIES} attempts (exit=${exit_code})"
 }
 
-assert_no_disabled_output() {
-  local label="$1"
-  local file="$2"
-  if grep -Eiq 'Memory search disabled|disabled:[[:space:]]*true|missing embedding provider auth|missing embedding model path|timed out after|ENOENT|rename .*\.ipull' "${file}"; then
-    cat "${file}" >&2 || true
-    fail "${label} reports memory search disabled"
-  fi
-  pass "${label} has no disabled-state markers"
-}
-
 real_workspace="$(readlink -f "${WORKSPACE_DIR}")"
 assert_eq "${real_workspace}" "${WORKSPACE_VOLUME_DIR}" "active workspace path"
 
@@ -106,43 +116,63 @@ if printf '%s' "${status_output}" | grep -Eiq 'credentials.*permission|permissio
 fi
 pass "openclaw status has no credentials permission warning"
 
-retry_capture "openclaw memory status" /tmp/openclaw-memory-status.txt openclaw memory status
-assert_no_disabled_output "openclaw memory status" /tmp/openclaw-memory-status.txt
+retry_capture "openclaw models status --json" /tmp/openclaw-model-status.json openclaw models status --json
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-model-status.json','utf8')); const defaults=data.defaults||{}; const fallbacks=Array.isArray(defaults.fallbacks)?defaults.fallbacks:[]; if(defaults.default!=='kimi-coding/k2p5'){process.exit(1)} if(!fallbacks.includes('openai-codex/gpt-5.3-codex')){process.exit(1)}" \
+  || fail "default model routing is not Kimi primary with Codex fallback"
+pass "default model routing is Kimi primary with Codex fallback"
 
-retry_capture "openclaw memory index" /tmp/openclaw-memory-index.txt openclaw memory index
-assert_no_disabled_output "openclaw memory index" /tmp/openclaw-memory-index.txt
+retry_capture \
+  "openclaw config get agents.defaults.memorySearch.enabled --json" \
+  /tmp/openclaw-memory-enabled.json \
+  openclaw config get agents.defaults.memorySearch.enabled --json
+assert_eq "$(tr -d '\r\n ' </tmp/openclaw-memory-enabled.json)" "false" "OpenClaw memorySearch disabled"
+
+retry_capture \
+  "openclaw config get agents.defaults.heartbeat --json" \
+  /tmp/openclaw-heartbeat.json \
+  openclaw config get agents.defaults.heartbeat --json
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-heartbeat.json','utf8')); if(data.every!=='4h'||data.target!=='none'){process.exit(1)}" \
+  || fail "heartbeat policy is not every=4h,target=none"
+pass "heartbeat policy is every=4h,target=none"
 
 retry_capture \
   "openclaw config get memory.qmd.paths --json" \
   /tmp/openclaw-memory-qmd-paths.json \
   openclaw config get memory.qmd.paths --json
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-qmd-paths.json','utf8')); const paths=Array.isArray(data)?data:Array.isArray(data?.value)?data.value:[]; if(!paths.some((entry)=>entry&&typeof entry==='object'&&String(entry.path||'')==='/data/workspace'&&String(entry.pattern||'')==='**/*.md')){process.exit(1)}" \
+  || fail "memory.qmd.paths is missing the workspace-wide markdown collection"
+pass "memory.qmd.paths contains the workspace-wide markdown collection"
 
-node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-qmd-paths.json','utf8')); const paths=Array.isArray(data)?data:Array.isArray(data?.value)?data.value:[]; if(!paths.some((entry)=>entry&&typeof entry==='object'&&/^workspace(?:-|$)/.test(String(entry.name||'')))){process.exit(1)}" \
-  || fail "memory.qmd.paths is missing workspace-wide QMD entries"
-pass "memory.qmd.paths contains workspace-wide QMD entries"
+assert_file_exists "${WORKSPACE_DIR}/HEARTBEAT.md"
+assert_file_exists "${WORKSPACE_DIR}/memory/heartbeat-prompt.md"
+assert_file_exists "${WORKSPACE_DIR}/skills/qmd-retrieval/SKILL.md"
+assert_file_exists "${WORKSPACE_DIR}/memory/system/openclaw-memory-bible.md"
+assert_file_exists "${QMD_RESCAN_SCRIPT}"
+assert_file_exists "${QMD_SEARCH_SCRIPT}"
+assert_file_exists "${OPENCLAW_ADMIN_SCRIPT}"
+assert_file_absent "${WORKSPACE_DIR}/patterns/stalwart-single-control-plane-email-ops-pattern.md"
+
+retry_capture "openclaw control-plane summary" /tmp/openclaw-admin-summary.txt "${PYTHON_BIN}" "${OPENCLAW_ADMIN_SCRIPT}" summary
+retry_capture "openclaw control-plane audit-backups" /tmp/openclaw-admin-audit.txt "${PYTHON_BIN}" "${OPENCLAW_ADMIN_SCRIPT}" audit-backups
+
+retry_capture "direct qmd rescan" /tmp/qmd-rescan-path.txt bash "${QMD_RESCAN_SCRIPT}"
+QMD_RESCAN_LOG="$(tr -d '\r\n' </tmp/qmd-rescan-path.txt)"
+if [ -z "${QMD_RESCAN_LOG}" ] || [ ! -f "${QMD_RESCAN_LOG}" ]; then
+  fail "qmd-rescan did not return a readable log path"
+fi
+pass "qmd-rescan log created at ${QMD_RESCAN_LOG}"
 
 retry_capture \
-  "openclaw memory status --agent main --deep --index --json" \
-  /tmp/openclaw-memory-status.json \
-  openclaw memory status --agent main --deep --index --json
-assert_no_disabled_output "openclaw memory status --json" /tmp/openclaw-memory-status.json
-
-node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-status.json','utf8')); const first=data.results?.[0]; if(!first||Number(first.status?.files||0)<=0||Number(first.status?.chunks||0)<=0){process.exit(1)}" \
-  || fail "memory file/chunk count is zero"
-pass "memory file/chunk count is non-zero"
-
-retry_capture "openclaw memory search \"${QUERY}\"" /tmp/openclaw-memory-search.txt openclaw memory search "${QUERY}"
-assert_no_disabled_output "openclaw memory search" /tmp/openclaw-memory-search.txt
-
-retry_capture \
-  "openclaw memory search --agent main --json \"${QUERY}\"" \
-  /tmp/openclaw-memory-search.json \
-  openclaw memory search --agent main --json "${QUERY}"
-assert_no_disabled_output "openclaw memory search --json" /tmp/openclaw-memory-search.json
-
-node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-memory-search.json','utf8')); const results=data.results||[]; if(!results.length||!String(results[0].snippet||'').trim()){process.exit(1)}" \
-  || fail "memory_search returned no snippets"
-pass "memory_search returned snippets"
+  "direct qmd retrieval" \
+  /tmp/qmd-direct-search.json \
+  "${PYTHON_BIN}" \
+  "${QMD_SEARCH_SCRIPT}" \
+  --query "${QUERY}" \
+  --max-results 5 \
+  --min-score 0
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/qmd-direct-search.json','utf8')); const results=Array.isArray(data.results)?data.results:[]; if(!results.length){process.exit(1)} const first=results[0]; if(!String(first.snippet||'').trim()){process.exit(1)} if(!String(first.citation||'').includes('#L')){process.exit(1)}" \
+  || fail "direct qmd retrieval returned no citation-ready snippets"
+pass "direct qmd retrieval returned citation-ready snippets"
 
 sqlite_extensions="$(sqlite3 ':memory:' "SELECT sqlite_compileoption_used('ENABLE_LOAD_EXTENSION');" 2>/dev/null || true)"
 if [ "${sqlite_extensions}" = "1" ]; then

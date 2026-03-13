@@ -164,6 +164,9 @@ def cmd_patch(args: argparse.Namespace) -> int:
     for merge_json in args.merge_json:
         patch = json.loads(merge_json)
         updated = deep_merge(updated, patch)
+    for merge_file in args.merge_file:
+        patch = load_json(Path(merge_file))
+        updated = deep_merge(updated, patch)
     removed = []
     for dotted_path in args.unset:
         if delete_dotted_path(updated, dotted_path):
@@ -196,6 +199,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     patch = subparsers.add_parser("patch", help="Apply JSON merge patches and create a backup first.")
     patch.add_argument("--merge-json", action="append", default=[], help="Deep-merge JSON object into the config.")
+    patch.add_argument("--merge-file", action="append", default=[], help="Deep-merge JSON object from a file path.")
     patch.add_argument("--unset", action="append", default=[], help="Remove a dotted-path key.")
     patch.add_argument("--backup-label", default="manual", help="Backup label suffix.")
     patch.set_defaults(func=cmd_patch)

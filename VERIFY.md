@@ -8,45 +8,34 @@ Run these commands inside the `openclaw-core` container after deploy and after a
 bash /app/scripts/post-deploy-verify.sh
 ```
 
-Expected result: every line starts with `[verify] PASS`, including the active workspace path, the compatibility symlink, permissions, QMD version, memory file/chunk counts, and memory search snippets.
+Expected result: every line starts with `[verify] PASS`, including the active workspace path, the compatibility symlink, permissions, Kimi primary with Codex fallback, `memorySearch.enabled=false`, the 4-hour heartbeat policy, direct QMD rescan success, and citation-ready QMD retrieval snippets.
 
-The verifier fails if any of these commands reports disabled memory search or returns zero snippets:
+The verifier uses the live-supported operator flow:
 
 ```bash
 openclaw status
-openclaw memory status
-openclaw memory index
-openclaw memory search "Railway workspace"
+openclaw models status --json
+openclaw config get agents.defaults.memorySearch.enabled --json
+openclaw config get agents.defaults.heartbeat --json
+bash /data/workspace/tools/admin/qmd-rescan.sh
+python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_search.py --query "OpenClaw" --max-results 5
 ```
 
-The template explicitly sets `memory.qmd.scope.default=allow` so the CLI search
-path above is valid even without an active chat session.
-It also sets `memory.qmd.paths` for the active workspace so QMD can recall
-general workspace files instead of only the default memory Markdown files.
-It keeps `memory.qmd.includeDefaultMemory=false` so OpenClaw does not derive a
-file-rooted `/data/workspace/MEMORY.md` collection, which QMD `2.0.x` rejects
-with `ENOTDIR`.
-It also raises the QMD timeouts used during search and bootstrap so first-run
-local model downloads have longer to complete on Railway.
-QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd`
-with `BUN_INSTALL` cleared so the verification shell matches the wrapper's
-runtime behavior.
-The current core image is pinned to OpenClaw `v2026.2.9`, so
-`memory.qmd.searchMode` must remain absent; the wrapper scrubs that unsupported
-key on boot.
-Template defaults now leave custom QMD warmup disabled so the deployment does
-not inject book-specific probe queries into runtime logs.
-It also seeds a managed OpenClaw control-plane skill and system docs into the
-workspace so the live agent can answer provider/model questions without direct
-CLI access.
+The template keeps QMD on `/data/workspace` through `memory.qmd.paths`, disables derived default-memory file roots, disables OpenClaw `memorySearch` for the default agent, and relies on the direct QMD wrappers in the managed workspace seed. QMD is invoked via `/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd` with `BUN_INSTALL` cleared so the verification shell matches the wrapper runtime.
 
-After deploy, verify that seeded control-plane surface too:
+Heartbeat is fixed at `every: 4h` and uses the same `qmd-rescan.sh` wrapper, which stays incremental with `qmd update` only and skips if the last successful rescan is still fresh.
+
+## Managed control plane
+
+After deploy, verify that the seeded control-plane surface is present too:
 
 ```bash
-python /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py summary
-python /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups
+python3 /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py summary
+python3 /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups
 test -f /data/workspace/memory/system/openclaw-configuration-bible.md
+test -f /data/workspace/memory/system/openclaw-memory-bible.md
 test -f /data/workspace/memory/system/email-control-plane-bible.md
+test -f /data/workspace/skills/qmd-retrieval/SKILL.md
 test ! -f /data/workspace/patterns/stalwart-single-control-plane-email-ops-pattern.md
 ```
 
@@ -54,26 +43,8 @@ Expected output:
 
 - `summary` shows the current primary model plus all persisted auth profiles
 - `audit-backups` does not show a missing `openai-codex:default` profile after re-onboarding
-- both system-doc files exist
+- the managed QMD skill plus both system-doc files exist
 - the stale Stalwart pattern file is absent from the active workspace
-
-If you enable Claude Max API Proxy from Admin, also verify the local proxy path:
-
-```bash
-claude --version
-claude-max-api --help
-curl http://127.0.0.1:3456/health
-openclaw config get models.providers.claude-max --json
-openclaw config get agents.defaults.model.primary
-```
-
-Expected output:
-
-- `claude --version` prints the Claude Code CLI version
-- `claude-max-api --help` exits successfully
-- `/health` returns an HTTP 200 after the wrapper starts the proxy
-- `models.providers.claude-max.baseUrl` is `http://127.0.0.1:3456/v1`
-- the default model is `claude-max/claude-opus-4` unless you intentionally changed it
 
 ## Manual checks
 
@@ -126,42 +97,40 @@ Expected output:
 1
 ```
 
-5. Memory corpus exists and is indexed:
+5. Runtime policy is correct:
 
 ```bash
-find /data/workspace -maxdepth 2 -type f \( -name 'MEMORY.md' -o -path '/data/workspace/memory/*.md' \) | sort
-openclaw config get memory.qmd.includeDefaultMemory
-openclaw memory status
-openclaw memory index
+openclaw models status --json
+openclaw config get agents.defaults.memorySearch.enabled --json
+openclaw config get agents.defaults.heartbeat --json
 openclaw config get memory.qmd.paths --json
-openclaw memory status --agent main --deep --index --json
 ```
 
 Expected output:
 
-- at least one `MEMORY.md`
-- at least one dated file under `memory/`
-- `openclaw config get memory.qmd.includeDefaultMemory` returns `false`
-- `openclaw memory status` does not report `disabled:true`
-- `openclaw memory index` does not report `Memory search disabled`
+- default model is `kimi-coding/k2p5`
+- fallback list includes `openai-codex/gpt-5.3-codex`
+- `openclaw config get agents.defaults.memorySearch.enabled --json` returns `false`
+- `openclaw config get agents.defaults.heartbeat --json` returns `{ "every": "4h", "target": "none" }`
 - `memory.qmd.paths` contains the `/data/workspace` directory with pattern `**/*.md`
 - `memory.qmd.paths` does not contain `/data/workspace/MEMORY.md`
-- JSON with `results[0].status.files > 0`
-- JSON with `results[0].status.chunks > 0`
 
-6. Runtime memory search returns snippets:
+6. Direct QMD retrieval returns snippets:
 
 ```bash
-openclaw memory search "Railway workspace"
-openclaw memory search --agent main --json "Railway workspace"
+bash /data/workspace/tools/admin/qmd-rescan.sh
+python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_search.py --query "OpenClaw" --max-results 5
+python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_get.py --path MEMORY.md --from 1 --lines 20
 ```
 
 Expected output:
 
-- plain-text search returns at least one snippet
-- JSON with `results.length > 0`
-- first result contains a non-empty `snippet`
+- `qmd-rescan.sh` exits successfully and returns a log path under `knowledge/qmd/`
+- JSON search output returns at least one snippet
+- the first result contains a non-empty `snippet`
+- the citation is in `path#Lx-Ly` form
+- `qmd_memory_get.py` returns JSON content for the requested Markdown path
 
 ## First-run note
 
-QMD may download local model assets on the first boot or first query. That can make the first `qmd embed` or `openclaw memory search` noticeably slower than later runs.
+The first direct QMD pass can still be slower than later runs if QMD needs to create or refresh its SQLite index, but the managed heartbeat workflow does not force `qmd embed` on the 4-hour maintenance lane.

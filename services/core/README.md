@@ -91,8 +91,11 @@ On every boot the service:
 - enforces `700` on `/data/.openclaw` and `/data/.openclaw/credentials`
 - seeds `MEMORY.md` plus `memory/YYYY-MM-DD.md` if missing
 - persists Claude Code CLI auth under `/data/.claude` and re-links `/root/.claude` there on boot
+- keeps Kimi as the primary model with Codex as the default automatic fallback
+- fixes heartbeat at every 4 hours with `target=none`
 - configures QMD to index `/data/workspace` via `memory.qmd.paths`
 - disables OpenClaw's derived default-memory roots so QMD does not try to bind `/data/workspace/MEMORY.md` as a collection root
+- disables OpenClaw `memorySearch` for the default agent and seeds the direct QMD retrieval skill instead
 - reconciles `auth.profiles` from `/data/.openclaw/agents/main/agent/auth-profiles.json` and config backups so re-onboarding does not silently drop older providers
 - syncs the managed OpenClaw control-plane skill and source-of-truth docs into `/data/workspace`
 - archives stale Stalwart email guidance so Resend stays the active email control plane
@@ -132,9 +135,10 @@ starting the gateway. Use this to initialize persistent install prefixes or venv
 | `unauthorized: gateway token mismatch` | Token mismatch between UI and gateway | Re-run setup or set both tokens to same value in config |
 | `502 Bad Gateway` | Gateway can't start or can't bind | Ensure volume at `/data`, check Railway logs |
 | Repeating `gateway already running (pid ...)` or `Port 18789 is already in use` in logs | A stale gateway child survived a wrapper restart, or `openclaw doctor`/manual gateway commands collided with the wrapper-managed gateway | Use the wrapper-managed restart path only; the current wrapper kills the full gateway process tree on restart and skips `doctor` for reachable-port conflicts |
-| `memory search disabled` | QMD or local embedding warmup is still running, or the provider override is wrong | Wait for the first warmup to finish, then run `openclaw memory status --agent main --deep --index` and `openclaw config get memory.qmd.paths --json`; Railway defaults to explicit local embeddings with the GGUF cached under `/data/.openclaw/models/node-llama-cpp` unless you intentionally override `OPENCLAW_MEMORY_SEARCH_PROVIDER` |
+| `memory_search` returns `disabled:true` | Expected on this template unless you explicitly re-enable OpenClaw memorySearch | Use `bash /data/workspace/tools/admin/qmd-rescan.sh` and `python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_search.py --query "<text>"` for workspace recall |
 | `qmd ... ENOTDIR: not a directory, scandir '/data/workspace/MEMORY.md'` | OpenClaw derived a file-root default-memory collection and QMD `2.0.x` rejected it | Set `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY=false`, keep `memory.qmd.paths` pointed at `/data/workspace`, then redeploy or restart so the gateway reloads the config |
 | `memory.qmd: Unrecognized key: "searchMode"` | The current pinned OpenClaw release (`v2026.2.9`) does not support that config key | Remove it with `openclaw doctor --fix`, or redeploy the template so the wrapper scrubs it automatically |
+| `sh: 1: python: not found` | The container only guarantees `python3`, not a `python` shim | Run managed scripts with `python3 ...` |
 | Claude Max proxy selected but model calls fail | `claude-max-api` is running without a valid Claude Code CLI login, or `claude`/`claude-max-api` is missing | Verify `claude --version`, complete `claude` login once, then check `curl http://127.0.0.1:3456/health` inside core |
 | Build OOM | Insufficient memory | Use Railway plan with 2GB+ memory |
 

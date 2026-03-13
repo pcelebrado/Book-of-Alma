@@ -24,6 +24,6 @@ Reduce hallucinations by aligning live OpenClaw config, provider persistence, em
 
 ## Verification targets
 
-- `python skills/openclaw-control-plane/scripts/openclaw_admin.py summary`
-- `python skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups`
+- `python3 skills/openclaw-control-plane/scripts/openclaw_admin.py summary`
+- `python3 skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups`
 - `/setup/healthz`

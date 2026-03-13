@@ -30,6 +30,10 @@ OPENCLAW_CLAUDE_MAX_PROXY_PORT=3456
 OPENCLAW_CLAUDE_MAX_PROXY_BASE_URL=http://127.0.0.1:3456/v1
 OPENCLAW_CLAUDE_MAX_PROXY_PROVIDER_ID=claude-max
 OPENCLAW_CLAUDE_MAX_PROXY_DEFAULT_MODEL=claude-opus-4
+OPENCLAW_DEFAULT_MODEL_PRIMARY=kimi-coding/k2p5
+OPENCLAW_DEFAULT_MODEL_FALLBACKS=openai-codex/gpt-5.3-codex
+OPENCLAW_HEARTBEAT_EVERY=4h
+OPENCLAW_HEARTBEAT_TARGET=none
 SFTPGO_PORTABLE_DIRECTORY=/data/workspace
 OPENCLAW_MEMORY_BACKEND=qmd
 OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd
@@ -42,11 +46,13 @@ OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS=120000
 OPENCLAW_MEMORY_QMD_COMMAND_TIMEOUT_MS=120000
 OPENCLAW_MEMORY_QMD_UPDATE_TIMEOUT_MS=60000
 OPENCLAW_MEMORY_QMD_EMBED_TIMEOUT_MS=300000
+OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS=14400
 OPENCLAW_QMD_WARM_ON_BOOT=false
 OPENCLAW_MEMORY_WARMUP_ENABLED=false
 OPENCLAW_MEMORY_QMD_WARMUP_QUERY=test
 OPENCLAW_MEMORY_WARMUP_TIMEOUT_MS=300000
 OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH=true
+OPENCLAW_MEMORY_SEARCH_ENABLED=false
 OPENCLAW_MEMORY_SEARCH_PROVIDER=local
 OPENCLAW_MEMORY_SEARCH_FALLBACK=none
 OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf
@@ -56,18 +62,19 @@ OPENCLAW_MEMORY_SEARCH_STORE_PATH=/data/.openclaw/memory/{agentId}.sqlite
 
 3. Redeploy the service.
 
-Default Railway memory-search strategy:
+Default Railway runtime strategy:
 
-- QMD remains the memory backend.
-- QMD now indexes the whole active workspace by default via `memory.qmd.paths`, not just `MEMORY.md` and `memory/*.md`.
+- Kimi stays the primary model and Codex is the automatic fallback.
+- Anthropic remains available for explicit task selection, not as the default fallback chain.
+- Heartbeat is fixed at `every: 4h` with `target: none`.
+- QMD remains configured on the workspace via `memory.qmd.paths`.
 - OpenClaw's derived default-memory roots are disabled on Railway because QMD `2.0.x` treats collection roots as directories and will fail on a file-rooted `MEMORY.md` collection.
-- QMD scope default is set to `allow` so CLI verification searches are not denied.
-- QMD query/update/embed timeouts are raised for Railway cold starts and model downloads.
+- OpenClaw `memorySearch` is disabled by default.
+- Direct QMD wrappers under `skills/qmd-retrieval/` are the supported recall path.
+- `tools/admin/qmd-rescan.sh` keeps refresh incremental with `qmd update` only and skips if the last successful run is still fresh.
 - The wrapper clears `BUN_INSTALL` and pins `OPENCLAW_MEMORY_QMD_COMMAND` to the direct `@tobilu/qmd` entrypoint on Railway.
 - The current image is pinned to OpenClaw `v2026.2.9`, which does not accept `memory.qmd.searchMode`; startup scrubs that key automatically if a bad deploy wrote it.
-- Semantic memory search uses explicit local embeddings.
-- No embedding API key is required unless you intentionally switch providers.
-- Remote override path: set `OPENCLAW_MEMORY_SEARCH_PROVIDER=openai|gemini|voyage` plus the matching API key.
+- The local embedding settings stay in the template only as scaffolding if you intentionally re-enable OpenClaw `memorySearch`.
 
 4. On first boot the startup script will:
 
@@ -79,8 +86,11 @@ Default Railway memory-search strategy:
 - seed `MEMORY.md` and `memory/YYYY-MM-DD.md` if missing
 - keep `memory.qmd.includeDefaultMemory=false` so QMD binds `/data/workspace` as the collection root instead of `/data/workspace/MEMORY.md`
 - remove the legacy `memory/railway-alma-verification.md` seed if it exists on an older volume
+- set Kimi primary with Codex fallback and a 4-hour heartbeat cadence
+- disable OpenClaw `memorySearch` for the default agent
 - reconcile `auth.profiles` from the persisted main-agent auth store and config backups so re-onboarding does not silently drop older providers
 - sync the managed OpenClaw control-plane skill and source-of-truth docs into `/data/workspace`
+- sync the managed direct-QMD retrieval skill, heartbeat policy, and QMD maintenance wrapper into `/data/workspace`
 - archive stale Stalwart email notes so Resend remains the active email control plane
 - auto-start `claude-max-api` whenever `models.providers.claude-max` is configured
 
@@ -90,13 +100,15 @@ Default Railway memory-search strategy:
 bash /app/scripts/post-deploy-verify.sh
 ```
 
-That verifier runs the operator commands required for go-live:
+That verifier proves the live runtime shape:
 
 ```bash
 openclaw status
-openclaw memory status
-openclaw memory index
-openclaw memory search "Railway workspace"
+openclaw models status --json
+openclaw config get agents.defaults.memorySearch.enabled --json
+openclaw config get agents.defaults.heartbeat --json
+bash /data/workspace/tools/admin/qmd-rescan.sh
+python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_search.py --query "OpenClaw" --max-results 5
 ```
 
 ## Recovery and restore
@@ -121,7 +133,7 @@ If the new layout must be reverted:
 ```text
 OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace
 SFTPGO_PORTABLE_DIRECTORY=/data/workspace
-OPENCLAW_MEMORY_SEARCH_PROVIDER=
+OPENCLAW_MEMORY_SEARCH_ENABLED=
 ```
 
 3. Remove the symlink and recreate the old direct path only after copying data:

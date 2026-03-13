@@ -123,6 +123,21 @@ const OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR =
 const OPENCLAW_MEMORY_SEARCH_STORE_PATH =
   process.env.OPENCLAW_MEMORY_SEARCH_STORE_PATH?.trim() ||
   path.join(STATE_DIR, "memory", "{agentId}.sqlite");
+const OPENCLAW_DEFAULT_MODEL_PRIMARY =
+  process.env.OPENCLAW_DEFAULT_MODEL_PRIMARY?.trim() || "kimi-coding/k2p5";
+const OPENCLAW_HEARTBEAT_EVERY = process.env.OPENCLAW_HEARTBEAT_EVERY?.trim() || "4h";
+const OPENCLAW_HEARTBEAT_TARGET = process.env.OPENCLAW_HEARTBEAT_TARGET?.trim() || "none";
+
+function parseCsvEnv(value, fallback = []) {
+  if (value == null) {
+    return [...fallback];
+  }
+  const items = String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length ? Array.from(new Set(items)) : [...fallback];
+}
 
 function parseBoolEnv(value, fallback) {
   if (value == null) return fallback;
@@ -174,6 +189,14 @@ const OPENCLAW_MEMORY_WARMUP_ENABLED = parseBoolEnv(
   process.env.OPENCLAW_MEMORY_WARMUP_ENABLED,
   false,
 );
+const OPENCLAW_MEMORY_SEARCH_ENABLED = parseBoolEnv(
+  process.env.OPENCLAW_MEMORY_SEARCH_ENABLED,
+  false,
+);
+const OPENCLAW_DEFAULT_MODEL_FALLBACKS = parseCsvEnv(
+  process.env.OPENCLAW_DEFAULT_MODEL_FALLBACKS,
+  ["openai-codex/gpt-5.3-codex"],
+).filter((modelRef) => modelRef !== OPENCLAW_DEFAULT_MODEL_PRIMARY);
 const OPENCLAW_MEMORY_QMD_WARMUP_QUERY =
   process.env.OPENCLAW_MEMORY_QMD_WARMUP_QUERY?.trim() || "test";
 const OPENCLAW_MEMORY_WARMUP_RETRIES = parsePositiveIntEnv(
@@ -455,6 +478,12 @@ function describeMemorySearchRuntime(runtime = resolveMemorySearchRuntime()) {
 }
 
 function logMemorySearchRuntime(runtime = resolveMemorySearchRuntime(), context = "boot") {
+  if (!OPENCLAW_MEMORY_SEARCH_ENABLED) {
+    console.log(
+      `[memory-search] ${context} enabled=false direct-qmd workflow preferred; use skills/qmd-retrieval and bash tools/admin/qmd-rescan.sh`,
+    );
+    return;
+  }
   console.log(`[memory-search] ${context} resolved ${describeMemorySearchRuntime(runtime)}`);
   for (const warning of runtime.warnings) {
     console.warn(`[memory-search] warning: ${warning}`);
@@ -2195,6 +2224,8 @@ app.get("/healthz", async (_req, res) => {
       stateDirMode: safeMode(STATE_DIR),
       credentialsDirMode: safeMode(CREDENTIALS_DIR),
       memoryFiles: memoryStats.totalFiles,
+      memorySearchEnabled: OPENCLAW_MEMORY_SEARCH_ENABLED,
+      memoryWorkflow: OPENCLAW_MEMORY_SEARCH_ENABLED ? "openclaw-memory" : "direct-qmd",
       memorySearchProvider: memorySearch.provider,
       memorySearchSource: memorySearch.source,
       memorySearchStorePath: memorySearch.storePath,
@@ -2256,6 +2287,8 @@ app.get("/internal/health", requireInternalApiAuth, async (_req, res) => {
         indexPresent: fs.existsSync(QMD_INDEX_SQLITE_PATH),
       },
       memory: {
+        enabled: OPENCLAW_MEMORY_SEARCH_ENABLED,
+        workflow: OPENCLAW_MEMORY_SEARCH_ENABLED ? "openclaw-memory" : "direct-qmd",
         files: memoryStats.totalFiles,
         dailyFiles: memoryStats.dailyFiles,
         searchProvider: memorySearch.provider,
@@ -4342,7 +4375,30 @@ function applyCustomProviderConfig(payload) {
 }
 
 function buildManagedRuntimeConfigEntries() {
+  const managedModelRefs = [
+    OPENCLAW_DEFAULT_MODEL_PRIMARY,
+    ...OPENCLAW_DEFAULT_MODEL_FALLBACKS,
+  ].filter(Boolean);
+  const aliasForModelRef = (modelRef) => {
+    switch (modelRef) {
+      case "kimi-coding/k2p5":
+        return "Kimi K2.5";
+      case "openai-codex/gpt-5.3-codex":
+        return "Codex Fallback";
+      default:
+        return modelRef.split("/").at(-1) || modelRef;
+    }
+  };
+
   return [
+    ["agents.defaults.model.primary", OPENCLAW_DEFAULT_MODEL_PRIMARY],
+    ["agents.defaults.model.fallbacks", OPENCLAW_DEFAULT_MODEL_FALLBACKS],
+    ...managedModelRefs.map((modelRef) => [
+      `agents.defaults.models.${modelRef}`,
+      { alias: aliasForModelRef(modelRef) },
+    ]),
+    ["agents.defaults.heartbeat.every", OPENCLAW_HEARTBEAT_EVERY],
+    ["agents.defaults.heartbeat.target", OPENCLAW_HEARTBEAT_TARGET],
     ["gateway.mode", "local"],
     ["gateway.auth.mode", "token"],
     ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
@@ -4537,6 +4593,7 @@ async function buildSetupMemoryBackendDefaults() {
   const backend = OPENCLAW_MEMORY_BACKEND.toLowerCase();
   const runtime = ensureMemorySearchRuntimeLayout();
   const memorySearchEntries = [
+    ["agents.defaults.memorySearch.enabled", OPENCLAW_MEMORY_SEARCH_ENABLED],
     ["agents.defaults.memorySearch.provider", runtime.provider],
     ["agents.defaults.memorySearch.fallback", runtime.fallback],
     ["agents.defaults.memorySearch.store.path", runtime.storePath],
@@ -4548,11 +4605,15 @@ async function buildSetupMemoryBackendDefaults() {
     memorySearchEntries.push(["agents.defaults.memorySearch.local.modelPath", runtime.local.modelPath]);
     memorySearchEntries.push(["agents.defaults.memorySearch.local.modelCacheDir", runtime.local.modelCacheDir]);
   }
-  const memorySearchLines = [
-    `[memory-search] ${describeMemorySearchRuntime(runtime)}`,
-    ...runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`),
-    ...runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`),
-  ];
+  const memorySearchLines = OPENCLAW_MEMORY_SEARCH_ENABLED
+    ? [
+        `[memory-search] enabled=true ${describeMemorySearchRuntime(runtime)}`,
+        ...runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`),
+        ...runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`),
+      ]
+    : [
+        "[memory-search] enabled=false direct-qmd workflow preferred; use skills/qmd-retrieval and bash tools/admin/qmd-rescan.sh",
+      ];
 
   if (backend !== "qmd") {
     return {
@@ -5230,6 +5291,7 @@ async function applyMemoryBackendDefaults() {
   const applyMemorySearchDefaults = async () => {
     const runtime = ensureMemorySearchRuntimeLayout();
     const entries = [
+      ["agents.defaults.memorySearch.enabled", OPENCLAW_MEMORY_SEARCH_ENABLED],
       ["agents.defaults.memorySearch.provider", runtime.provider],
       ["agents.defaults.memorySearch.fallback", runtime.fallback],
       ["agents.defaults.memorySearch.store.path", runtime.storePath],
@@ -5249,9 +5311,15 @@ async function applyMemoryBackendDefaults() {
 
     const patch = applyConfigPatch(entries);
     const output = [
-      `[memory-search] ${describeMemorySearchRuntime(runtime)}`,
-      ...runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`),
-      ...runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`),
+      OPENCLAW_MEMORY_SEARCH_ENABLED
+        ? `[memory-search] enabled=true ${describeMemorySearchRuntime(runtime)}`
+        : "[memory-search] enabled=false direct-qmd workflow preferred; use skills/qmd-retrieval and bash tools/admin/qmd-rescan.sh",
+      ...(OPENCLAW_MEMORY_SEARCH_ENABLED
+        ? runtime.warnings.map((warning) => `[memory-search] warning: ${warning}`)
+        : []),
+      ...(OPENCLAW_MEMORY_SEARCH_ENABLED
+        ? runtime.hints.map((hint) => `[memory-search] remediation: ${hint}`)
+        : []),
       patch.output || "",
     ].join("\n");
 
