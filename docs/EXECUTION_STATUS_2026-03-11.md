@@ -4,8 +4,9 @@
 
 This note records the direct Railway deployments and live remediations performed
 from the local working tree on March 10-11, 2026 for
-`codex/railway-state-qmd-remediation`, the later `main` follow-up, and the
-Claude Max proxy onboarding rollout.
+`codex/railway-state-qmd-remediation`, the later `main` follow-up, the
+Claude Max proxy onboarding rollout, and the March 13, 2026 auth-persistence /
+workspace source-of-truth hardening pass.
 
 ## How deployments were done
 
@@ -52,6 +53,8 @@ All timestamps below are America/Denver (`-06:00`).
 | `7621eb81-6c00-4ccd-9d96-74f8cb2a93cd` | success | 2026-03-11 08:35:20 | Railway restart requested by the Alma bot so live config changes could apply. After restart, a direct live config hotfix set `memory.qmd.includeDefaultMemory=false` and the gateway reloaded cleanly. |
 | `1616726f-3d24-41b5-9ce2-03e5c4575b02` | success | 2026-03-11 13:28:09 | Commit `7c1e450` deployed via repo-root `railway up` and shipped Claude Max API Proxy support into `openclaw-core`, including Claude CLI install, proxy supervision, persisted Claude state under `/data/.claude`, and setup-status reporting for the admin flow. |
 | `e8da3fac-dc4a-4a10-88dc-a64aaee7a6b5` | success | 2026-03-11 13:58:38 | Commit `9f82f4a` deployed via repo-root `railway up` and added the hosted `/claude-auth` portal on the core domain, plus internal start/storage handling for Anthropic setup-token onboarding through the admin UI. |
+| `cf006a4a-bdf7-4b08-b48b-d54f09028898` | removed | 2026-03-12 19:11:32 | First March 13 Dockerfile rollout for auth persistence and workspace source-of-truth seeding. Build completed, but the deployment was later removed during cleanup of a stray CLI deploy. |
+| `86ae5ffa-5161-4d00-b456-7afb5a96c3f1` | success | 2026-03-12 19:15:06 | Commits `0ccb25c` and `0977e98` deployed the auth-profile reconciliation path plus managed workspace source-of-truth sync. Live runtime now preserves Codex/Kimi/Anthropic profiles together and seeds the OpenClaw control-plane skill/docs into `/data/workspace`. |
 
 ## Web deployment chain
 
@@ -85,6 +88,19 @@ All timestamps below are America/Denver (`-06:00`).
   - `openclaw-web` starts a Claude auth popup from Admin
   - `openclaw-core` exposes `https://openclaw-core-reality-check.up.railway.app/claude-auth`
   - the portal stores a pasted `claude setup-token` into OpenClaw's Anthropic token profile for the main agent
+- March 13, 2026 live config audit found a real persistence gap after re-onboarding:
+  - `openclaw.json` had dropped `openai-codex:default`
+  - `/data/.openclaw/agents/main/agent/auth-profiles.json` still held the Codex, Anthropic, and Kimi credentials
+- Live remediation restored `auth.profiles.openai-codex:default` in-place before redeploy.
+- Template hardening in commit `0ccb25c` now reconciles `auth.profiles` from the persisted main-agent auth store and config backups on boot and after setup.
+- Template hardening in commits `0ccb25c` and `0977e98` also syncs a managed workspace source-of-truth payload into `/data/workspace`:
+  - `skills/openclaw-control-plane/`
+  - `memory/system/openclaw-configuration-bible.md`
+  - `memory/system/email-control-plane-bible.md`
+  - `patterns/openclaw-admin-pattern.md`
+  - `patterns/resend-email-control-plane-pattern.md`
+  - `knowledge/WORKSPACE_STATUS.md`
+- The same bootstrap pass archives stale Stalwart email guidance so Resend remains the active email control plane in the workspace docs.
 
 ## Current live findings
 
@@ -111,6 +127,11 @@ Operational interpretation:
 - Current live domains after the Claude Max rollout:
   - `https://openclaw-core-reality-check.up.railway.app/setup/healthz` -> `{"ok":true}`
   - `https://openclaw-web-reality-check.up.railway.app/api/health` -> `{"status":"ok","service":"web",...}`
+- Current live OpenClaw control-plane proof after deploy `86ae5ffa-5161-4d00-b456-7afb5a96c3f1`:
+  - `openclaw config get auth.profiles --json` now returns `kimi-coding:default`, `openai-codex:default`, and `anthropic:default`
+  - `python /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py summary` reports primary model `kimi-coding/k2p5` while preserving the multi-provider auth set
+  - `/data/workspace/memory/system/openclaw-configuration-bible.md` and `/data/workspace/memory/system/email-control-plane-bible.md` exist
+  - `/data/workspace/patterns/stalwart-single-control-plane-email-ops-pattern.md` is no longer present in the active workspace
 - Public Claude auth probe after deploy `e8da3fac-dc4a-4a10-88dc-a64aaee7a6b5`:
   - `https://openclaw-core-reality-check.up.railway.app/claude-auth` returns `404 Claude auth expired` without flow credentials, which confirms the new hosted route is live and enforcing short-lived flow tokens
 - Live SSH verification on `openclaw-core` after deploy `1616726f-3d24-41b5-9ce2-03e5c4575b02` confirmed:
