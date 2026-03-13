@@ -14,6 +14,8 @@ CLAUDE_STATE_DIR="${OPENCLAW_CLAUDE_STATE_DIR:-${DATA_ROOT}/.claude}"
 CLAUDE_COMPAT_DIR="${OPENCLAW_CLAUDE_COMPAT_DIR:-/root/.claude}"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-${DATA_ROOT}/sftpgo}"
 SFTPGO_SRV_DIR="${SFTPGO_DATA_ROOT}/srv"
+WORKSPACE_SOURCE_SEED_DIR="${OPENCLAW_WORKSPACE_SOURCE_SEED_DIR:-/app/workspace-seed}"
+WORKSPACE_REMOTE_ARCHIVE_DIR="${WORKSPACE_DIR}/archive/remote-operator-2026-03-12"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
 QMD_WORKSPACE_PATTERN="${OPENCLAW_MEMORY_QMD_WORKSPACE_PATTERN:-**/*.md}"
 QMD_STATE_DIR="${STATE_DIR}/agents/main/qmd"
@@ -96,6 +98,108 @@ sync_if_target_empty() {
     cp -a "${src}/." "${dst}/"
     log "Migrated contents from ${src} -> ${dst}"
   fi
+}
+
+sync_seed_file() {
+  local rel="$1"
+  local src="${WORKSPACE_SOURCE_SEED_DIR}/${rel}"
+  local dst="${WORKSPACE_DIR}/${rel}"
+  if [ ! -f "${src}" ]; then
+    return 0
+  fi
+
+  ensure_dir "$(dirname "${dst}")"
+  if [ -f "${dst}" ] && cmp -s "${src}" "${dst}"; then
+    return 0
+  fi
+
+  cp "${src}" "${dst}"
+  case "${dst}" in
+    *.py)
+      chmod 700 "${dst}" 2>/dev/null || true
+      ;;
+    *)
+      chmod 600 "${dst}" 2>/dev/null || true
+      ;;
+  esac
+  log "Synced managed workspace file ${rel}"
+}
+
+archive_workspace_file() {
+  local rel="$1"
+  local src="${WORKSPACE_DIR}/${rel}"
+  local dst="${WORKSPACE_REMOTE_ARCHIVE_DIR}/${rel}"
+  if [ ! -e "${src}" ] && [ ! -L "${src}" ]; then
+    return 0
+  fi
+
+  ensure_dir "$(dirname "${dst}")"
+  if [ -e "${dst}" ] || [ -L "${dst}" ]; then
+    rm -rf "${dst}" 2>/dev/null || true
+  fi
+  mv "${src}" "${dst}"
+  log "Archived stale workspace file ${rel}"
+}
+
+ensure_openclaw_governance_note() {
+  local agents_path="${WORKSPACE_DIR}/AGENTS.md"
+  local temp_script
+  temp_script="$(mktemp)"
+  cat > "${temp_script}" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+start = "<!-- BEGIN MANAGED OPENCLAW GOVERNANCE -->"
+end = "<!-- END MANAGED OPENCLAW GOVERNANCE -->"
+block = """<!-- BEGIN MANAGED OPENCLAW GOVERNANCE -->
+## Managed OpenClaw Governance
+
+- Use `skills/openclaw-control-plane/` for provider, model, gateway, channel, memory, and auth-profile questions.
+- Do not hand-edit `/data/.openclaw/openclaw.json`; use the control-plane script workflow instead.
+- Any OpenClaw mutation must also update the control-plane skill, `memory/system/openclaw-configuration-bible.md`, and the relevant pattern/knowledge writeback.
+- Treat `Resend` as the canonical outbound email system. Historical Stalwart notes are archived evidence only.
+<!-- END MANAGED OPENCLAW GOVERNANCE -->"""
+
+if path.exists():
+    original = path.read_text(encoding="utf-8")
+else:
+    original = "# Workspace Governance\n\n"
+
+if start in original and end in original:
+    head, remainder = original.split(start, 1)
+    _, tail = remainder.split(end, 1)
+    updated = head.rstrip() + "\n\n" + block + "\n" + tail.lstrip()
+else:
+    separator = "" if original.endswith("\n") else "\n"
+    updated = original + separator + ("\n" if separator == "" else "") + block + "\n"
+
+if updated != original:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(updated, encoding="utf-8")
+PY
+  python3 "${temp_script}" "${agents_path}" >/dev/null 2>&1 || true
+  rm -f "${temp_script}" 2>/dev/null || true
+}
+
+sync_workspace_source_of_truth() {
+  if [ ! -d "${WORKSPACE_SOURCE_SEED_DIR}" ]; then
+    return 0
+  fi
+
+  archive_workspace_file "patterns/stalwart-single-control-plane-email-ops-pattern.md"
+  archive_workspace_file "knowledge/2026-03-11_stalwart-direct-email-skill-completion-pass.md"
+
+  sync_seed_file "skills/openclaw-control-plane/SKILL.md"
+  sync_seed_file "skills/openclaw-control-plane/references/source-of-truth.md"
+  sync_seed_file "skills/openclaw-control-plane/scripts/openclaw_admin.py"
+  sync_seed_file "memory/system/openclaw-configuration-bible.md"
+  sync_seed_file "memory/system/email-control-plane-bible.md"
+  sync_seed_file "patterns/openclaw-admin-pattern.md"
+  sync_seed_file "patterns/resend-email-control-plane-pattern.md"
+  sync_seed_file "knowledge/WORKSPACE_STATUS.md"
+  sync_seed_file "knowledge/2026-03-12_remote-openclaw-source-of-truth-refresh.md"
+  ensure_openclaw_governance_note
 }
 
 ensure_workspace_target() {
@@ -314,6 +418,7 @@ prepare_runtime() {
   fix_permissions
   ensure_claude_cli_state
   seed_memory_corpus
+  sync_workspace_source_of_truth
   expose_workspace_for_sftpgo
   prepare_qmd_dirs
   prepare_memory_search_dirs

@@ -89,6 +89,11 @@ test("runtime bootstrap removes the legacy Alma verification note and keeps gene
   assert.match(bootstrap, /CLAUDE_COMPAT_DIR/);
   assert.match(bootstrap, /Linked \$\{CLAUDE_COMPAT_DIR\} -> \$\{CLAUDE_STATE_DIR\}/);
   assert.match(bootstrap, /Removed legacy Alma verification seed/);
+  assert.match(bootstrap, /WORKSPACE_SOURCE_SEED_DIR/);
+  assert.match(bootstrap, /sync_workspace_source_of_truth/);
+  assert.match(bootstrap, /openclaw-control-plane/);
+  assert.match(bootstrap, /stalwart-single-control-plane-email-ops-pattern\.md/);
+  assert.match(bootstrap, /BEGIN MANAGED OPENCLAW GOVERNANCE/);
   assert.match(bootstrap, /QMD_WARMUP_QUERY/);
   assert.match(bootstrap, /Skipping direct qmd update\/embed warmup/);
   assert.doesNotMatch(bootstrap, /collection add/);
@@ -108,6 +113,7 @@ test("runtime image and entrypoint pin the direct qmd command path", () => {
     /OPENCLAW_MEMORY_QMD_COMMAND:\-\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
   );
   assert.match(dockerfile, /npm install -g @anthropic-ai\/claude-code claude-max-api-proxy/);
+  assert.match(dockerfile, /COPY workspace-seed \.\/workspace-seed/);
   assert.match(dockerfile, /ENV OPENCLAW_CLAUDE_STATE_DIR=\/data\/\.claude/);
   assert.match(entrypoint, /OPENCLAW_CLAUDE_STATE_DIR:\-\$\{OPENCLAW_DATA_ROOT\}\/\.claude/);
   assert.match(entrypoint, /CLAUDE_CONFIG_DIR:\-\$\{OPENCLAW_CLAUDE_STATE_DIR\}/);
@@ -182,4 +188,14 @@ test("onboarding setup applies wrapper-managed config in one pass without doctor
   assert.match(src, /const providerPatch = buildSetupCustomProviderConfig\(payload\);/);
   assert.doesNotMatch(src, /clawArgs\(\["plugins", "enable", "telegram"\]\)/);
   assert.doesNotMatch(src, /clawArgs\(\["doctor", "--fix"\]\)/);
+});
+
+test("runtime reconciles auth profiles from persisted agent state and backup snapshots", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /function listConfigBackupPaths\(/);
+  assert.match(src, /function collectRecoverableAuthProfiles\(/);
+  assert.match(src, /auth-profiles\.json/);
+  assert.match(src, /function reconcileConfiguredAuthProfiles\(/);
+  assert.match(src, /reconcilePersistedAuthProfilesOnBoot/);
+  assert.match(src, /reconcileConfiguredAuthProfiles\("configured-setup"\)/);
 });

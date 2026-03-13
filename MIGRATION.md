@@ -79,6 +79,9 @@ Default Railway memory-search strategy:
 - seed `MEMORY.md` and `memory/YYYY-MM-DD.md` if missing
 - keep `memory.qmd.includeDefaultMemory=false` so QMD binds `/data/workspace` as the collection root instead of `/data/workspace/MEMORY.md`
 - remove the legacy `memory/railway-alma-verification.md` seed if it exists on an older volume
+- reconcile `auth.profiles` from the persisted main-agent auth store and config backups so re-onboarding does not silently drop older providers
+- sync the managed OpenClaw control-plane skill and source-of-truth docs into `/data/workspace`
+- archive stale Stalwart email notes so Resend remains the active email control plane
 - auto-start `claude-max-api` whenever `models.providers.claude-max` is configured
 
 5. Run the verifier:

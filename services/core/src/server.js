@@ -1053,6 +1053,165 @@ function readConfigJsonFromDisk() {
   };
 }
 
+function readJsonFileIfPresent(targetPath) {
+  try {
+    if (!fs.existsSync(targetPath)) {
+      return null;
+    }
+    const raw = fs.readFileSync(targetPath, "utf8");
+    return raw.trim() ? JSON.parse(raw) : {};
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAuthProfileForConfig(profile) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+    return null;
+  }
+
+  const provider = typeof profile.provider === "string" ? profile.provider.trim() : "";
+  const modeSource =
+    typeof profile.mode === "string" && profile.mode.trim()
+      ? profile.mode
+      : typeof profile.type === "string"
+        ? profile.type
+        : "";
+  const mode = String(modeSource || "").trim();
+  if (!provider || !mode) {
+    return null;
+  }
+
+  return { provider, mode };
+}
+
+function listConfigBackupPaths() {
+  try {
+    return fs
+      .readdirSync(STATE_DIR)
+      .filter((name) => /^openclaw\.json\.bak/.test(name))
+      .sort()
+      .reverse()
+      .map((name) => path.join(STATE_DIR, name));
+  } catch {
+    return [];
+  }
+}
+
+function collectRecoverableAuthProfiles() {
+  const recovered = {};
+  const sources = [];
+  const mergeSource = (profiles, sourceLabel) => {
+    if (!profiles || typeof profiles !== "object" || Array.isArray(profiles)) {
+      return;
+    }
+
+    const added = [];
+    for (const [profileId, profile] of Object.entries(profiles)) {
+      if (recovered[profileId]) {
+        continue;
+      }
+      const normalized = normalizeAuthProfileForConfig(profile);
+      if (!normalized) {
+        continue;
+      }
+      recovered[profileId] = normalized;
+      added.push(profileId);
+    }
+
+    if (added.length > 0) {
+      sources.push(`${sourceLabel}:${added.join(",")}`);
+    }
+  };
+
+  const agentAuthStore = readJsonFileIfPresent(path.join(resolveMainAgentDir(), "auth-profiles.json"));
+  mergeSource(agentAuthStore?.profiles, "agent-auth-store");
+
+  for (const backupPath of listConfigBackupPaths()) {
+    const backup = readJsonFileIfPresent(backupPath);
+    mergeSource(backup?.auth?.profiles, `backup:${path.basename(backupPath)}`);
+  }
+
+  return { profiles: recovered, sources };
+}
+
+function reconcileConfiguredAuthProfiles(reason = "boot") {
+  if (!isConfigured()) {
+    return {
+      ok: false,
+      changed: false,
+      added: [],
+      output: `[auth profiles] skipped (${reason}): config not present`,
+    };
+  }
+
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const nextConfig = cloneJsonValue(snapshot.config) || {};
+    const currentProfiles =
+      nextConfig.auth && nextConfig.auth.profiles && typeof nextConfig.auth.profiles === "object"
+        ? nextConfig.auth.profiles
+        : {};
+    const recoverable = collectRecoverableAuthProfiles();
+    const added = [];
+
+    for (const [profileId, profile] of Object.entries(recoverable.profiles)) {
+      const existing = normalizeAuthProfileForConfig(currentProfiles[profileId]);
+      if (existing) {
+        continue;
+      }
+      currentProfiles[profileId] = profile;
+      added.push(profileId);
+    }
+
+    if (added.length === 0) {
+      return {
+        ok: true,
+        changed: false,
+        added,
+        output: `[auth profiles] unchanged ${snapshot.path}`,
+      };
+    }
+
+    nextConfig.auth = {
+      ...(nextConfig.auth && typeof nextConfig.auth === "object" ? nextConfig.auth : {}),
+      profiles: currentProfiles,
+    };
+
+    const nextRaw = `${JSON.stringify(nextConfig, null, 2)}\n`;
+    const currentRaw = `${JSON.stringify(snapshot.config, null, 2)}\n`;
+    if (nextRaw === currentRaw) {
+      return {
+        ok: true,
+        changed: false,
+        added: [],
+        output: `[auth profiles] unchanged ${snapshot.path}`,
+      };
+    }
+
+    fs.mkdirSync(path.dirname(snapshot.path), { recursive: true });
+    const tempPath = `${snapshot.path}.tmp`;
+    fs.writeFileSync(tempPath, nextRaw, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tempPath, snapshot.path);
+
+    const sourceSummary =
+      recoverable.sources.length > 0 ? ` from ${recoverable.sources.join("; ")}` : "";
+    return {
+      ok: true,
+      changed: true,
+      added,
+      output: `[auth profiles] restored ${added.join(", ")}${sourceSummary} in ${snapshot.path}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      added: [],
+      output: `[auth profiles] reconcile failed (${reason}): ${String(err)}`,
+    };
+  }
+}
+
 function setConfigValue(target, dottedPath, value) {
   const parts = String(dottedPath || "")
     .split(".")
@@ -1221,6 +1380,19 @@ function removeConfigKeys(dottedPaths) {
   }
   if (cleanup.changed) {
     console.log(`[migration] Scrubbed legacy config keys: ${cleanup.removed.join(", ")}`);
+  }
+})();
+
+(function reconcilePersistedAuthProfilesOnBoot() {
+  if (!isConfigured()) return;
+
+  const repair = reconcileConfiguredAuthProfiles("boot");
+  if (!repair.ok) {
+    console.warn(`[migration] ${repair.output}`);
+    return;
+  }
+  if (repair.changed) {
+    console.log(`[migration] ${repair.output}`);
   }
 })();
 
@@ -5001,6 +5173,12 @@ async function applyConfiguredSetupPayload(payload) {
   extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}`;
   if (runtimePatch.output) {
     extra += `\n${runtimePatch.output}`;
+  }
+
+  const authProfileRepair = reconcileConfiguredAuthProfiles("configured-setup");
+  extra += `\n[auth profiles] ${authProfileRepair.ok ? "reconciled" : "failed"}`;
+  if (authProfileRepair.output) {
+    extra += `\n${authProfileRepair.output}`;
   }
 
   if (runtimePatch.ok && memoryDefaults.ok) {

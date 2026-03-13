@@ -171,6 +171,9 @@ Core now enforces one durable workspace layout on every boot:
 - `/data/workspace` is the configured OpenClaw workspace path
 - `/root/.openclaw/workspace` is recreated as a compatibility symlink to `/data/workspace`
 - SFTPGo transfers land directly in `/data/workspace`
+- `/data/workspace/skills/openclaw-control-plane/` is synced from the image as the managed OpenClaw admin skill
+- `/data/workspace/memory/system/` and `/data/workspace/knowledge/WORKSPACE_STATUS.md` are refreshed as the workspace source of truth
+- stale Stalwart email guidance is archived on boot so Resend remains the active email control plane
 
 ### 3. After Deploy
 
@@ -483,6 +486,9 @@ directories, so Railway defaults `OPENCLAW_MEMORY_QMD_INCLUDE_DEFAULT_MEMORY` to
 The wrapper also sets `memory.qmd.scope.default=allow` so operator-side CLI
 checks like `openclaw memory search "Railway workspace"` work from Railway shells without a
 chat session key.
+It also reconciles `auth.profiles` from the persisted main-agent auth store and
+config backups so re-onboarding can change the primary model without dropping
+Codex, Claude, or other previously authenticated providers from `openclaw.json`.
 It also raises the QMD query/update/embed timeouts for Railway cold starts so
 first-run model downloads do not fail memory verification prematurely.
 It also raises the supported OpenClaw QMD command timeout so `qmd collection add`
@@ -512,6 +518,22 @@ remote embedding provider.
 
 See `docs/PREDEPLOY_NEXT_STEPS.md`, [MIGRATION.md](./MIGRATION.md), and
 [VERIFY.md](./VERIFY.md) for the full deployment, migration, and verification flow.
+
+### Managed workspace control plane
+
+Fresh boots now sync a managed OpenClaw source-of-truth payload into the
+workspace:
+
+- `skills/openclaw-control-plane/`
+- `memory/system/openclaw-configuration-bible.md`
+- `memory/system/email-control-plane-bible.md`
+- `patterns/openclaw-admin-pattern.md`
+- `patterns/resend-email-control-plane-pattern.md`
+- `knowledge/WORKSPACE_STATUS.md`
+
+That payload exists to reduce hallucinations in the live agent workspace. If you
+change OpenClaw runtime behavior in the wrapper, update those seeded files in
+`services/core/workspace-seed/` in the same change.
 
 ---
 

@@ -145,6 +145,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
 
 COPY src ./src
 COPY scripts ./scripts
+COPY workspace-seed ./workspace-seed
 
 # =============================================================================
 # Railway Port Configuration

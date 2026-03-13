@@ -93,6 +93,9 @@ On every boot the service:
 - persists Claude Code CLI auth under `/data/.claude` and re-links `/root/.claude` there on boot
 - configures QMD to index `/data/workspace` via `memory.qmd.paths`
 - disables OpenClaw's derived default-memory roots so QMD does not try to bind `/data/workspace/MEMORY.md` as a collection root
+- reconciles `auth.profiles` from `/data/.openclaw/agents/main/agent/auth-profiles.json` and config backups so re-onboarding does not silently drop older providers
+- syncs the managed OpenClaw control-plane skill and source-of-truth docs into `/data/workspace`
+- archives stale Stalwart email guidance so Resend stays the active email control plane
 - forces the hosted Railway command/tool profile expected by the live service (`commands.restart=true`, `tools.profile=full`, gateway exec host, cross-context messaging, and agent-to-agent enabled)
 - scrubs unsupported `memory.qmd.searchMode` keys on boot for the pinned OpenClaw `v2026.2.9` release
 - removes the legacy `memory/railway-alma-verification.md` seed if present

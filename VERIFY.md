@@ -36,6 +36,26 @@ The current core image is pinned to OpenClaw `v2026.2.9`, so
 key on boot.
 Template defaults now leave custom QMD warmup disabled so the deployment does
 not inject book-specific probe queries into runtime logs.
+It also seeds a managed OpenClaw control-plane skill and system docs into the
+workspace so the live agent can answer provider/model questions without direct
+CLI access.
+
+After deploy, verify that seeded control-plane surface too:
+
+```bash
+python /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py summary
+python /data/workspace/skills/openclaw-control-plane/scripts/openclaw_admin.py audit-backups
+test -f /data/workspace/memory/system/openclaw-configuration-bible.md
+test -f /data/workspace/memory/system/email-control-plane-bible.md
+test ! -f /data/workspace/patterns/stalwart-single-control-plane-email-ops-pattern.md
+```
+
+Expected output:
+
+- `summary` shows the current primary model plus all persisted auth profiles
+- `audit-backups` does not show a missing `openai-codex:default` profile after re-onboarding
+- both system-doc files exist
+- the stale Stalwart pattern file is absent from the active workspace
 
 If you enable Claude Max API Proxy from Admin, also verify the local proxy path:
 
