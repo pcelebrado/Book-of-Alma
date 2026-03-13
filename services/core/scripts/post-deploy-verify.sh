@@ -119,7 +119,7 @@ node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/ope
 pass "wrapper setup health reports ok=true"
 
 retry_capture "openclaw models status --json" /tmp/openclaw-model-status.json openclaw models status --json
-node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-model-status.json','utf8')); const defaults=data.defaults||{}; const fallbacks=Array.isArray(defaults.fallbacks)?defaults.fallbacks:[]; if(defaults.default!=='kimi-coding/k2p5'){process.exit(1)} if(!fallbacks.includes('openai-codex/gpt-5.3-codex')){process.exit(1)}" \
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-model-status.json','utf8')); const defaults=data.defaults||{}; const defaultModel=String(data.defaultModel||data.resolvedDefault||defaults.default||defaults.primary||''); const fallbacks=Array.isArray(data.fallbacks)?data.fallbacks:(Array.isArray(defaults.fallbacks)?defaults.fallbacks:[]); if(defaultModel!=='kimi-coding/k2p5'){process.exit(1)} if(!fallbacks.includes('openai-codex/gpt-5.3-codex')){process.exit(1)}" \
   || fail "default model routing is not Kimi primary with Codex fallback"
 pass "default model routing is Kimi primary with Codex fallback"
 

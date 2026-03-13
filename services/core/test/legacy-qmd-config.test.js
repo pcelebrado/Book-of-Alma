@@ -252,5 +252,7 @@ test("seeded direct qmd helpers default to the Railway workspace path and explai
   assert.match(search, /QMD collection '.+' is missing\. Run `bash tools\/admin\/qmd-rescan\.sh` first\./);
   assert.match(verify, /APP_PORT="\$\{PORT:-\$\{OPENCLAW_PUBLIC_PORT:-3000\}\}"/);
   assert.match(verify, /wrapper setup health/);
+  assert.match(verify, /data\.defaultModel\|\|data\.resolvedDefault\|\|defaults\.default\|\|defaults\.primary/);
+  assert.match(verify, /Array\.isArray\(data\.fallbacks\)\?data\.fallbacks/);
   assert.doesNotMatch(verify, /retry_capture "openclaw status"/);
 });
