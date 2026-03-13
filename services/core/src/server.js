@@ -4379,7 +4379,7 @@ function applyCustomProviderConfig(payload) {
   if (isClaudeMaxPreset) {
     const modelRef = buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL);
     entries.push(["agents.defaults.model.primary", modelRef]);
-    entries.push([`agents.defaults.models.${modelRef}`, { alias: "Claude Max" }]);
+    entries.push(["agents.defaults.models", buildManagedModelsConfigValue([modelRef], () => "Claude Max")]);
   }
 
   const patch = applyConfigPatch(entries);
@@ -4428,10 +4428,7 @@ function buildManagedRuntimeConfigEntries() {
   return [
     ["agents.defaults.model.primary", OPENCLAW_DEFAULT_MODEL_PRIMARY],
     ["agents.defaults.model.fallbacks", OPENCLAW_DEFAULT_MODEL_FALLBACKS],
-    ...managedModelRefs.map((modelRef) => [
-      `agents.defaults.models.${modelRef}`,
-      { alias: aliasForModelRef(modelRef) },
-    ]),
+    ["agents.defaults.models", buildManagedModelsConfigValue(managedModelRefs, aliasForModelRef)],
     ["agents.defaults.heartbeat.every", OPENCLAW_HEARTBEAT_EVERY],
     ["agents.defaults.heartbeat.target", OPENCLAW_HEARTBEAT_TARGET],
     ["gateway.mode", "local"],
@@ -4464,6 +4461,66 @@ function buildManagedRuntimeConfigEntries() {
     ["tools.agentToAgent.enabled", true],
     ...managedChannelEntries,
   ];
+}
+
+function deleteNestedModelRefArtifact(target, parts) {
+  if (!target || typeof target !== "object" || Array.isArray(target) || parts.length < 2) {
+    return;
+  }
+
+  const trail = [];
+  let cursor = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const value = cursor?.[key];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return;
+    }
+    trail.push([cursor, key, value]);
+    cursor = value;
+  }
+
+  const leafKey = parts[parts.length - 1];
+  if (!Object.prototype.hasOwnProperty.call(cursor, leafKey)) {
+    return;
+  }
+
+  delete cursor[leafKey];
+  for (let index = trail.length - 1; index >= 0; index -= 1) {
+    const [parent, key, value] = trail[index];
+    if (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0) {
+      delete parent[key];
+    } else {
+      break;
+    }
+  }
+}
+
+function buildManagedModelsConfigValue(managedModelRefs, aliasForModelRef) {
+  let currentModels = {};
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const configuredModels = snapshot.config?.agents?.defaults?.models;
+    if (configuredModels && typeof configuredModels === "object" && !Array.isArray(configuredModels)) {
+      currentModels = cloneJsonValue(configuredModels) || {};
+    }
+  } catch {
+    currentModels = {};
+  }
+
+  for (const modelRef of managedModelRefs) {
+    deleteNestedModelRefArtifact(currentModels, String(modelRef).split(".").filter(Boolean));
+    const existing = currentModels[modelRef];
+    const nextEntry =
+      existing && typeof existing === "object" && !Array.isArray(existing) ? { ...existing } : {};
+    const alias = aliasForModelRef(modelRef);
+    if (alias) {
+      nextEntry.alias = alias;
+    }
+    currentModels[modelRef] = nextEntry;
+  }
+
+  return currentModels;
 }
 
 function buildSetupChannelConfigEntries(normalizedPayload, supportsChannel = () => true) {
@@ -4606,7 +4663,7 @@ function buildSetupCustomProviderConfig(payload) {
   if (isClaudeMaxPreset) {
     const modelRef = buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL);
     entries.push(["agents.defaults.model.primary", modelRef]);
-    entries.push([`agents.defaults.models.${modelRef}`, { alias: "Claude Max" }]);
+    entries.push(["agents.defaults.models", buildManagedModelsConfigValue([modelRef], () => "Claude Max")]);
     lines.push(
       `[claude-max] provider=${CLAUDE_MAX_PROXY_PROVIDER_ID} model=${buildClaudeMaxProxyModelRef(modelId || CLAUDE_MAX_PROXY_DEFAULT_MODEL)} baseUrl=${CLAUDE_MAX_PROXY_BASE_URL}`,
     );

@@ -166,6 +166,11 @@ Operational interpretation:
   - `openclaw config get channels.telegram.commands.nativeSkills --json` -> `false`
   - runtime logs still contain the original startup failure at `2026-03-13T05:05:01Z`, but after the wrapper-managed restart at `2026-03-13T05:09:41Z` the next provider start at `2026-03-13T05:09:43Z` did not emit a fresh `setMyCommands failed` / `BOT_COMMANDS_TOO_MUCH`
   - template policy is now to keep Telegram native menu registration disabled by default on Railway so skill-heavy workspaces do not flood Telegram's 100-command cap
+- Live recovery after deployment `0a09b392-6a59-46a1-9836-4c1d21e79791` exposed a separate wrapper bug:
+  - `agents.defaults.models.openai-codex/gpt-5.3-codex` was being written via dotted config path mutation, which split the key into invalid JSON (`openai-codex/gpt-5 -> 3-codex`)
+  - this made OpenClaw `2026.2.9` reject `/data/.openclaw/openclaw.json` and exit before the gateway became ready
+  - the running container was hotfixed by rewriting `/data/.openclaw/openclaw.json` to restore a flat `agents.defaults.models["openai-codex/gpt-5.3-codex"]` entry and manually starting `node /openclaw/dist/entry.js gateway run --force`
+  - `openclaw health` then returned `Telegram: ok (@Almastockbot)` with the main agent present again
 - The hosted admin setup/auth endpoints remain protected. An unauthenticated
   request to `/api/admin/openclaw/setup/auth-groups` now returns `401 Not authenticated`,
   which is expected for the web service.

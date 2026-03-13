@@ -247,6 +247,13 @@ test("runtime reconciles auth profiles from persisted agent state and backup sna
   assert.match(src, /reconcileConfiguredAuthProfiles\("configured-setup"\)/);
 });
 
+test("runtime writes managed model aliases without dotted config paths", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /function buildManagedModelsConfigValue\(/);
+  assert.match(src, /\["agents\.defaults\.models", buildManagedModelsConfigValue\(managedModelRefs, aliasForModelRef\)\]/);
+  assert.doesNotMatch(src, /`agents\.defaults\.models\.\$\{modelRef\}`/);
+});
+
 test("seeded direct qmd helpers default to the Railway workspace path and explain missing collections", () => {
   const rescan = fs.readFileSync(new URL("../workspace-seed/tools/admin/qmd-rescan.sh", import.meta.url), "utf8");
   const search = fs.readFileSync(
