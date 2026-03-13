@@ -254,6 +254,29 @@ test("runtime writes managed model aliases without dotted config paths", () => {
   assert.doesNotMatch(src, /`agents\.defaults\.models\.\$\{modelRef\}`/);
 });
 
+test("openclaw control-plane patch tool blocks unsupported pinned config keys", () => {
+  const tool = fs.readFileSync(
+    new URL("../workspace-seed/skills/openclaw-control-plane/scripts/openclaw_admin.py", import.meta.url),
+    "utf8",
+  );
+  const skill = fs.readFileSync(
+    new URL("../workspace-seed/skills/openclaw-control-plane/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const sourceOfTruth = fs.readFileSync(
+    new URL("../workspace-seed/skills/openclaw-control-plane/references/source-of-truth.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(tool, /UNSUPPORTED_DOTTED_PATHS/);
+  assert.match(tool, /"mcpServers"/);
+  assert.match(tool, /"memory\.qmd\.searchMode"/);
+  assert.match(tool, /find_unsupported_paths/);
+  assert.match(tool, /Unsupported pinned config keys/);
+  assert.match(skill, /Do not merge unsupported pinned keys/);
+  assert.match(sourceOfTruth, /unsupported pinned keys/);
+});
+
 test("seeded direct qmd helpers default to the Railway workspace path and explain missing collections", () => {
   const rescan = fs.readFileSync(new URL("../workspace-seed/tools/admin/qmd-rescan.sh", import.meta.url), "utf8");
   const search = fs.readFileSync(

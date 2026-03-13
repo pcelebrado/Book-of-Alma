@@ -32,6 +32,7 @@ Use this skill for both questions and changes involving the live OpenClaw system
 
 - Do not hand-edit `/data/.openclaw/openclaw.json`.
 - Use `scripts/openclaw_admin.py patch` for config changes so backups are created deterministically.
+- Do not merge unsupported pinned keys such as `mcpServers` or `memory.qmd.searchMode`; the patch tool now rejects them for the pinned OpenClaw `2026.2.9` runtime.
 - Preserve unrelated auth profiles when switching the primary model. Changing the default model is not a reason to delete another provider's auth profile.
 - After any OpenClaw mutation, update:
   - this skill when workflow or assumptions change
@@ -77,6 +78,7 @@ python3 skills/openclaw-control-plane/scripts/openclaw_admin.py patch \
 ```
 
 Prefer `--merge-file <path>` for larger patches to avoid shell-quoting errors.
+If the tool reports `Unsupported pinned config keys`, stop and revise the patch instead of forcing it through.
 
 ## Output contract
 

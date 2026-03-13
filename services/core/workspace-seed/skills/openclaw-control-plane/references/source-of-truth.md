@@ -32,4 +32,5 @@ Question routing:
 - Provider/model selection: use `openclaw_admin.py summary` and current auth profiles first
 - Config persistence concerns: use `openclaw_admin.py audit-backups`
 - Runtime mutation: use `openclaw_admin.py patch`
+- Do not introduce unsupported pinned keys like `mcpServers` or `memory.qmd.searchMode`; for `2026.2.9` those must stay absent from the saved config
 - Retrieval and memory questions: use `memory/system/openclaw-memory-bible.md` and `skills/qmd-retrieval/`

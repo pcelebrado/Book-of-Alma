@@ -24,6 +24,10 @@ INTERESTING_PREFIXES = (
     "gateway",
     "wizard",
 )
+UNSUPPORTED_DOTTED_PATHS = (
+    "mcpServers",
+    "memory.qmd.searchMode",
+)
 
 
 def load_json(path: Path) -> Any:
@@ -78,6 +82,22 @@ def delete_dotted_path(target: dict[str, Any], dotted_path: str) -> bool:
         return False
     del cursor[parts[-1]]
     return True
+
+
+def has_dotted_path(target: Any, dotted_path: str) -> bool:
+    parts = [part for part in dotted_path.split(".") if part]
+    if not parts:
+        return False
+    cursor: Any = target
+    for part in parts:
+        if not isinstance(cursor, dict) or part not in cursor:
+            return False
+        cursor = cursor[part]
+    return True
+
+
+def find_unsupported_paths(target: dict[str, Any]) -> list[str]:
+    return [path for path in UNSUPPORTED_DOTTED_PATHS if has_dotted_path(target, path)]
 
 
 def backup_config(label: str) -> Path:
@@ -171,6 +191,20 @@ def cmd_patch(args: argparse.Namespace) -> int:
     for dotted_path in args.unset:
         if delete_dotted_path(updated, dotted_path):
             removed.append(dotted_path)
+    unsupported_paths = find_unsupported_paths(updated)
+    if unsupported_paths:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "Unsupported pinned config keys",
+                    "unsupported_keys": unsupported_paths,
+                    "hint": "Unset those keys or use wrapper-supported config for OpenClaw 2026.2.9 before saving.",
+                },
+                indent=2,
+            )
+        )
+        return 2
     backup = backup_config(args.backup_label)
     save_json(CONFIG_PATH, updated)
     print(

@@ -47,6 +47,7 @@ This file is the source of truth for Nate's live OpenClaw runtime on Railway.
 2. Apply config changes with:
    - `python3 skills/openclaw-control-plane/scripts/openclaw_admin.py patch --merge-json ...`
    - or `python3 skills/openclaw-control-plane/scripts/openclaw_admin.py patch --merge-file <path>`
+   - do not merge unsupported pinned keys like `mcpServers` or `memory.qmd.searchMode`; the patch tool should reject them
 3. Verify runtime behavior with health, logs, and config evidence.
 4. Update:
    - `skills/openclaw-control-plane/`
