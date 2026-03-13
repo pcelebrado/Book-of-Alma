@@ -23,6 +23,7 @@ OPENCLAW_ADMIN_SCRIPT="${WORKSPACE_DIR}/skills/openclaw-control-plane/scripts/op
 VERIFY_TIMEOUT_SECONDS="${OPENCLAW_VERIFY_TIMEOUT_SECONDS:-240}"
 VERIFY_RETRIES="${OPENCLAW_VERIFY_RETRIES:-4}"
 VERIFY_RETRY_DELAY_SECONDS="${OPENCLAW_VERIFY_RETRY_DELAY_SECONDS:-10}"
+APP_PORT="${PORT:-${OPENCLAW_PUBLIC_PORT:-3000}}"
 
 pass() {
   printf '[verify] PASS %s\n' "$*"
@@ -77,8 +78,11 @@ retry_capture() {
   local attempt=1
   local exit_code=0
   while [ "${attempt}" -le "${VERIFY_RETRIES}" ]; do
-    run_capture "${outfile}" "$@"
-    exit_code=$?
+    if run_capture "${outfile}" "$@"; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
     if [ "${exit_code}" -eq 0 ]; then
       pass "${label} (attempt ${attempt})"
       return 0
@@ -109,12 +113,10 @@ assert_eq "${credentials_mode}" "700" "credentials dir permissions"
 }
 pass "${QMD_COMMAND} --version"
 
-retry_capture "openclaw status" /tmp/openclaw-verify-status.txt openclaw status
-status_output="$(cat /tmp/openclaw-verify-status.txt)"
-if printf '%s' "${status_output}" | grep -Eiq 'credentials.*permission|permission.*credentials'; then
-  fail "openclaw status reports credentials permission warning"
-fi
-pass "openclaw status has no credentials permission warning"
+retry_capture "wrapper setup health" /tmp/openclaw-wrapper-health.json curl -fsS "http://127.0.0.1:${APP_PORT}/setup/healthz"
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-wrapper-health.json','utf8')); if(!data || data.ok !== true){process.exit(1)}" \
+  || fail "wrapper setup health did not report ok=true"
+pass "wrapper setup health reports ok=true"
 
 retry_capture "openclaw models status --json" /tmp/openclaw-model-status.json openclaw models status --json
 node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/openclaw-model-status.json','utf8')); const defaults=data.defaults||{}; const fallbacks=Array.isArray(defaults.fallbacks)?defaults.fallbacks:[]; if(defaults.default!=='kimi-coding/k2p5'){process.exit(1)} if(!fallbacks.includes('openai-codex/gpt-5.3-codex')){process.exit(1)}" \

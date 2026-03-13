@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-ROOT = Path(os.environ.get("OPENCLAW_WORKSPACE_DIR", "/root/.openclaw/workspace")).resolve()
+ROOT = Path(os.environ.get("OPENCLAW_WORKSPACE_DIR", "/data/workspace")).resolve()
 
 
 def resolve_workspace_markdown(raw_path: str) -> tuple[str, Path]:

@@ -6,12 +6,13 @@ import re
 import subprocess
 from pathlib import Path
 
-ROOT = Path(os.environ.get("OPENCLAW_WORKSPACE_DIR", "/root/.openclaw/workspace")).resolve()
+ROOT = Path(os.environ.get("OPENCLAW_WORKSPACE_DIR", "/data/workspace")).resolve()
 STATE_DIR = Path(os.environ.get("OPENCLAW_STATE_DIR", "/data/.openclaw"))
 QMD_COMMAND = os.environ.get(
     "OPENCLAW_MEMORY_QMD_COMMAND",
     "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd",
 )
+QMD_COLLECTION_NAME = os.environ.get("OPENCLAW_QMD_COLLECTION_NAME", "workspace").strip() or "workspace"
 QMD_XDG_CONFIG = STATE_DIR / "agents" / "main" / "qmd" / "xdg-config"
 QMD_XDG_CACHE = STATE_DIR / "agents" / "main" / "qmd" / "xdg-cache"
 
@@ -82,12 +83,21 @@ def main() -> None:
         "search",
         args.query,
         "-c",
-        "workspace",
+        QMD_COLLECTION_NAME,
         "-n",
         str(max(1, min(args.max_results * 3, 50))),
         "--json",
     ]
-    raw = subprocess.check_output(cmd, text=True, env=qmd_env())
+    proc = subprocess.run(cmd, text=True, env=qmd_env(), capture_output=True, check=False)
+    if proc.returncode != 0:
+        combined = "\n".join(part for part in [proc.stdout.strip(), proc.stderr.strip()] if part).strip()
+        if "Collection not found" in combined:
+            raise SystemExit(
+                f"QMD collection '{QMD_COLLECTION_NAME}' is missing. Run `bash tools/admin/qmd-rescan.sh` first.",
+            )
+        raise SystemExit(combined or f"qmd search failed with exit code {proc.returncode}")
+
+    raw = proc.stdout
     rows = json.loads(raw)
 
     out = []

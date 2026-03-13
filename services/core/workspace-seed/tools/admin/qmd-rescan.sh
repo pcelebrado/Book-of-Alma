@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKDIR="${OPENCLAW_WORKSPACE_DIR:-/root/.openclaw/workspace}"
+WORKDIR="${OPENCLAW_WORKSPACE_DIR:-/data/workspace}"
 STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd}"
 QMD_AGENT_DIR="${STATE_DIR}/agents/main/qmd"

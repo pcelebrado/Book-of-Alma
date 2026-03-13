@@ -232,3 +232,25 @@ test("runtime reconciles auth profiles from persisted agent state and backup sna
   assert.match(src, /reconcilePersistedAuthProfilesOnBoot/);
   assert.match(src, /reconcileConfiguredAuthProfiles\("configured-setup"\)/);
 });
+
+test("seeded direct qmd helpers default to the Railway workspace path and explain missing collections", () => {
+  const rescan = fs.readFileSync(new URL("../workspace-seed/tools/admin/qmd-rescan.sh", import.meta.url), "utf8");
+  const search = fs.readFileSync(
+    new URL("../workspace-seed/skills/qmd-retrieval/scripts/qmd_memory_search.py", import.meta.url),
+    "utf8",
+  );
+  const get = fs.readFileSync(
+    new URL("../workspace-seed/skills/qmd-retrieval/scripts/qmd_memory_get.py", import.meta.url),
+    "utf8",
+  );
+  const verify = fs.readFileSync(new URL("../scripts/post-deploy-verify.sh", import.meta.url), "utf8");
+
+  assert.match(rescan, /OPENCLAW_WORKSPACE_DIR:-\/data\/workspace/);
+  assert.match(search, /OPENCLAW_WORKSPACE_DIR", "\/data\/workspace"/);
+  assert.match(get, /OPENCLAW_WORKSPACE_DIR", "\/data\/workspace"/);
+  assert.match(search, /OPENCLAW_QMD_COLLECTION_NAME/);
+  assert.match(search, /QMD collection '.+' is missing\. Run `bash tools\/admin\/qmd-rescan\.sh` first\./);
+  assert.match(verify, /APP_PORT="\$\{PORT:-\$\{OPENCLAW_PUBLIC_PORT:-3000\}\}"/);
+  assert.match(verify, /wrapper setup health/);
+  assert.doesNotMatch(verify, /retry_capture "openclaw status"/);
+});
