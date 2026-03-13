@@ -1376,6 +1376,11 @@ function removeConfigKeys(dottedPaths) {
   }
 }
 
+const UNSUPPORTED_PINNED_CONFIG_KEYS = [
+  "memory.qmd.searchMode",
+  "mcpServers",
+];
+
 // One-time migration: rename legacy config files to openclaw.json so existing
 // deployments that still have the old filename on their volume keep working.
 (function migrateLegacyConfigFile() {
@@ -1402,7 +1407,7 @@ function removeConfigKeys(dottedPaths) {
 (function scrubLegacyConfigKeys() {
   if (!isConfigured()) return;
 
-  const cleanup = removeConfigKeys(["memory.qmd.searchMode"]);
+  const cleanup = removeConfigKeys(UNSUPPORTED_PINNED_CONFIG_KEYS);
   if (!cleanup.ok) {
     console.warn(`[migration] Failed to scrub legacy config keys: ${cleanup.output}`);
     return;
@@ -5234,6 +5239,12 @@ async function applyConfiguredSetupPayload(payload) {
   extra += `\n[runtime config] ${runtimePatch.ok ? "configured" : "failed"}`;
   if (runtimePatch.output) {
     extra += `\n${runtimePatch.output}`;
+  }
+
+  const unsupportedCleanup = removeConfigKeys(UNSUPPORTED_PINNED_CONFIG_KEYS);
+  extra += `\n[pinned config cleanup] ${unsupportedCleanup.ok ? "checked" : "failed"}`;
+  if (unsupportedCleanup.output) {
+    extra += `\n${unsupportedCleanup.output}`;
   }
 
   const authProfileRepair = reconcileConfiguredAuthProfiles("configured-setup");

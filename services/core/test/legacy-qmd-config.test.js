@@ -5,7 +5,10 @@ import fs from "node:fs";
 test("core runtime scrubs unsupported qmd searchMode for the pinned OpenClaw release", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.doesNotMatch(src, /OPENCLAW_MEMORY_QMD_SEARCH_MODE/);
-  assert.match(src, /removeConfigKeys\(\["memory\.qmd\.searchMode"\]\)/);
+  assert.match(src, /const UNSUPPORTED_PINNED_CONFIG_KEYS = \[/);
+  assert.match(src, /"memory\.qmd\.searchMode"/);
+  assert.match(src, /"mcpServers"/);
+  assert.match(src, /removeConfigKeys\(UNSUPPORTED_PINNED_CONFIG_KEYS\)/);
   assert.match(src, /delete process\.env\.BUN_INSTALL/);
 });
 
@@ -217,6 +220,7 @@ test("onboarding setup applies wrapper-managed config in one pass without doctor
   assert.match(src, /function buildSetupChannelConfigEntries\(/);
   assert.match(src, /function buildSetupMemoryBackendDefaults\(/);
   assert.match(src, /const runtimePatch = applyConfigPatch\(entries\)/);
+  assert.match(src, /const unsupportedCleanup = removeConfigKeys\(UNSUPPORTED_PINNED_CONFIG_KEYS\)/);
   assert.match(src, /extra = await applyConfiguredSetupPayload\(payload\);/);
   assert.match(src, /const providerPatch = buildSetupCustomProviderConfig\(payload\);/);
   assert.doesNotMatch(src, /clawArgs\(\["plugins", "enable", "telegram"\]\)/);
