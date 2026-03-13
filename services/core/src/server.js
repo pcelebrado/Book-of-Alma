@@ -169,6 +169,14 @@ const OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH = parseBoolEnv(
   process.env.OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH,
   IS_RAILWAY,
 );
+const OPENCLAW_TELEGRAM_NATIVE_COMMANDS = parseBoolEnv(
+  process.env.OPENCLAW_TELEGRAM_NATIVE_COMMANDS,
+  false,
+);
+const OPENCLAW_TELEGRAM_NATIVE_SKILLS = parseBoolEnv(
+  process.env.OPENCLAW_TELEGRAM_NATIVE_SKILLS,
+  false,
+);
 const OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.OPENCLAW_MEMORY_QMD_QUERY_TIMEOUT_MS,
   120_000,
@@ -1063,6 +1071,20 @@ function configPath() {
 function isConfigured() {
   try {
     return resolveConfigCandidates().some((candidate) => fs.existsSync(candidate));
+  } catch {
+    return false;
+  }
+}
+
+function hasConfiguredChannel(channelKey) {
+  if (!isConfigured()) {
+    return false;
+  }
+
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const channelConfig = snapshot.config?.channels?.[channelKey];
+    return Boolean(channelConfig && typeof channelConfig === "object" && !Array.isArray(channelConfig));
   } catch {
     return false;
   }
@@ -4395,6 +4417,14 @@ function buildManagedRuntimeConfigEntries() {
     }
   };
 
+  const managedChannelEntries = [];
+  if (hasConfiguredChannel("telegram")) {
+    managedChannelEntries.push(
+      ["channels.telegram.commands.native", OPENCLAW_TELEGRAM_NATIVE_COMMANDS],
+      ["channels.telegram.commands.nativeSkills", OPENCLAW_TELEGRAM_NATIVE_SKILLS],
+    );
+  }
+
   return [
     ["agents.defaults.model.primary", OPENCLAW_DEFAULT_MODEL_PRIMARY],
     ["agents.defaults.model.fallbacks", OPENCLAW_DEFAULT_MODEL_FALLBACKS],
@@ -4432,6 +4462,7 @@ function buildManagedRuntimeConfigEntries() {
     ["tools.message.crossContext.allowAcrossProviders", true],
     ["tools.message.broadcast.enabled", true],
     ["tools.agentToAgent.enabled", true],
+    ...managedChannelEntries,
   ];
 }
 
@@ -4451,6 +4482,10 @@ function buildSetupChannelConfigEntries(normalizedPayload, supportsChannel = () 
           botToken: normalizedPayload.telegramToken.trim(),
           groupPolicy: "allowlist",
           streamMode: "partial",
+          commands: {
+            native: OPENCLAW_TELEGRAM_NATIVE_COMMANDS,
+            nativeSkills: OPENCLAW_TELEGRAM_NATIVE_SKILLS,
+          },
         },
       ]);
       entries.push(["plugins.entries.telegram.enabled", true]);
@@ -6155,35 +6190,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
     console.log("[wrapper] syncing gateway tokens in config...");
     try {
-      const runtimePatch = applyConfigPatch([
-        ["gateway.auth.mode", "token"],
-        ["gateway.auth.token", OPENCLAW_GATEWAY_TOKEN],
-        ["gateway.remote.token", OPENCLAW_GATEWAY_TOKEN],
-        ["gateway.http.endpoints.chatCompletions.enabled", true],
-        ["gateway.http.endpoints.responses.enabled", true],
-        ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
-        ["gateway.bind", "loopback"],
-        ["gateway.port", INTERNAL_GATEWAY_PORT],
-        ["gateway.trustedProxies", ["127.0.0.1"]],
-        ["commands.native", true],
-        ["commands.nativeSkills", true],
-        ["commands.text", true],
-        ["commands.bash", true],
-        ["commands.config", true],
-        ["commands.debug", true],
-        ["commands.restart", true],
-        ["commands.useAccessGroups", false],
-        ["tools.profile", "full"],
-        ["tools.elevated.enabled", true],
-        ["tools.exec.host", "gateway"],
-        ["tools.exec.security", "full"],
-        ["tools.exec.ask", "off"],
-        ["tools.message.allowCrossContextSend", true],
-        ["tools.message.crossContext.allowWithinProvider", true],
-        ["tools.message.crossContext.allowAcrossProviders", true],
-        ["tools.message.broadcast.enabled", true],
-        ["tools.agentToAgent.enabled", true],
-      ]);
+      const runtimePatch = applyConfigPatch(buildManagedRuntimeConfigEntries());
       console.log(`[wrapper] runtime config: ${runtimePatch.ok ? "configured" : "failed"}`);
       if (runtimePatch.output) {
         console.log(runtimePatch.output);

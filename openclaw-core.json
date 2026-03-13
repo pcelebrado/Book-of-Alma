@@ -131,6 +131,14 @@
     "value": "none",
     "description": "Heartbeat target selector. Railway template keeps this at `none` so heartbeat stays in local observation/maintenance mode."
   },
+  "OPENCLAW_TELEGRAM_NATIVE_COMMANDS": {
+    "value": "false",
+    "description": "Disable Telegram native command menu registration by default. This avoids BOT_COMMANDS_TOO_MUCH on skill-heavy deployments while leaving typed commands and provider routing intact."
+  },
+  "OPENCLAW_TELEGRAM_NATIVE_SKILLS": {
+    "value": "false",
+    "description": "Disable Telegram skill command menu registration by default so Telegram startup does not try to publish the full skill list."
+  },
   "OPENCLAW_MEMORY_BACKEND": {
     "value": "qmd",
     "description": "OpenClaw memory backend. Railway keeps this at `qmd` for managed workspace collection metadata while the default agent uses direct QMD wrappers instead of OpenClaw memorySearch."

@@ -161,6 +161,11 @@ Operational interpretation:
   - `bash /data/workspace/tools/admin/qmd-rescan.sh` -> `/data/workspace/knowledge/qmd/qmd-rescan-20260313T040559Z.log`
   - `python3 /data/workspace/skills/qmd-retrieval/scripts/qmd_memory_search.py --query OpenClaw --max-results 5 --min-score 0` returned citation-ready snippets from `/data/workspace/memory/openclaw/...`
   - `bash /app/scripts/post-deploy-verify.sh` passed end-to-end
+- Current live Telegram command-menu remediation on deployment `22090354-1669-4acc-b820-d8ac40543ca7`:
+  - `openclaw config get channels.telegram.commands.native --json` -> `false`
+  - `openclaw config get channels.telegram.commands.nativeSkills --json` -> `false`
+  - runtime logs still contain the original startup failure at `2026-03-13T05:05:01Z`, but after the wrapper-managed restart at `2026-03-13T05:09:41Z` the next provider start at `2026-03-13T05:09:43Z` did not emit a fresh `setMyCommands failed` / `BOT_COMMANDS_TOO_MUCH`
+  - template policy is now to keep Telegram native menu registration disabled by default on Railway so skill-heavy workspaces do not flood Telegram's 100-command cap
 - The hosted admin setup/auth endpoints remain protected. An unauthenticated
   request to `/api/admin/openclaw/setup/auth-groups` now returns `401 Not authenticated`,
   which is expected for the web service.

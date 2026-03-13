@@ -15,6 +15,8 @@ test("core runtime scrubs unsupported qmd searchMode for the pinned OpenClaw rel
 test("core runtime force-sets control ui insecure auth for hosted Railway webchat", () => {
   const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(src, /OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH/);
+  assert.match(src, /OPENCLAW_TELEGRAM_NATIVE_COMMANDS = parseBoolEnv/);
+  assert.match(src, /OPENCLAW_TELEGRAM_NATIVE_SKILLS = parseBoolEnv/);
   assert.match(src, /gateway\.controlUi\.allowInsecureAuth/);
   assert.match(src, /"gateway",\s*"run",\s*"--force"/);
   assert.match(src, /detached:\s*process\.platform !== "win32"/);
@@ -27,6 +29,8 @@ test("core runtime force-sets control ui insecure auth for hosted Railway webcha
   assert.match(src, /"tools\.exec\.security",\s*"full"/);
   assert.match(src, /"tools\.message\.crossContext\.allowAcrossProviders",\s*true/);
   assert.match(src, /"tools\.agentToAgent\.enabled",\s*true/);
+  assert.match(src, /"channels\.telegram\.commands\.native", OPENCLAW_TELEGRAM_NATIVE_COMMANDS/);
+  assert.match(src, /"channels\.telegram\.commands\.nativeSkills", OPENCLAW_TELEGRAM_NATIVE_SKILLS/);
   assert.match(src, /OPENCLAW_GATEWAY_READY_TIMEOUT_MS/);
   assert.match(src, /isGatewayProcessConflict/);
   assert.match(src, /process\.kill\(-proc\.pid,\s*signal\)/);
@@ -50,6 +54,10 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   assert.match(envRailway, /OPENCLAW_HEARTBEAT_EVERY=4h/);
   assert.match(envExample, /OPENCLAW_HEARTBEAT_TARGET=none/);
   assert.match(envRailway, /OPENCLAW_HEARTBEAT_TARGET=none/);
+  assert.match(envExample, /OPENCLAW_TELEGRAM_NATIVE_COMMANDS=false/);
+  assert.match(envRailway, /OPENCLAW_TELEGRAM_NATIVE_COMMANDS=false/);
+  assert.match(envExample, /OPENCLAW_TELEGRAM_NATIVE_SKILLS=false/);
+  assert.match(envRailway, /OPENCLAW_TELEGRAM_NATIVE_SKILLS=false/);
   assert.match(
     envExample,
     /OPENCLAW_MEMORY_QMD_COMMAND=\/root\/\.bun\/install\/global\/node_modules\/@tobilu\/qmd\/bin\/qmd/,
@@ -94,6 +102,8 @@ test("template env does not expose unsupported qmd searchMode on the pinned rele
   assert.match(templateVars, /"OPENCLAW_DEFAULT_MODEL_FALLBACKS"/);
   assert.match(templateVars, /"OPENCLAW_HEARTBEAT_EVERY"/);
   assert.match(templateVars, /"OPENCLAW_HEARTBEAT_TARGET"/);
+  assert.match(templateVars, /"OPENCLAW_TELEGRAM_NATIVE_COMMANDS"/);
+  assert.match(templateVars, /"OPENCLAW_TELEGRAM_NATIVE_SKILLS"/);
   assert.match(templateVars, /"OPENCLAW_MEMORY_SEARCH_ENABLED"/);
   assert.match(templateVars, /"OPENCLAW_QMD_RESCAN_MIN_INTERVAL_SECONDS"/);
 });
