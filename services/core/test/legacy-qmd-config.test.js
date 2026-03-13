@@ -229,6 +229,7 @@ test("onboarding setup applies wrapper-managed config in one pass without doctor
   assert.match(src, /function buildManagedRuntimeConfigEntries\(/);
   assert.match(src, /function buildSetupChannelConfigEntries\(/);
   assert.match(src, /function buildSetupMemoryBackendDefaults\(/);
+  assert.match(src, /app\.post\("\/setup\/api\/run", requireSetupAuth, async \(req, res\) => {\s*const respondJson =/);
   assert.match(src, /const runtimePatch = applyConfigPatch\(entries\)/);
   assert.match(src, /const unsupportedCleanup = removeConfigKeys\(UNSUPPORTED_PINNED_CONFIG_KEYS\)/);
   assert.match(src, /extra = await applyConfiguredSetupPayload\(payload\);/);
@@ -245,6 +246,16 @@ test("runtime reconciles auth profiles from persisted agent state and backup sna
   assert.match(src, /function reconcileConfiguredAuthProfiles\(/);
   assert.match(src, /reconcilePersistedAuthProfilesOnBoot/);
   assert.match(src, /reconcileConfiguredAuthProfiles\("configured-setup"\)/);
+});
+
+test("runtime restores missing channel config from backup snapshots after destructive setup resets", () => {
+  const src = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(src, /function collectRecoverableChannelConfig\(/);
+  assert.match(src, /function reconcileConfiguredChannels\(/);
+  assert.match(src, /backup:\$\{path\.basename\(backupPath\)\}/);
+  assert.match(src, /reconcileConfiguredChannelsOnBoot/);
+  assert.match(src, /reconcileConfiguredChannels\("configured-setup"\)/);
+  assert.match(src, /restored channels=/);
 });
 
 test("runtime writes managed model aliases without dotted config paths", () => {

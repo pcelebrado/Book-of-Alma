@@ -1285,6 +1285,134 @@ function reconcileConfiguredAuthProfiles(reason = "boot") {
   }
 }
 
+function isConfigObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function collectRecoverableChannelConfig() {
+  const recoveredChannels = {};
+  const recoveredPluginEntries = {};
+  const sources = [];
+
+  for (const backupPath of listConfigBackupPaths()) {
+    const backup = readJsonFileIfPresent(backupPath);
+    if (!isConfigObject(backup)) {
+      continue;
+    }
+
+    const addedChannels = [];
+    const addedPlugins = [];
+    const backupChannels = isConfigObject(backup.channels) ? backup.channels : {};
+    for (const [channelId, channelConfig] of Object.entries(backupChannels)) {
+      if (recoveredChannels[channelId] || !isConfigObject(channelConfig)) {
+        continue;
+      }
+      recoveredChannels[channelId] = cloneJsonValue(channelConfig);
+      addedChannels.push(channelId);
+    }
+
+    const backupPluginEntries = isConfigObject(backup.plugins?.entries) ? backup.plugins.entries : {};
+    for (const [pluginId, pluginConfig] of Object.entries(backupPluginEntries)) {
+      if (recoveredPluginEntries[pluginId] || !isConfigObject(pluginConfig)) {
+        continue;
+      }
+      recoveredPluginEntries[pluginId] = cloneJsonValue(pluginConfig);
+      addedPlugins.push(pluginId);
+    }
+
+    if (addedChannels.length > 0 || addedPlugins.length > 0) {
+      sources.push(
+        `backup:${path.basename(backupPath)} channels=${addedChannels.join(",") || "-"} plugins=${addedPlugins.join(",") || "-"}`,
+      );
+    }
+  }
+
+  return {
+    channels: recoveredChannels,
+    pluginEntries: recoveredPluginEntries,
+    sources,
+  };
+}
+
+function reconcileConfiguredChannels(reason = "boot") {
+  if (!isConfigured()) {
+    return {
+      ok: false,
+      changed: false,
+      restoredChannels: [],
+      restoredPlugins: [],
+      output: `[channel recovery] skipped (${reason}): config not present`,
+    };
+  }
+
+  try {
+    const snapshot = readConfigJsonFromDisk();
+    const nextConfig = cloneJsonValue(snapshot.config) || {};
+    const currentChannels = isConfigObject(nextConfig.channels) ? nextConfig.channels : {};
+    const currentPluginEntries = isConfigObject(nextConfig.plugins?.entries) ? nextConfig.plugins.entries : {};
+    const recoverable = collectRecoverableChannelConfig();
+    const restoredChannels = [];
+    const restoredPlugins = [];
+
+    for (const [channelId, channelConfig] of Object.entries(recoverable.channels)) {
+      if (isConfigObject(currentChannels[channelId])) {
+        continue;
+      }
+      currentChannels[channelId] = cloneJsonValue(channelConfig);
+      restoredChannels.push(channelId);
+    }
+
+    for (const [pluginId, pluginConfig] of Object.entries(recoverable.pluginEntries)) {
+      if (isConfigObject(currentPluginEntries[pluginId])) {
+        continue;
+      }
+      currentPluginEntries[pluginId] = cloneJsonValue(pluginConfig);
+      restoredPlugins.push(pluginId);
+    }
+
+    if (restoredChannels.length === 0 && restoredPlugins.length === 0) {
+      return {
+        ok: true,
+        changed: false,
+        restoredChannels,
+        restoredPlugins,
+        output: `[channel recovery] unchanged ${snapshot.path}`,
+      };
+    }
+
+    nextConfig.channels = currentChannels;
+    nextConfig.plugins = {
+      ...(isConfigObject(nextConfig.plugins) ? nextConfig.plugins : {}),
+      entries: currentPluginEntries,
+    };
+
+    const tempPath = `${snapshot.path}.tmp`;
+    fs.writeFileSync(tempPath, `${JSON.stringify(nextConfig, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    fs.renameSync(tempPath, snapshot.path);
+
+    const sourceSummary =
+      recoverable.sources.length > 0 ? ` from ${recoverable.sources.join("; ")}` : "";
+    return {
+      ok: true,
+      changed: true,
+      restoredChannels,
+      restoredPlugins,
+      output: `[channel recovery] restored channels=${restoredChannels.join(",") || "-"} plugins=${restoredPlugins.join(",") || "-"}${sourceSummary} in ${snapshot.path}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      changed: false,
+      restoredChannels: [],
+      restoredPlugins: [],
+      output: `[channel recovery] failed (${reason}): ${String(err)}`,
+    };
+  }
+}
+
 function setConfigValue(target, dottedPath, value) {
   const parts = String(dottedPath || "")
     .split(".")
@@ -1465,6 +1593,19 @@ const UNSUPPORTED_PINNED_CONFIG_KEYS = [
   if (!isConfigured()) return;
 
   const repair = reconcileConfiguredAuthProfiles("boot");
+  if (!repair.ok) {
+    console.warn(`[migration] ${repair.output}`);
+    return;
+  }
+  if (repair.changed) {
+    console.log(`[migration] ${repair.output}`);
+  }
+})();
+
+(function reconcileConfiguredChannelsOnBoot() {
+  if (!isConfigured()) return;
+
+  const repair = reconcileConfiguredChannels("boot");
   if (!repair.ok) {
     console.warn(`[migration] ${repair.output}`);
     return;
@@ -5447,6 +5588,12 @@ async function applyConfiguredSetupPayload(payload) {
     extra += `\n${authProfileRepair.output}`;
   }
 
+  const channelRepair = reconcileConfiguredChannels("configured-setup");
+  extra += `\n[channel recovery] ${channelRepair.ok ? "checked" : "failed"}`;
+  if (channelRepair.output) {
+    extra += `\n${channelRepair.output}`;
+  }
+
   const sessionDefaults = reconcileMainSessionDefaults("configured-setup");
   extra += `\n[session defaults] ${sessionDefaults.ok ? "checked" : "failed"}`;
   if (sessionDefaults.output) {
@@ -5652,11 +5799,12 @@ function startMemoryIndexWarmup(reason = "boot") {
 }
 
 app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
+  const respondJson = (status, body) => {
+    if (res.writableEnded || res.headersSent) return;
+    res.status(status).json(body);
+  };
+
   try {
-    const respondJson = (status, body) => {
-      if (res.writableEnded || res.headersSent) return;
-      res.status(status).json(body);
-    };
     if (isConfigured()) {
       await ensureGatewayRunning();
       return respondJson(200, {
