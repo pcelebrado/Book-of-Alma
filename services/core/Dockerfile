@@ -84,9 +84,12 @@ COPY --from=sftpgo-bin /srv/sftpgo /srv/sftpgo
 COPY --from=sftpgo-bin /var/lib/sftpgo /var/lib/sftpgo
 
 # Install runtime dependencies
+# lsof is required by `openclaw gateway run --force` to detect/kill stale port listeners.
+# Without it, --force falls back to fuser (also absent) and fails.
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     tini \
+    lsof \
     python3 \
     python3-venv \
     bash \
