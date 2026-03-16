@@ -670,8 +670,7 @@ function verifyWebAuthCredentials({ email, password }) {
 
   const incomingHash = hashPassword(password);
   const storedHash = typeof user.password_hash === "string" ? user.password_hash : "";
-  const storedPlain = typeof user.password === "string" ? user.password : "";
-  if (storedHash !== incomingHash && storedPlain !== String(password)) {
+  if (storedHash !== incomingHash) {
     return { ok: false, code: "invalid_credentials", user: null };
   }
 
