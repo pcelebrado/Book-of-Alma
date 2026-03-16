@@ -36,9 +36,10 @@ fi
 # ---------------------------------------------------------------------------
 # SFTPGo
 # ---------------------------------------------------------------------------
-# SFTPGo provides SFTP on port 2022 for book content upload.
+# SFTPGo provides SFTP access to the full /data volume (all workspaces, state, logs, configs).
 # The web admin UI listens on port 2080 (internal only — reachable via private networking).
 # To expose SFTP externally, enable TCP Proxy on port 2022 in Railway dashboard.
+# SFTPGO_PORTABLE_DIRECTORY defaults to /data so all volume contents are accessible.
 SFTPGO_ENABLED="${SFTPGO_ENABLED:-true}"
 SFTPGO_DATA_ROOT="${SFTPGO_DATA_ROOT:-/data/sftpgo}"
 SFTPGO_SFTP_PORT="${SFTPGO_SFTPD__BINDINGS__0__PORT:-2022}"
@@ -74,7 +75,7 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   export SFTPGO_HTTPD__BINDINGS__0__PORT="${SFTPGO_HTTP_PORT}"
   export SFTPGO_HTTPD__BINDINGS__0__ADDRESS=""
   export SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN="${SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN:-true}"
-  export SFTPGO_PORTABLE_DIRECTORY="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_WORKSPACE_DIR}}"
+  export SFTPGO_PORTABLE_DIRECTORY="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_DATA_ROOT}}"
 
   # Start SFTPGo in the background, logging to the shared log directory.
   # If full serve fails (for example missing embedded templates in slim image),
@@ -82,7 +83,7 @@ if [ "$SFTPGO_ENABLED" = "true" ] && command -v sftpgo >/dev/null 2>&1; then
   start_portable_sftpgo() {
     PORTABLE_USER="${SFTPGO_PORTABLE_USERNAME:-${SFTPGO_DEFAULT_ADMIN_USERNAME:-book-uploader}}"
     PORTABLE_PASS="${SFTPGO_PORTABLE_PASSWORD:-${SFTPGO_DEFAULT_ADMIN_PASSWORD:-change-me-now}}"
-    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_WORKSPACE_DIR}}"
+    PORTABLE_DIR="${SFTPGO_PORTABLE_DIRECTORY:-${OPENCLAW_DATA_ROOT}}"
     mkdir -p "$PORTABLE_DIR"
 
     sftpgo portable \

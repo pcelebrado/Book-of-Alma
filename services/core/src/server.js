@@ -4605,6 +4605,9 @@ function buildManagedRuntimeConfigEntries() {
     ["gateway.http.endpoints.chatCompletions.enabled", true],
     ["gateway.http.endpoints.responses.enabled", true],
     ["gateway.controlUi.allowInsecureAuth", OPENCLAW_CONTROL_UI_ALLOW_INSECURE_AUTH],
+    // Allow Host-header origin fallback so the Control UI works from the
+    // Railway public domain without needing to hardcode allowedOrigins.
+    ["gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback", true],
     ["gateway.bind", "loopback"],
     ["gateway.port", INTERNAL_GATEWAY_PORT],
     ["gateway.trustedProxies", ["127.0.0.1"]],

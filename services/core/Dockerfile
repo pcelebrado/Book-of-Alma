@@ -94,7 +94,8 @@ RUN apt-get update \
     python3-venv \
     bash \
     sqlite3 \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && ln -sf /usr/bin/python3 /usr/local/bin/python
 
 # `openclaw update` expects pnpm. Provide it in the runtime image.
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
@@ -132,7 +133,7 @@ ENV OPENCLAW_MEMORY_QMD_COMMAND=/root/.bun/install/global/node_modules/@tobilu/q
 ENV DISABLE_AUTOUPDATER=1
 ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf
 ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp
-ENV SFTPGO_PORTABLE_DIRECTORY=/data/workspace
+ENV SFTPGO_PORTABLE_DIRECTORY=/data
 # Force in-process restart on config changes. Without this, the gateway's
 # restart logic tries systemctl (systemd) which doesn't exist in containers.
 # OPENCLAW_NO_RESPAWN=1 tells the run-loop to re-initialize the server within
