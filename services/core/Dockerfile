@@ -130,6 +130,11 @@ ENV DISABLE_AUTOUPDATER=1
 ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_PATH=hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf
 ENV OPENCLAW_MEMORY_SEARCH_LOCAL_MODEL_CACHE_DIR=/data/.openclaw/models/node-llama-cpp
 ENV SFTPGO_PORTABLE_DIRECTORY=/data/workspace
+# Force in-process restart on config changes. Without this, the gateway's
+# restart logic tries systemctl (systemd) which doesn't exist in containers.
+# OPENCLAW_NO_RESPAWN=1 tells the run-loop to re-initialize the server within
+# the same process instead of spawning a new child or delegating to systemd.
+ENV OPENCLAW_NO_RESPAWN=1
 WORKDIR /app
 
 # Wrapper deps

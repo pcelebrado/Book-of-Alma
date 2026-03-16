@@ -1,0 +1,171 @@
+{
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "agents": {
+    "defaults": {
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "workspace": "/data/workspace",
+      "models": {
+        "openai-codex/gpt-5.4": { "alias": "ChatGPT" },
+        "kimi-coding/kimi-k2-thinking": { "alias": "Kimi" }
+      },
+      "model": {
+        "primary": "openai-codex/gpt-5.4",
+        "fallbacks": [
+          "kimi-coding/kimi-k2-thinking"
+        ]
+      },
+      "thinkingDefault": "high",
+      "verboseDefault": "full",
+      "heartbeat": {
+        "every": "4h",
+        "target": "none"
+      }
+    }
+  },
+  "memorySearch": {
+    "enabled": false
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "LpGJTQKuUuAFtfOYYmdtFSqrlhTtFqsk3kytibnlNeRDBwcLJH35ktKYjUDNHAxe"
+    },
+    "port": 18789,
+    "bind": "loopback",
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    },
+    "remote": {
+      "token": "LpGJTQKuUuAFtfOYYmdtFSqrlhTtFqsk3kytibnlNeRDBwcLJH35ktKYjUDNHAxe"
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        },
+        "responses": {
+          "enabled": true
+        }
+      }
+    },
+    "controlUi": {
+      "allowInsecureAuth": true
+    },
+    "trustedProxies": [
+      "127.0.0.1"
+    ]
+  },
+  "auth": {
+    "profiles": {
+      "kimi-coding:default": {
+        "provider": "kimi-coding",
+        "mode": "api_key"
+      },
+      "openai-codex:default": {
+        "provider": "openai-codex",
+        "mode": "oauth"
+      },
+      "anthropic:default": {
+        "provider": "anthropic",
+        "mode": "token"
+      }
+    }
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-13T17:28:05.813Z",
+    "lastRunVersion": "2026.2.9",
+    "lastRunCommand": "onboard",
+    "lastRunMode": "local"
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.2.9",
+    "lastTouchedAt": "2026-03-13T17:28:05.827Z"
+  },
+  "commands": {
+    "native": true,
+    "nativeSkills": true,
+    "text": true,
+    "bash": true,
+    "config": true,
+    "debug": true,
+    "restart": true,
+    "useAccessGroups": false
+  },
+  "tools": {
+    "profile": "full",
+    "elevated": {
+      "enabled": true
+    },
+    "exec": {
+      "host": "gateway",
+      "security": "full",
+      "ask": "off"
+    },
+    "message": {
+      "allowCrossContextSend": true,
+      "crossContext": {
+        "allowWithinProvider": true,
+        "allowAcrossProviders": true
+      },
+      "broadcast": {
+        "enabled": true
+      }
+    },
+    "agentToAgent": {
+      "enabled": true
+    }
+  },
+  "memory": {
+    "backend": "qmd",
+    "qmd": {
+      "command": "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd",
+      "update": {
+        "interval": "5m",
+        "waitForBootSync": false,
+        "commandTimeoutMs": 120000,
+        "updateTimeoutMs": 60000,
+        "embedTimeoutMs": 300000
+      },
+      "includeDefaultMemory": false,
+      "paths": [
+        {
+          "name": "workspace",
+          "path": "/data/workspace",
+          "pattern": "**/*.md"
+        }
+      ],
+      "limits": {
+        "timeoutMs": 120000
+      },
+      "scope": {
+        "default": "allow"
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "botToken": "8536874844:AAH5Dyx4Lf9G-plkSo25UfiV1E-KqHrThc4",
+      "groupPolicy": "allowlist",
+      "streamMode": "partial",
+      "commands": {
+        "native": false,
+        "nativeSkills": false
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      }
+    }
+  }
+}

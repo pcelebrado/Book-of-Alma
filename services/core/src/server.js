@@ -2043,6 +2043,9 @@ async function startGateway() {
       NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=1024",
       OPENCLAW_STATE_DIR: STATE_DIR,
       OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
+      // Force in-process restart on config changes. Without this, the gateway
+      // run-loop tries systemctl (systemd) which doesn't exist in containers.
+      OPENCLAW_NO_RESPAWN: "1",
     },
   });
 

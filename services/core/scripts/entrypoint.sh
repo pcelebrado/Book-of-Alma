@@ -18,6 +18,9 @@ export OPENCLAW_MEMORY_QMD_COMMAND="${OPENCLAW_MEMORY_QMD_COMMAND:-/root/.bun/in
 export OPENCLAW_CLAUDE_STATE_DIR="${OPENCLAW_CLAUDE_STATE_DIR:-${OPENCLAW_DATA_ROOT}/.claude}"
 export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-${OPENCLAW_CLAUDE_STATE_DIR}}"
 export DISABLE_AUTOUPDATER="${DISABLE_AUTOUPDATER:-1}"
+# Force in-process gateway restart on config changes instead of systemd/detached spawn.
+# Without this, `openclaw gateway run` tries systemctl on Linux which fails in containers.
+export OPENCLAW_NO_RESPAWN="${OPENCLAW_NO_RESPAWN:-1}"
 
 SFTPGO_LOG_DIR="${SFTPGO_LOG_DIR:-${OPENCLAW_DATA_ROOT}/log}"
 mkdir -p "${SFTPGO_LOG_DIR}"

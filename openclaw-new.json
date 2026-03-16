@@ -1,0 +1,192 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.9",
+    "lastTouchedAt": "2026-03-11T15:11:21.462Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-11T12:43:04.841Z",
+    "lastRunVersion": "2026.2.9",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "openai-codex:default": {
+        "provider": "openai-codex",
+        "mode": "oauth"
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "kimi-coding": {
+        "apiKey": "${KIMI_API_KEY}",
+        "baseUrl": "https://api.moonshot.cn/v1"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "kimi-coding/k2p5"
+      },
+      "memorySearch": {
+        "provider": "local",
+        "fallback": "none",
+        "local": {
+          "modelPath": "hf:ggml-org/embeddinggemma-300m-qat-q8_0-GGUF/embeddinggemma-300m-qat-Q8_0.gguf",
+          "modelCacheDir": "/data/.openclaw/models/node-llama-cpp"
+        },
+        "store": {
+          "path": "/data/.openclaw/memory/{agentId}.sqlite"
+        }
+      },
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "maxConcurrent": 4,
+      "subagents": {
+        "maxConcurrent": 8
+      },
+      "models": ["kimi-coding/k2p5"]
+    }
+  },
+  "tools": {
+    "profile": "full",
+    "message": {
+      "allowCrossContextSend": true,
+      "crossContext": {
+        "allowWithinProvider": true,
+        "allowAcrossProviders": true
+      },
+      "broadcast": {
+        "enabled": true
+      }
+    },
+    "agentToAgent": {
+      "enabled": true
+    },
+    "elevated": {
+      "enabled": true,
+      "allowFrom": {
+        "telegram": [
+          7999487059,
+          "telegram:7999487059",
+          "agent:main:main"
+        ]
+      }
+    },
+    "exec": {
+      "host": "gateway",
+      "security": "full",
+      "ask": "off"
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "commands": {
+    "native": true,
+    "nativeSkills": true,
+    "text": true,
+    "bash": true,
+    "config": true,
+    "debug": true,
+    "restart": true,
+    "useAccessGroups": false
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "commands": {
+        "native": false,
+        "nativeSkills": false
+      },
+      "dmPolicy": "pairing",
+      "botToken": "8536874844:AAH5Dyx4Lf9G-plkSo25UfiV1E-KqHrThc4",
+      "groupPolicy": "allowlist",
+      "streamMode": "partial"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "controlUi": {
+      "allowInsecureAuth": true
+    },
+    "auth": {
+      "mode": "token",
+      "token": "LpGJTQKuUuAFtfOYYmdtFSqrlhTtFqsk3kytibnlNeRDBwcLJH35ktKYjUDNHAxe"
+    },
+    "trustedProxies": [
+      "127.0.0.1"
+    ],
+    "remote": {
+      "token": "LpGJTQKuUuAFtfOYYmdtFSqrlhTtFqsk3kytibnlNeRDBwcLJH35ktKYjUDNHAxe"
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        },
+        "responses": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "memory": {
+    "backend": "qmd",
+    "qmd": {
+      "command": "/root/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd",
+      "includeDefaultMemory": false,
+      "paths": [
+        {
+          "path": "/data/workspace",
+          "name": "workspace",
+          "pattern": "**/*.md"
+        }
+      ],
+      "update": {
+        "interval": "5m",
+        "waitForBootSync": false,
+        "commandTimeoutMs": 120000,
+        "updateTimeoutMs": 60000,
+        "embedTimeoutMs": 300000
+      },
+      "limits": {
+        "timeoutMs": 120000
+      },
+      "scope": {
+        "default": "allow"
+      }
+    }
+  },
+  "skills": {
+    "entries": {
+      "sequential-thinking": {
+        "enabled": true,
+        "env": {
+          "SEQUENTIAL_THINKING_HOME": "/data/workspace/tools/mcp-sequential-thinking",
+          "SEQUENTIAL_THINKING_VENV": "/data/workspace/tools/mcp-sequential-thinking/.venv"
+        },
+        "config": {
+          "command": "/data/workspace/tools/mcp-sequential-thinking/.venv/bin/python",
+          "args": [
+            "-m",
+            "mcp_sequential_thinking.server"
+          ],
+          "cwd": "/data/workspace/tools/mcp-sequential-thinking"
+        }
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      }
+    }
+  }
+}
