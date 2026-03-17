@@ -8,27 +8,29 @@
 
 ## CRITICAL — Must Fix Before First Login
 
-### C1. Every API route missing try/catch around MongoDB operations
+### C1. Every API route missing try/catch around SQLite operations
 
-**Impact**: If MongoDB is slow, down, or connection pool exhausted, these routes throw unhandled exceptions → Next.js generic 500 → no useful error for the user.
+> **Updated 2026-03-16**: Web datastore migrated from MongoDB to SQLite (`better-sqlite3`) per DECISION_197. The issue pattern is identical — missing try/catch — but the target is now SQLite calls, not MongoDB operations.
+
+**Impact**: If the SQLite file is locked, corrupt, or the volume is unmounted, these routes throw unhandled exceptions → Next.js generic 500 → no useful error for the user.
 
 **Affected routes** (all under `src/app/api/`):
 | Route | Methods | Issue |
 |-------|---------|-------|
-| `notes/route.ts` | POST, GET | No try/catch around collection access or insert/find |
-| `notes/[id]/route.ts` | PATCH, DELETE | No try/catch around findOneAndUpdate/deleteOne |
-| `highlights/route.ts` | POST | No try/catch around insertOne |
-| `progress/route.ts` | POST | No try/catch around findOneAndUpdate |
-| `progress/summary/route.ts` | GET | No try/catch around find |
-| `bookmarks/toggle/route.ts` | POST | No try/catch around findOne/deleteOne/insertOne |
-| `playbooks/route.ts` | GET | No try/catch around find |
-| `playbooks/draft/route.ts` | POST | No try/catch around insertOne |
-| `playbooks/[id]/route.ts` | PATCH | No try/catch around findOneAndUpdate |
-| `book/section/route.ts` | GET | No try/catch around findOne |
-| `book/toc/route.ts` | GET | No try/catch around findOne/find |
-| `book/search/route.ts` | GET | Text search has try/catch; collection access unguarded |
+| `notes/route.ts` | POST, GET | No try/catch around db calls |
+| `notes/[id]/route.ts` | PATCH, DELETE | No try/catch around db calls |
+| `highlights/route.ts` | POST | No try/catch around db call |
+| `progress/route.ts` | POST | No try/catch around db call |
+| `progress/summary/route.ts` | GET | No try/catch around db call |
+| `bookmarks/toggle/route.ts` | POST | No try/catch around db calls |
+| `playbooks/route.ts` | GET | No try/catch around db call |
+| `playbooks/draft/route.ts` | POST | No try/catch around db call |
+| `playbooks/[id]/route.ts` | PATCH | No try/catch around db call |
+| `book/section/route.ts` | GET | No try/catch around db call |
+| `book/toc/route.ts` | GET | No try/catch around db calls |
+| `book/search/route.ts` | GET | FTS search has try/catch; direct db access unguarded |
 
-**Fix**: Wrap MongoDB operations in try/catch. Return `apiError('database_error', 'descriptive message', 503)` on failure with logged details.
+**Fix**: Wrap SQLite repository calls in try/catch. Return `apiError('database_error', 'descriptive message', 503)` on failure with logged details.
 
 ### C2. Book section API has no auth guard
 
@@ -70,7 +72,7 @@ Function names literally say `PlaceholderPage`. These are in the command palette
 
 **File**: `src/app/book/[...slug]/page.tsx` lines 132-143  
 **Issue**: Both "Previous" and "Next" buttons link to `/book` landing page. Not wired to adjacent sections.  
-**Fix**: Query adjacent sections from MongoDB or derive from TOC tree.
+**Fix**: Query adjacent sections from SQLite (`book_sections` table) or derive from TOC tree.
 
 ### H4. No sign-out button
 
@@ -146,9 +148,9 @@ Many call sites use `await logSecurityEvent(...)` which blocks the response on c
 
 ## Architecture Notes (no action needed, for context)
 
-1. **Auth flow is sound**: NextAuth credentials → MongoDB user lookup → JWT session → middleware protection. Real implementation, not placeholder.
+1. **Auth flow is sound**: NextAuth credentials → SQLite user lookup → JWT session → middleware protection. Real implementation, not placeholder.
 2. **Core service integration is clean**: `coreFetch()` with JWT service tokens, timeout, error classification. Used by agent skill and admin endpoints.
-3. **Rate limiting is real**: MongoDB-backed sliding window with TTL indexes. Applied to login, agent, search, admin.
+3. **Rate limiting is real**: SQLite-backed sliding window. Applied to login, agent, search, admin.
 4. **Component library is real**: shadcn/ui components, sonner toasts, command palette with keyboard shortcuts. Not stubs.
 5. **Security logging is real**: Structured JSON events for auth, rate limits, admin actions. Written to console (Railway captures stdout).
 
@@ -220,22 +222,27 @@ The core service (`server.js`) is well-built:
 
 ### CORE-3. Entrypoint is correct
 
+> **Updated 2026-03-16**: MongoDB removed (DECISION_197). Entrypoint no longer starts MongoDB.
+
 `scripts/entrypoint.sh`:
-- Starts MongoDB with IPv6+IPv4 binding (Railway private networking requirement)
-- Waits for MongoDB readiness with 30 retries
-- Sets `MONGODB_URI` env var for downstream processes
-- Starts SFTPGo conditionally
+- Runs `runtime-bootstrap.sh` to wire persistent volume paths
+- Starts SFTPGo (full serve mode, falls back to portable on slim image)
+- SFTPGo portable directory is `/data` — full volume visible via SFTP
 - Runs Node.js wrapper in foreground via `exec`
 - Uses `tini` as PID 1 for zombie reaping
+- `OPENCLAW_NO_RESPAWN=1` exported — gateway uses in-process restart
 
 ### CORE-4. Dockerfile build chain is sound
 
-Multi-stage build:
-1. SFTPGo binary from official slim image
-2. OpenClaw from source (git clone → pnpm install → pnpm build → pnpm ui:build)
-3. Runtime image with Node 22, MongoDB 7.0, SFTPGo, tini, Python3
+> **Updated 2026-03-16**: MongoDB stage removed. `lsof` and `python→python3` symlink added.
 
-No issues found in the Dockerfile.
+Multi-stage build:
+1. SFTPGo binary from official slim image (`drakkan/sftpgo:v2.7.0-slim`)
+2. OpenClaw from source (git clone → pnpm install → pnpm build → pnpm ui:build)
+3. Runtime image with Node 22, SFTPGo, tini, lsof, python3 (+ `python` symlink), sqlite3
+
+`lsof` is required by `openclaw gateway run --force` to detect stale port listeners.
+`python` symlink prevents `sh: python: not found` errors in gateway exec tool.
 
 ### CORE-5. Railway config-as-code is correct
 
@@ -266,13 +273,13 @@ Not critical since core is internal-only (not public-facing via Railway). But if
 
 | Integration Point | Web Side | Core Side | Status |
 |-------------------|----------|-----------|--------|
-| MongoDB (direct) | `MONGODB_URI` → MongoClient | MongoDB runs in core container | **WORKS** — web connects via private networking |
+| SQLite (web app data) | `SQLITE_DB_PATH=/data/web.db` | N/A | **WORKS** — self-contained in web volume |
 | Auth (NextAuth) | `AUTH_SECRET` → JWT sessions | N/A | **WORKS** — self-contained in web |
-| Health probe | `GET /internal/health` via coreFetch | Not implemented | **FAILS GRACEFULLY** — shows core as unreachable |
-| Agent skills | `POST /internal/agent/run` via coreFetch | Not implemented | **FAILS GRACEFULLY** — shows "temporarily unavailable" |
-| Book reindex | `POST /internal/index/rebuild` via coreFetch | Not implemented | **FAILS GRACEFULLY** — shows error on reindex |
-| SFTP upload | Not wired from web UI | SFTPGo runs on port 2022 | **NOT INTEGRATED** — SFTP is manual/external only |
-| OpenClaw gateway | Not wired from web UI | Proxied via wrapper | **SEPARATE** — accessed via core's public domain directly |
+| Health probe | `GET /internal/health` via coreFetch | Implemented in `server.js` | **WORKS** — returns wrapper/gateway status |
+| Agent skills | `POST /internal/agent/run` via coreFetch | Implemented in `server.js` | **WORKS** — proxies to OpenClaw gateway HTTP API |
+| Book reindex | `POST /internal/index/rebuild` via coreFetch | Implemented in `server.js` | **WORKS** — restarts gateway, returns job id |
+| SFTP upload | Not wired from web UI | SFTPGo on `:2022`, exposes `/data` | **EXTERNAL** — direct SFTP access, Railway TCP Proxy required |
+| OpenClaw gateway | Control UI via wrapper proxy | Loopback `:18789`, proxied on `:8080` | **WORKS** — accessed via core's public domain |
 
 ---
 
