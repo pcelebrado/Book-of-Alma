@@ -4,7 +4,7 @@
 
 The operations layer provides deterministic workflows for maintaining the OpenClaw deployment. It follows a strict command lifecycle—**Probe, State, Snapshot, Mutate, Verify, Record, Learn**—that prevents blind state mutation and ensures every change is traceable and reversible.
 
-The core container uses `s6-overlay` as a process supervisor to manage OpenClaw, QMD, and SFTPGo with proper startup sequencing, health checks, and graceful shutdown.
+The core container uses a **Node.js wrapper process** as the runtime supervisor. It manages the OpenClaw gateway as a supervised child process with restart backoff, captured stdout/stderr, and health probing. SFTPGo is launched by `entrypoint.sh` before the wrapper starts. `tini` is PID 1 for zombie reaping and clean signal forwarding.
 
 ---
 
@@ -83,69 +83,69 @@ Update runbooks based on results.
 
 ### Process Architecture
 
-The core service runs multiple processes under `s6-overlay`:
+The core container runs three processes. `tini` (PID 1) manages signal forwarding and zombie reaping:
 
 ```
-┌─────────────────────────────────────┐
-│         s6-overlay (PID 1)          │
-├─────────────┬─────────────┬─────────┤
-│    QMD      │  OpenClaw   │ SFTPGo  │
-│   :7100     │   :7200     │ :7300   │
-├─────────────┴─────────────┴─────────┤
-│         Aggregate Health            │
-│              :7000                  │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│            tini (PID 1)                 │
+├─────────────────────────────────────────┤
+│   entrypoint.sh                         │
+│     └─ SFTPGo (background)  :2022 SFTP  │
+│                              :2080 HTTP  │
+│     └─ Node.js wrapper (foreground)     │
+│           └─ OpenClaw gateway :18789    │
+│           └─ QMD (via wrapper)          │
+├─────────────────────────────────────────┤
+│   Public HTTP: :8080 (Railway PORT)     │
+│   Health:      /setup/healthz           │
+│                /healthz                 │
+└─────────────────────────────────────────┘
 ```
 
 ### Startup Sequence
 
-#### Phase 0 — Init
-1. Load configs from environment + mounted config directory
-2. Ensure writable paths exist (indexes, uploads, logs)
-3. Validate required environment variables
-4. **Fail fast** if validation fails
+#### Phase 0 — Volume layout (`runtime-bootstrap.sh`)
+1. Symlink `~/.openclaw/workspace` → `/data/workspace`
+2. Symlink `~/.claude` → `/data/.claude`
+3. Prepare memory search cache and store paths
+4. **Fail fast** if `/data` is not mounted
 
-#### Phase 1 — Start QMD
-1. Start QMD process
-2. Wait for health endpoint: `GET /health` returns 200
-3. Optional: Verify `GET /ready` confirms index availability
-4. **Timeout:** 60 seconds
-5. **On failure:** Mark degraded but continue booting
+#### Phase 1 — Start SFTPGo (`entrypoint.sh`)
+1. Create `/data/sftpgo/srv` and `/data/sftpgo/lib`
+2. Symlink SFTPGo asset paths to persistent volume
+3. Attempt `sftpgo serve` (full mode)
+4. On failure: fall back to `sftpgo portable --directory /data --permissions '*'`
+5. SFTPGo runs in background on ports `:2022` (SFTP) and `:2080` (HTTP admin)
 
-#### Phase 2 — Start OpenClaw
-1. Start OpenClaw process
-2. Configure with:
-   - QMD base URL (internal loopback)
-   - Service auth verification (token/JWT)
-3. Wait for health endpoint: `GET /health` returns 200
-
-#### Phase 3 — Start SFTPGo
-1. Start SFTPGo process
-2. Ensure access to persistence directory
-3. No blocking health check required
+#### Phase 2 — Start Node.js wrapper (`entrypoint.sh`)
+1. Wrapper starts Express on `$PORT` (Railway injects this)
+2. Syncs gateway token, config, and session defaults
+3. Spawns OpenClaw gateway subprocess: `openclaw gateway run --force --bind loopback --port 18789`
+4. `OPENCLAW_NO_RESPAWN=1` forces in-process restart on config changes (no systemd)
+5. `lsof` available for `--force` port cleanup
 
 ### Health Endpoints
 
-#### Aggregate Health
-```http
-GET /internal/health
-Authorization: Bearer <jwt>
+```
+GET /healthz            — public, no auth; Railway healthcheck
+GET /setup/healthz      — public, no auth; Railway deployment healthcheck
+GET /internal/health    — bearer token required; web→core health probe
+```
 
-Response:
+`/healthz` response shape:
+```json
 {
   "ok": true,
-  "components": {
-    "qmd": "ok",
-    "agent": "ok",
-    "sftpgo": "ok"
-  }
+  "wrapper": { "configured": true, "stateDir": "...", "workspaceDir": "..." },
+  "gateway": { "reachable": true, "lastError": null, "lastExit": null },
+  "claudeMaxProxy": { "configured": false }
 }
 ```
 
 **Semantics:**
-- `ok: true` only when OpenClaw and QMD are healthy
-- If one component fails: return 200 with `ok: false` and component states
-- Never "hang"—Web UI must be able to display status
+- `ok` is always `true` — degraded gateway does not flip this (web UI reads component fields)
+- `gateway.reachable` is the live probe result
+- `gateway.lastError` / `lastExit` surface restart failures for diagnostics
 
 ---
 
@@ -155,26 +155,28 @@ Response:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `INTERNAL_SERVICE_TOKEN` | Yes* | Shared secret (if not using JWT) |
-| `INTERNAL_JWT_VERIFY_KEYS` | Yes* | JSON array of JWT verification keys |
-| `SETUP_PASSWORD` | Yes | Secure setup password |
-| `OPENCLAW_STATE_DIR` | Yes | State directory path |
-| `OPENCLAW_WORKSPACE_DIR` | Yes | Workspace directory path |
-| `OPENCLAW_GATEWAY_TOKEN` | Yes | Gateway token |
-| `QMD_PORT` | No | QMD port (default: 7100) |
-| `OPENCLAW_PORT` | No | OpenClaw port (default: 7200) |
-| `SFTPGO_PORT` | No | SFTPGo port (default: 7300) |
+| `SETUP_PASSWORD` | Yes | Protects `/setup` wizard |
+| `INTERNAL_SERVICE_TOKEN` | Yes | Shared bearer token for web→core calls |
+| `OPENCLAW_GATEWAY_TOKEN` | Yes | Token for OpenClaw gateway auth |
+| `OPENCLAW_STATE_DIR` | No | Defaults to `/data/.openclaw` |
+| `OPENCLAW_WORKSPACE_DIR` | No | Defaults to `/data/workspace` |
+| `OPENCLAW_NO_RESPAWN` | Baked in | `1` — forces in-process gateway restart (no systemd) |
+| `SFTPGO_ENABLED` | No | `true` to enable SFTPGo (default: `true`) |
+| `SFTPGO_DATA_ROOT` | No | Defaults to `/data/sftpgo` |
+| `SFTPGO_PORTABLE_DIRECTORY` | No | Defaults to `/data` (full volume access) |
+| `SFTPGO_SFTPD__BINDINGS__0__PORT` | No | SFTP port (default: `2022`) |
+| `SFTPGO_HTTPD__BINDINGS__0__PORT` | No | SFTPGo HTTP admin port (default: `2080`) |
+| `SFTPGO_DEFAULT_ADMIN_USERNAME` | No | SFTPGo admin username |
+| `SFTPGO_DEFAULT_ADMIN_PASSWORD` | Yes | SFTPGo admin password |
 
-*One of `INTERNAL_SERVICE_TOKEN` or `INTERNAL_JWT_VERIFY_KEYS` required.
+### Actual Port Map
 
-### Port Configuration
-
-```bash
-# Default ports
-QMD_PORT=7100
-OPENCLAW_PORT=7200
-SFTPGO_PORT=7300
-HEALTH_PORT=7000  # Optional aggregate health
+```
+:8080   — HTTP wrapper (Railway public PORT)
+:18789  — OpenClaw gateway (loopback only, not exposed)
+:2022   — SFTPGo SFTP (TCP Proxy required in Railway dashboard)
+:2080   — SFTPGo HTTP admin (internal only)
+:18791  — Browser control server (loopback only)
 ```
 
 ---
@@ -268,12 +270,13 @@ openclaw gateway start
 openclaw gateway probe
 ```
 
-### Non-Systemd Contexts
+### Container Restart Context
 
-In Docker/non-systemd environments:
-- Service stop failures are **non-fatal** if probe is healthy
-- Focus on process health, not systemd state
-- Use `s6-svc` commands if using s6-overlay
+This deployment is container-native — no systemd, no s6-overlay:
+- Gateway restarts are managed by the Node.js wrapper's restart loop
+- `OPENCLAW_NO_RESPAWN=1` forces in-process restart (no detached spawn)
+- To trigger a config-change restart: use `/restart` in chat or the setup admin UI
+- Full container restart: Railway dashboard → Redeploy
 
 ---
 
@@ -450,15 +453,16 @@ docker build -f services/core/Dockerfile services/core
 
 **Commands:**
 ```bash
-# Check logs
-docker logs core-service
+# Check Railway logs
+railway logs --service openclaw-core
 
-# Check environment
+# Check environment inside container
 openclaw doctor
+openclaw status
 
 # Manual health check
-curl http://localhost:7100/health  # QMD
-curl http://localhost:7200/health  # OpenClaw
+curl http://localhost:8080/healthz          # wrapper + gateway status
+curl http://localhost:8080/setup/healthz    # Railway healthcheck endpoint
 ```
 
 ### Reindex Fails
@@ -472,10 +476,10 @@ curl http://localhost:7200/health  # OpenClaw
 **Recovery:**
 ```bash
 # Check job status
-curl "http://core:7200/internal/index/status?jobId=job-abc-123"
+curl "http://core.railway.internal:8080/internal/index/status?jobId=job-abc-123"
 
 # Retry reindex
-curl -X POST http://core:7200/internal/index/rebuild
+curl -X POST http://core.railway.internal:8080/internal/index/rebuild
 ```
 
 ### Gateway Lock Issues
