@@ -38,11 +38,15 @@ Both services require their own `/data` volume mount:
 
 - Web volume:
   - `/data/web.db` (SQLite application datastore)
-- Core volume:
-  - `/data/.openclaw`
-  - `/data/workspace`
-  - `/data/book-source`
-  - `/data/sftpgo`
+- Core volume (`/data`):
+  - `/data/.openclaw` — OpenClaw state, credentials, config, memory
+  - `/data/workspace` — agent workspace files
+  - `/data/book-source` — book import source content
+  - `/data/sftpgo` — SFTPGo host keys and user data
+  - `/data/logs` — shared log directory
+  - `/data/.claude` — Claude CLI state
+
+> SFTPGo exposes the full `/data` volume (portable directory = `/data`), giving SFTP clients visibility into all subdirectories.
 
 If the web volume is missing, SQLite becomes ephemeral and user data is lost on
 redeploy.
@@ -95,9 +99,11 @@ Blocked by architecture:
 - `better-sqlite3` is a native module; build image must include compile tools.
 - Next 14 standalone output must set:
   - `experimental.serverComponentsExternalPackages: ['better-sqlite3']`
+- Core image requires `lsof` for `openclaw gateway run --force` port cleanup.
+- Core image provides `python → python3` symlink for gateway exec tool compatibility.
 - Web and core health checks:
   - Web: `/api/health`
-  - Core: `/setup/healthz`
+  - Core: `/setup/healthz` (Railway), `/healthz` (live probe)
 
 ## Environment highlights
 
@@ -112,6 +118,10 @@ Core:
 - `OPENCLAW_STATE_DIR=/data/.openclaw`
 - `OPENCLAW_WORKSPACE_DIR=/data/workspace`
 - `INTERNAL_SERVICE_TOKEN=<shared-token>`
+- `OPENCLAW_NO_RESPAWN=1` — in-process gateway restart (container-native, no systemd)
+- `SFTPGO_PORTABLE_DIRECTORY=/data` — full volume exposed via SFTP
+- `SFTPGO_SFTPD__BINDINGS__0__PORT=2022` — SFTP port (TCP Proxy required in Railway)
+- `SFTPGO_HTTPD__BINDINGS__0__PORT=2080` — SFTPGo admin UI (internal only)
 
 ## Migration note
 
